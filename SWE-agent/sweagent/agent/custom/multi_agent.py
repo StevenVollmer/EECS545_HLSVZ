@@ -1,209 +1,323 @@
-from __future__ import annotations
+"""
+Docstring for Project.SWE-agent.sweagent.agent.custom.multi_agent
 
-import asyncio
-import copy
-import json
-import logging
-import time
-from pathlib import Path, PurePosixPath
-from typing import Annotated, Any, Literal
-
-import yaml
-from pydantic import BaseModel
-from typing_extensions import Self
-
-from sweagent import __version__
-from sweagent.agent.action_sampler import AbstractActionSampler, ActionSamplerConfig
-from sweagent.agent.history_processors import HistoryProcessor
-from sweagent.agent.hooks.abstract import CombinedAgentHook
-from sweagent.agent.models import (
-    AbstractModel,
-    HumanModel,
-    HumanThoughtModel,
-    ModelConfig,
-    get_model,
-)
-from sweagent.agent.problem_statement import ProblemStatement, ProblemStatementConfig
-from sweagent.environment.swe_env import SWEEnv
-from sweagent.tools.parsing import (
-    ActionOnlyParser,
-    ThoughtActionParser,
-)
-from sweagent.tools.tools import ToolHandler
-from sweagent.types import AgentInfo, AgentRunResult, StepOutput, Trajectory
-from sweagent.utils.log import get_logger
-
-from sweagent.agent.agents import AbstractAgent, TemplateConfig, MultiAgentConfig
-
-class MultiAgent(AbstractAgent):
-    """CUSTOM class created for experimental agent architecture. We will implement an agent 
+#CUSTOM class created for experimental agent architecture. We will implement an agent
     that includes a planner, coder, and reviewer. Each will have its own history and may require
     its own parser to read its output and convert to an appropriate file format. This was adapted
     from ShellAgent in extra/shell_agent.py
-    
-    Example useage:
-    sweagent run \
-        --config config/custom_configs/multi_agent.yaml \
-        --env.repo.github_url=https://github.com/SWE-agent/test-repo \
-        --problem_statement.text="Add a simple hello world function to a new file named hello.py."
-    
-    
-    """
-    
+
+Example useage:
+sweagent run \
+    --config SWE-agent/config/custom_configs/multi_agent.yaml \
+    --env.repo.github_url=https://github.com/SWE-agent/test-repo \
+    --problem_statement.text="Add a simple hello world function to a new file named hello.py."
+
+sweagent run \
+    --config SWE-agent/config/custom_configs/multi_agent_planner_4.yaml \
+    --env.repo.github_url=https://github.com/SWE-agent/test-repo \
+    --problem_statement.text="Add a simple hello world function to a new file named hello.py."
+"""
+
+import pprint
+from jinja2 import Template
+from dataclasses import dataclass
+from pathlib import Path
+from sweagent.environment.swe_env import SWEEnv
+from sweagent.agent.problem_statement import ProblemStatement, ProblemStatementConfig
+from sweagent.utils.log import get_logger
+from typing_extensions import Self
+from sweagent.tools.tools import ToolHandler
+from typing import Any
+from sweagent.types import (StepOutput)
+from sweagent.agent.agents import DefaultAgent, TemplateConfig, MultiAgentConfig
+from sweagent.agent.models import get_model
+from dataclasses import dataclass, field
+
+
+@dataclass
+class RoleTemplatesConfig:
+    # 'roles' is a dictionary mapping string keys to TemplateConfig objects
+    roles: dict[str, TemplateConfig] = field(default_factory=dict)
+
+
+class Role:
+    def __init__(self, name, template: TemplateConfig):
+        self.name = name
+        self.system_template = template.system_template
+        self.instance_template = template.instance_template
+        self.next_step_template = template.next_step_template
+        self.next_step_no_output_template = template.next_step_no_output_template
+        self.next_step_truncated_observation_template = (template.next_step_truncated_observation_template)
+        self.max_observation_length = template.max_observation_length
+        self.history = []
+
+    def reset(self):
+        self.history.clear()
+
+
+class MultiAgent(DefaultAgent):
+    role_templates: RoleTemplatesConfig | None = None
+    roles: dict[str, Role]
+
     def __init__(
-        self,
-        *,
-        templates: TemplateConfig,
-        tools: ToolHandler,
-        history_processors: list[HistoryProcessor],
-        model: AbstractModel,
-        max_requeries: int = 3,
-        name: str = "main",
-        _catch_errors: bool = True,
-        _always_require_zero_exit_code: bool = False,
-        action_sampler_config: ActionSamplerConfig | None = None,
+        self, *args, role_templates: RoleTemplatesConfig | None = None, **kwargs
     ):
         """The agent handles the behaviour of the model and how it interacts with the environment.
-
         To run the agent, either call `self.run` or `self.setup` and then `self.step` in a loop.
         """
-        self._catch_errors = _catch_errors
-        self._always_require_zero_exit_code = _always_require_zero_exit_code
-        self.name = name
-        self.model = model
-        self.templates = templates
-        self.tools = tools
-    #TODO will need to modify parser for each sub agent
-        if isinstance(self.model, HumanThoughtModel):
-            self.tools.config.parse_function = ThoughtActionParser()
-        elif isinstance(self.model, HumanModel):
-            self.tools.config.parse_function = ActionOnlyParser()
-        self.history_processors = history_processors
-        self.max_requeries = max_requeries
-        self.logger = get_logger("swea-agent", emoji="📅")
-        # Set in run method
-        self._env: SWEEnv | None = None
-        self._problem_statement: ProblemStatement | ProblemStatementConfig | None = None
-        self.traj_path: Path | None = None
+        super().__init__(*args, **kwargs)
+        self.role_templates = role_templates
+        # TODO may need to change parsing functions , for example to extract list from planner's output
+        # if isinstance(self.model, HumanThoughtModel):
+        #     self.tools.config.parse_function = ThoughtActionParser()
+        # elif isinstance(self.model, HumanModel):
+        #     self.tools.config.parse_function = ActionOnlyParser()
 
-        #: The following three attributes collect the information about how the agent
-        #: solved the problem.
-        self.history = []
-        self._trajectory = []
-        self.info = AgentInfo()
-
-        self._chook = CombinedAgentHook()
-
-        self._replay_config: BaseModel | None = None
-        """This can be set to a RunSingleConfig from the Run instance whenever possible.
-        It can be used to replay the agent's trajectory in an environment.
-        """
-
-        self._action_sampler: AbstractActionSampler | None = None
-        if action_sampler_config is not None:
-            self._action_sampler = action_sampler_config.get(self.model, self.tools)
-
-        #: Count how many timeout errors have occurred consecutively. Kills agent
-        #: after 5 of them.
-        self._n_consecutive_timeouts = 0
-        self._total_execution_time = 0.0
-
+    @property
+    def current_role_name(self) -> str:
+        return self.current_role.name
 
     @classmethod
     def from_config(cls, config: MultiAgentConfig) -> Self:
-        # To ensure that all models stay completely independent, we deepcopy the
-        # model config, because it lives on as a property in the model, tools, etc.
         config = config.model_copy(deep=True)
         model = get_model(config.model, config.tools)
+        role_templates = RoleTemplatesConfig(roles=config.roles)
+
         return cls(
-            templates=config.templates,
+            templates=next(
+                iter(role_templates.roles.values())
+            ),  # not used, but avoids creating error with parent class DefaultAgent
             tools=ToolHandler(config.tools),
             history_processors=config.history_processors,
             model=model,
             max_requeries=config.max_requeries,
             action_sampler_config=config.action_sampler,
+            role_templates=role_templates,
         )
-    
-    def setup(
-        self,
-        env: SWEEnv,
-        problem_statement: ProblemStatement | ProblemStatementConfig,
-        output_dir: Path = Path("."),
-    ) -> None:
-        """Setup the agent for a new instance. This includes
-        formatting the system message and adding demonstrations to the history.
 
+    def _init_roles(self):
+        assert self.role_templates is not None
+        self.roles = {}
+        self.role_histories = {}
+        self.role_loggers = {}
+        emojis = {"planner": "🗓️", "coder": "💻", "reviewer": "👓"}
+
+        # role_templates.roles is a dictionary with roles defined in the config.yaml
+        for (role_name, template) in (self.role_templates.roles.items()):
+            role = Role(role_name, template)
+            role.reset()
+            self.roles[role_name] = role
+            self.role_histories[role_name] = role.history
+            self.role_loggers[role_name] = get_logger(
+                role_name, emoji=emojis.get(role_name, "🧠"))
+
+        self.role_order = list(self.roles.keys())
+        self.current_role = self.roles[self.role_order[0]]
+
+    def setup(self, env: SWEEnv, problem_statement: ProblemStatement | ProblemStatementConfig, output_dir: Path = Path(".")) -> None:
+        """Setup the agent for a new instance. This includes formatting the system message and adding demonstrations to the history.
+        NOTE: This mirrors DefaultAgent.add_instance_message_to_history
+        but writes to role-local history instead of self.history
         This method is called by `self.run`.
         """
-        
-        # output_dir.mkdir(parents=True, exist_ok=True)
+        # setup everything as if DefaulatAgent
+        super().setup(env, problem_statement, output_dir)
+        # clear history after DefaultAgent setup
+        self.history.clear()
+        # Initialize roles, role histories are kept separate
+        self._init_roles()
+        # Populate role histories
+        for role in self.roles.values():
+            self._init_role_history(role)
 
-        # # apply template configuration to multimodal problem statements
-        # if hasattr(problem_statement, "type") and problem_statement.type == "swe_bench_multimodal":
-        #     from sweagent.agent.problem_statement import SWEBenchMultimodalProblemStatement
+    def _init_role_history(self, role: Role):
+        self.add_system_message_to_role_history(role)
+        self.add_role_instance_template_to_history(
+            state=self.tools.get_state(self._env), role=role)
 
-        #     if isinstance(problem_statement, SWEBenchMultimodalProblemStatement):
-        #         # apply the global disable_image_processing setting if it's not explicitly set
-        #         if not problem_statement.disable_image_processing and self.templates.disable_image_processing:
-        #             problem_statement.disable_image_processing = True
+    def _append_role_history(self, item: dict[str, Any], role: Role) -> None:
+        """Adds an item to the role specific history.
+        NOTE: This mirrors DefaultAgent.add_instance_message_to_history
+        but writes to role-local history instead of self.history"""
+        self._chook.on_query_message_added(**item)
+        item.setdefault("role_name", role.name)
+        item.setdefault("multi_agent", True)
+        role.history.append(item)  # type: ignore
 
-        # self._problem_statement = problem_statement
-        self._env = env
-        # iid = self._problem_statement.id
-        # self.logger.info("Setting up agent for instance %s", iid)
+    def add_system_message_to_role_history(self, role: Role) -> None:
+        """Add system message to role specific history
+        NOTE: This mirrors DefaultAgent.add_system_message_to_history
+        but writes to role-local history instead of self.history"""
 
-        # # Save/reset some attributes
-        # self.traj_path = output_dir / (self._problem_statement.id + ".traj")
-        # self.logger.info("Trajectory will be saved to %s", self.traj_path)
-
-        # self._chook.on_tools_installation_started()
-        # self.tools.install(self._env)
-        # self._chook.on_setup_attempt()
-        # self.info = AgentInfo()
-        # self.info["swe_agent_hash"] = get_agent_commit_hash()
-        # self.info["swe_agent_version"] = __version__
-        # self.info["swe_rex_version"] = get_rex_version()
-        # self.info["swe_rex_hash"] = get_rex_commit_hash()
-        # assert self._env is not None
-        # assert self._problem_statement is not None
-        # self._env.set_env_variables({"PROBLEM_STATEMENT": self._problem_statement.get_problem_statement_for_env()})
-        # self.add_system_message_to_history()
-        # self.add_demonstrations_to_history()
-        # self.add_instance_template_to_history(state=self.tools.get_state(self._env))
-        # self._chook.on_setup_done()
-        
-        pass
-    
-    @property
-    def trajectory(self) -> Trajectory:
-        return self._trajectory
-
-    def save_trajectory(
-        self,
-    ) -> None:
-        """Save the trajectory to disk.
-        This includes the history, the environment state, and the model stats.
-        """
-        data = self.get_trajectory_data()
-        assert self.traj_path is not None
-        self.traj_path.write_text(json.dumps(data, indent=2))
-
-    def get_trajectory_data(self) -> dict[str, Any]:
-        """Get all data that we save in .traj files."""
-
-        assert self._env is not None
-        # The deepcopy here is important because else the
-        # data["info"]["model_stats"] update will create havoc!
-        attempt_data = copy.deepcopy(
+        assert self._problem_statement is not None
+        system_msg = Template(role.system_template).render(
+            **self._get_format_dict())
+        self.logger.info(f"SYSTEM ({role.name})\n{system_msg}")
+        self._append_role_history(
             {
-                "trajectory": self.trajectory,
-                "history": self.history,
-                "info": self.info,
-            }
+                "role": "system",
+                "content": system_msg,
+                "agent": self.name,
+                "message_type": "system_prompt"
+            },
+            role)
+
+    def add_role_instance_template_to_history(self, state: dict[str, str], role: Role) -> None:
+        """Add observation to role specific history, as well as the instance template or demonstrations if we're
+        at the start of a new attempt.
+        NOTE: This mirrors DefaultAgent.add_instance_message_to_history
+        but writes to role-local history instead of self.history
+        """
+        templates: list[str] = []
+        # Determine observation template based on what prior observation was
+        assert role.history[-1]["role"] == "system" or role.history[-1].get(
+            "is_demo", False)
+        # Show instance template if prev. obs. was initial system message
+        templates = [role.instance_template]
+
+        self._add_role_templated_messages_to_history(
+            templates, role, **state)  # type: ignore
+
+    def _add_role_templated_messages_to_history(
+        self,
+        templates: list[str],
+        role: Role,
+        tool_call_ids: list[str] | None = None,
+        **kwargs: str | int | None,
+    ) -> None:
+        """Populate selected template(s) with information (e.g., issue, arguments, state) and add to history.
+        NOTE: This mirrors DefaultAgent but writes to role-local history instead of self.history
+
+        Args:
+            templates: templates to populate and add to history
+            role: specific multi-agent role (i.e. planner, coder, reviewer)
+            tool_call_ids: tool call ids to be added to the history
+            **kwargs: keyword arguments to be passed to the templates (in addition to the
+                ones in `self._get_format_dict`)
+        """
+        messages = []
+
+        format_dict = self._get_format_dict(**kwargs)
+        for template in templates:
+            try:
+                messages.append(Template(template).render(**format_dict))
+            except KeyError:
+                self.logger.debug(
+                    "The following keys are available: %s", format_dict.keys()
+                )
+                raise
+
+        message = "\n".join(messages)
+
+        # We disable syntax highlighting here, because some inputs can lead to a complete cross-thread
+        # freeze in the agent. See https://github.com/SWE-agent/SWE-agent/issues/901 .
+        self.logger.info(f"🤖 {role.name.upper()} MODEL INPUT\n{message}",
+                         extra={"highlighter": None})
+        history_item: dict[str, Any] = {
+            "role": "user",
+            "content": message,
+            "agent": self.name,
+            "message_type": "observation",
+        }
+        if tool_call_ids:
+            assert (len(tool_call_ids) == 1), "This should be ensured by the FunctionCalling parse method"
+            history_item["role"] = "tool"
+            history_item["tool_call_ids"] = tool_call_ids
+        self._append_role_history(history_item, role)
+
+    def add_step_to_role_history(self, step: StepOutput, role: Role) -> None:
+        """Adds a step (command that was run and output) to the model history"""
+        self._append_role_history(
+            {
+                "role": "assistant",
+                "content": step.output,
+                "thought": step.thought,
+                "action": step.action,
+                "agent": self.name,
+                "tool_calls": step.tool_calls,
+                "message_type": "action",
+                "thinking_blocks": step.thinking_blocks,
+            },
+            role
         )
-        attempt_data["replay_config"] = self.replay_config.model_dump_json() if self.replay_config is not None else None # type: ignore
-        attempt_data["environment"] = self._env.name # type: ignore
-        return attempt_data
+
+        elided_chars = 0
+
+        if step.observation.strip() == "":
+            # Show no output template if observation content was empty
+            templates = [role.next_step_no_output_template]
+        # NOTE does this still work with how we defined self and roles?
+        elif len(step.observation) > role.max_observation_length:
+            # NOTE does this still work with how we defined self and roles?
+            templates = [role.next_step_truncated_observation_template]
+            # NOTE does this still work with how we defined self and roles?
+            elided_chars = len(step.observation) - role.max_observation_length
+        else:
+            # Show standard output template if there is observation content
+            templates = [role.next_step_template]
+        self._add_role_templated_messages_to_history(
+            templates,
+            role,
+            observation=step.observation,
+            elided_chars=elided_chars,
+            max_observation_length=role.max_observation_length,
+            tool_call_ids=step.tool_call_ids,
+            **(step.state or {}),
+        )
+
+    def get_active_history(self) -> list[dict[str, Any]]:
+        return self.current_role.history
+
+    def advance_current_role(self) -> None:
+        # 1. Find the current index based on the name
+        current_idx = self.role_order.index(self.current_role.name)
+        # 2. Use modulo to wrap around automatically
+        next_idx = (current_idx + 1) % len(self.role_order)
+        # 3. Update to the next Role object
+        self.current_role = self.roles[self.role_order[next_idx]]
+
+    def run_role_forward(self, role: Role) -> StepOutput:
+        # Use communicate instead of execute. 
+        # Also check if self._env is not None to satisfy the Pylance warning.
+        if self._env is not None:
+            res = self._env.communicate(input="cat hello.py")
+            print(f"DEBUG: File Content of hello.py:\n{res}")
+        else:
+            print("DEBUG: Environment is None!")
+        
+        self.history = role.history
+        try:
+
+            self.messages
+
+            # pp = pprint.PrettyPrinter(indent=2)
+            # print("--- FULL SELF OBJECT STATE ---")
+            # pp.pprint(vars(self))
+            # print("------------------------------")
+            
+            # print(f"\n{'='*20} AGENT STATE {'='*20}")
+            # for attr, value in self.__dict__.items():
+            #     # We skip history to keep the output focused, as you already know it
+            #     if attr == "history":
+            #         print(f"{attr}: <list of {len(value)} items>")
+            #         continue
+            #     print(f"{attr}: {repr(value)[:10]}...") # truncate very long strings
+            # print(f"{'='*53}\n")
+            
+            print(f"\n{'='*20} AGENT STATE {'='*20}")
+            print(f"DEBUG: Formatted messages for {role.name}:")
+            # pprint.pprint(self.messages)
+            print(f"{'='*53}\n")
+
+            step_output = self.forward_with_handling(self.messages)
+
+            # For planner: use raw model output as thought
+            if role.name == "planner" and not step_output.thought:
+                step_output.thought = step_output.output
+
+            return step_output
+        finally:
+            pass
 
     def step(self) -> StepOutput:
         """Run a step of the agent. This is a wrapper around `self.forward_with_handling`
@@ -216,60 +330,30 @@ class MultiAgent(AbstractAgent):
         Returns:
             step_output: step output (same as the output of `self.forward_with_handling`)
         """
-        return StepOutput()
 
-        # assert self._env is not None
-        # self._chook.on_step_start()
+        assert self._env is not None
+        self._chook.on_step_start()
 
-        # n_step = len(self.trajectory) + 1
-        # self.logger.info("=" * 25 + f" STEP {n_step} " + "=" * 25)
-        # step_output = self.forward_with_handling(self.messages)
-        # self.add_step_to_history(step_output)
+        n_step = len(self.trajectory) + 1
+        self.logger.info("=" * 25 + f" STEP {n_step} " + "=" * 25)
 
-        # self.info["submission"] = step_output.submission
-        # self.info["exit_status"] = step_output.exit_status  # type: ignore
-        # self.info.update(self._get_edited_files_with_context(patch=step_output.submission or ""))  # type: ignore
-        # self.info["model_stats"] = self.model.stats.model_dump()
+        # CUSTOM modified these 2 functions for managing current role
+        step_output = self.run_role_forward(self.current_role)
+        # step_output.info["role_name"] = self.current_role.name
+        self.add_step_to_role_history(step_output, self.current_role)
 
-        # self.add_step_to_trajectory(step_output)
+        self.info["submission"] = step_output.submission
+        self.info["exit_status"] = step_output.exit_status  # type: ignore
+        self.info.update(self._get_edited_files_with_context(patch=step_output.submission or ""))  # type: ignore
+        self.info["model_stats"] = self.model.stats.model_dump()
+        self.add_step_to_trajectory(step_output)
 
-        # self._chook.on_step_done(step=step_output, info=self.info)
-        # return step_output
+        # change current_role to next in order for the next step call (only if you have more than one)
+        if len(self.role_order) > 1:
+            self.advance_current_role()
 
-    def run(
-        self,
-        env: SWEEnv,
-        problem_statement: ProblemStatement | ProblemStatementConfig,
-        output_dir: Path = Path("."),
-    ) -> AgentRunResult:
-        """Run the agent on a problem instance. This method contains the
-        main loop that repeatedly calls `self._step` until the problem is solved.
-        
-        Removed hooks for now.
+        self._chook.on_step_done(step=step_output, info=self.info)
+        return step_output
 
-        Args:
-            setup_args: Arguments to pass to the agent's setup method.
-            env: The environment to run the agent on.
-            traj_dir: Directory to save the trajectory to
-        """
-        
-        # This is where we will make the main modifications.
-        # query planner model and parse out put into plan
-        # for eash task in plan
-        #   query coder model
-        # after coder loop is finished, query reviewer model
-        
-        self.setup(env=env, problem_statement=problem_statement, output_dir=output_dir)
-
-        # # Run action/observation loop
-        # step_output = StepOutput()
-
-        # while not step_output.done:
-        #     step_output = self.step()
-        #     self.save_trajectory()
-
-        # self.logger.info("Trajectory saved to %s", self.traj_path)
-
-        data = self.get_trajectory_data()
-        # this checks that the data is correctly formatted so it can be used in evaluation later
-        return AgentRunResult(info=data["info"], trajectory=data["trajectory"])
+        """run is not modified as it handles a significant amount of bookeeping and interaction with SWE-Bench.
+        Modifying the step logic is enough"""

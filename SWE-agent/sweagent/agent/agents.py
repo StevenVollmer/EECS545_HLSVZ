@@ -187,10 +187,11 @@ class ShellAgentConfig(BaseModel):
 class MultiAgentConfig(BaseModel):
     """CUSTOM: Custom config class for our multi-agent structure"""
     name: str = "main"
-    templates: TemplateConfig = Field(default_factory=TemplateConfig)
-    tools: ToolConfig = Field(default_factory=ToolConfig)
+    templates: TemplateConfig = Field(default_factory=TemplateConfig) # type: ignore
+    tools: ToolConfig = Field(default_factory=ToolConfig) # type: ignore
     history_processors: list[HistoryProcessor] = Field(default_factory=lambda: [DefaultHistoryProcessor()])
     model: ModelConfig = Field(description="Model options.")
+    roles: dict[str, TemplateConfig]
 
     max_requeries: int = 3
     """Maximum number of times to requery the model after an error, such as a

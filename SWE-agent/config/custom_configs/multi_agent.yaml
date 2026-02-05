@@ -8,13 +8,43 @@
 # or
 
 # sweagent run \
-#   --config config/custom_configs/multi_agent.yaml
+#   --config config/custom_configs/multi_agent_planner.yaml
 #   --env.repo.github_url=https://github.com/SWE-agent/test-repo \
 #   --problem_statement.text="Add a simple hello world function to a new file named hello.py."
 
+# used for running on run-batch on swe bench test
+# instances:
+#   type: swe_bench
+#   subset: lite # can also be verified, full
+#   split: dev # can also be test
+#   slice: :1 # just the first problem
+
+# This config shows the use of the thought_action action parser together with the line-range based replace tools
+# This config is close to SWE-agent 0.7
+
+# sweagent run --config SWE-agent/config/custom_configs/multi_agent.yaml \
+
+
+env: 
+  repo:
+    github_url: "https://github.com/SWE-agent/test-repo"
+
+problem_statement:
+  id: "multi_agent_test"
+  type: "text"
+  text: "Add a simple hello world function to a new file named hello.py."
 
 agent:
-  templates:
+  type: multi
+  model:
+    name: ollama/qwen2.5-coder:7b-instruct
+    api_base: http://localhost:11434
+    per_instance_cost_limit: 0
+    total_cost_limit: 0
+    per_instance_call_limit: 10
+    temperature: 0.0
+    max_input_tokens: 100000
+  roles:
     planner:
       system_template: |-
         You are an experienced programmer that can interact with a computer to solve tasks.
@@ -37,6 +67,13 @@ agent:
         1. As a first step, it might be a good idea to find and read code relevant to the <pr_description>
         2. Create a step-by-step plan to solve the problem. Another coder will use your plan to solve the problem step by step.
         Your thinking should be thorough and so it's fine if it's very long.
+
+        Before calling a tool, you must first output a detailed 'THOUGHT:' block explaining your reasoning.
+      next_step_template: |-
+        OBSERVATION:
+        {{observation}}
+      next_step_no_output_template: |-
+        Your command ran successfully and did not produce any output.
     coder:
       system_template: |-
         You are an experienced programmer that can interact with a computer to solve tasks.
@@ -54,81 +91,67 @@ agent:
         Another experienced programmer has developed a plan for resolving the issue. You are on step {{step_num}} of that plan.
 
         Your task is to now execute this step in the plan of action.
+      next_step_template: |-
+        OBSERVATION:
+        {{observation}}
+      next_step_no_output_template: |-
+        Your command ran successfully and did not produce any output.
     reviewer:
       system_template: |-
         You are an experienced programmer that can interact with a computer to solve tasks.
         You have expertise in reviewing patches to to complex coding issues.
       instance_template: |-
         Can you review the suggested fixes for any errors?
-    next_step_template: |-
-      OBSERVATION:
-      {{observation}}
-    next_step_no_output_template: |-
-      Your command ran successfully and did not produce any output.
+      next_step_template: |-
+        OBSERVATION:
+        {{observation}}
+      next_step_no_output_template: |-
+        Your command ran successfully and did not produce any output.
   tools:
     env_variables:
-      PAGER: cat
-      MANPAGER: cat
-      LESS: -R
-      PIP_PROGRESS_BAR: 'off'
-      TQDM_DISABLE: '1'
-      GIT_PAGER: cat
+      WINDOW: 100
+      OVERLAP: 2
     bundles:
       - path: tools/registry
-      - path: tools/edit_anthropic
-      - path: tools/review_on_submit_m
-    registry_variables:
-      USE_FILEMAP: 'true'
-      SUBMIT_REVIEW_MESSAGES:
-        - |
-          Thank you for your work on this issue. Please carefully follow the steps below to help review your changes.
-
-          1. If you made any changes to your code after running the reproduction script, please run the reproduction script again.
-            If the reproduction script is failing, please revisit your changes and make sure they are correct.
-            If you have already removed your reproduction script, please ignore this step.
-          2. Remove your reproduction script (if you haven't done so already).
-          3. If you have modified any TEST files, please revert them to the state they had before you started fixing the issue.
-            You can do this with `git checkout -- /path/to/test/file.py`. Use below <diff> to find the files you need to revert.
-          4. Run the submit command again to confirm.
-
-          Here is a list of all of your changes:
-
-          <diff>
-          {{diff}}
-          </diff>
+      - path: tools/windowed
+      - path: tools/search
+      - path: tools/windowed_edit_linting
+      - path: tools/submit
     enable_bash_tool: true
     parse_function:
-      type: function_calling
-  history_processors:
-    - type: cache_control
-      last_n_messages: 2
-  type: multi
-  model:
-    name: ollama/qwen2.5-coder:7b-instruct
-    per_instance_cost_limit: 0
-    per_instance_call_limit: 15
-    temperature: 0.0
-    api_key: ollama
-    api_base: http://localhost:11434
-    max_input_tokens: 32000
-    total_cost_limit: 0
-    # max_output_tokens:
-    # custom_tokenizer:
-    # retry:
+      type: thought_action # function_calling
+    str_replace_editor:
+      arguments:
+      - name: view_range
+        argument_format: "--view_range {{value}}"
+    execution_timeout: 60 # how long a model's bash command is allowed to run in the Docker environment
+    # registry_variables:
+    #   USE_FILEMAP: 'true'
+    #   SUBMIT_REVIEW_MESSAGES:
+    #     - |
+    #       Thank you for your work on this issue. Please carefully follow the steps below to help review your changes.
+
+    #       1. If you made any changes to your code after running the reproduction script, please run the reproduction script again.
+    #         If the reproduction script is failing, please revisit your changes and make sure they are correct.
+    #         If you have already removed your reproduction script, please ignore this step.
+    #       2. Remove your reproduction script (if you haven't done so already).
+    #       3. If you have modified any TEST files, please revert them to the state they had before you started fixing the issue.
+    #         You can do this with `git checkout -- /path/to/test/file.py`. Use below <diff> to find the files you need to revert.
+    #       4. Run the submit command again to confirm.
+
+    #       Here is a list of all of your changes:
+
+    #       <diff>
+    #       {{diff}}
+    #       </diff>
+  history_processors: []
+    # - type: remove_regex # might be useful later on
+    #   n: 5 """Keep the last n history items unchanged"""
+    #   remove:   """Regex patterns to remove from history items"""
+
+
 
 # class name GenericAPIModelConfig
-
-# agent:
-#   type: DefaultAgent
-
-# model:
-#   name: openai/qwen2.5-coder:7b-instruct
-#   temperature: 0.2
-#   max_output_tokens: 2048
-#   parse_function: thought_action
-
-# per_instance_cost_limit: 0
-# total_cost_limit: 0
 
 # for use later on when making sub-models 
 # planner:
