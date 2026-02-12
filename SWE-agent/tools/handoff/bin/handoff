@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# The Shebang: The #!/bin/bash must be the very first line of the file. It tells the system 
+# which interpreter to use. It cannot be inside a function.
+
+# handoff - Signals that the plan.txt is ready and switches roles
+
+main() {
+    # 1. Navigate to the repository root
+    cd $ROOT
+
+    # 2. Check if the plan exists and is non-empty
+    # We use -s to check that the file exists AND has a size greater than zero
+    if [ -s "plan.txt" ]; then
+        echo "Plan finalized. Transitioning to Coder role."
+        # No 'exit 0' inside the function; just let it finish
+    else
+        echo "Error: plan.txt is missing or empty. Please write your plan before calling handoff."
+        # Return 1 to indicate failure to the caller
+        return 1
+    fi
+}
+
+# This executes the function and passes any arguments (like file paths) to it
+main "$@"

@@ -1,0 +1,358 @@
+# This is a demo file generated from trajectory file:
+# /home/szvollmer/eecs545/Project/trajectories/multi_agent/multi_agent_test_4/multi_agent_test_4.traj
+# You can use this demo file to replay the actions in the trajectory with run_replay.py.
+# You can edit the content of the actions in this file to modify the replay behavior.
+# NOTICE:
+#         Only the actions of the assistant will be replayed.
+#         You do not need to modify the observation's contents or any other fields.
+#         You can add or remove actions to modify the replay behavior.
+history:
+  - role: assistant
+    content: ''
+    agent: main
+    tool_calls:
+      - function:
+          arguments: '{"command": "view", "path": "/SWE-agent__test-repo"}'
+          name: str_replace_editor
+        id: call_30a65451-e401-4ae0-884b-ed77ba2c3e96
+        type: function
+    message_type: action
+  - role: assistant
+    content: ''
+    agent: main
+    tool_calls:
+      - function:
+          arguments: "{\"command\": \"create\", \"path\": \"/SWE-agent__test-repo/plan.txt\", \"file_text\": \"\\nThis plan will teach you to resolve the following PR description:\\nAdd a simple hello world function to a new file named hello.py.\\n\\nFirst, find and read code relevant to the PR description:\\n- Check if there is already a file named hello.py in the top directory.\\n- If not, create a new file named hello.py\\n- Open the file hello.py\\n- Add a simple hello world function with the following content:\\n\\ndef hello_world():\\n print('Hello, World!')\\n- Save and close the file.\"}"
+          name: str_replace_editor
+        id: call_b1c06aa2-4e2f-49c3-9e02-0d0e5899c6a5
+        type: function
+    message_type: action
+  - role: assistant
+    content: ''
+    agent: main
+    tool_calls:
+      - function:
+          arguments: '{}'
+          name: handoff
+        id: call_32ebefe0-386e-4ee6-8f10-e6ef49627026
+        type: function
+    message_type: action
+replay_config:
+  env:
+    deployment:
+      image: python:3.11
+      port:
+      docker_args: []
+      startup_timeout: 180.0
+      pull: missing
+      remove_images: false
+      python_standalone_dir: /root
+      platform:
+      remove_container: true
+      container_runtime: docker
+      type: docker
+    repo:
+      github_url: https://github.com/SWE-agent/test-repo
+      base_commit: HEAD
+      clone_timeout: 500.0
+      type: github
+    post_startup_commands: []
+    post_startup_command_timeout: 500
+    name: main
+  agent:
+    name: main
+    templates:
+      system_template: Empty
+      instance_template: Empty
+      next_step_template: 'Observation: {{observation}}'
+      next_step_truncated_observation_template: 'Observation: {{observation[:max_observation_length]}}<response clipped><NOTE>Observations should not exceeded {{max_observation_length}} characters. {{elided_chars}} characters were elided. Please try a different command that produces less output or use head/tail/grep/redirect the output to a file. Do not use interactive pagers.</NOTE>'
+      max_observation_length: 100000
+      next_step_no_output_template: 'Observation: {{observation}}'
+      strategy_template:
+      demonstration_template:
+      demonstrations: []
+      put_demos_in_history: false
+      disable_image_processing: false
+      shell_check_error_template: |-
+        Your bash command contained syntax errors and was NOT executed. Please fix the syntax errors and try again. This can be the result of not adhering to the syntax for multi-line commands. Here is the output of `bash -n`:
+        {{bash_stdout}}
+        {{bash_stderr}}
+      command_cancelled_timeout_template: "The command '{{command}}' was cancelled because it took more than {{timeout}} seconds. Please try a different command that completes more quickly. Note: A common source of this error is if the command is interactive or requires user input (it is impossible to receive user input in the current environment, so the command will never complete)."
+    tools:
+      filter:
+        blocklist_error_template: Operation '{{action}}' is not supported by this environment.
+        blocklist:
+          - vim
+          - vi
+          - emacs
+          - nano
+          - nohup
+          - gdb
+          - less
+          - tail -f
+          - python -m venv
+          - make
+        blocklist_standalone:
+          - python
+          - python3
+          - ipython
+          - bash
+          - sh
+          - /usr/bin/bash
+          - /usr/bin/dash
+          - nohup
+          - vi
+          - vim
+          - emacs
+          - nano
+          - su
+        block_unless_regex:
+          radare2: \b(?:radare2)\b.*\s+-c\s+.*
+          r2: \b(?:radare2)\b.*\s+-c\s+.*
+      bundles:
+        - path: /home/szvollmer/eecs545/Project/SWE-agent/tools/registry
+          hidden_tools: []
+        - path: /home/szvollmer/eecs545/Project/SWE-agent/tools/edit_anthropic
+          hidden_tools: []
+        - path: /home/szvollmer/eecs545/Project/SWE-agent/tools/handoff
+          hidden_tools: []
+        - path: /home/szvollmer/eecs545/Project/SWE-agent/tools/submit
+          hidden_tools: []
+      propagate_env_variables: []
+      env_variables:
+        PAGER: cat
+        MANPAGER: cat
+        LESS: -R
+        PIP_PROGRESS_BAR: off
+        TQDM_DISABLE: '1'
+        GIT_PAGER: cat
+      registry_variables:
+        USE_FILEMAP: 'true'
+      submit_command: submit
+      parse_function:
+        error_message: |
+          {%- if error_code == "missing" -%}
+          Your last output did not use any tool calls!
+          Please make sure your output includes exactly _ONE_ function call!
+          You must invoke the function directly using the function call format.
+          You cannot invoke commands with ```, you have to use the function call format.
+          If you think you have already resolved the issue, please submit your changes by running the `submit` command.
+          If you think you cannot solve the problem, please run `exit_forfeit` (if available) or `submit`.
+          Else, please continue with a new tool call!
+          {%- elif error_code == "multiple" -%}
+          Your last output included multiple tool calls!
+          Please make sure your output includes a thought and exactly _ONE_ function call.
+          {%- elif error_code == "unexpected_arg" -%}
+          Your action could not be parsed properly: {{exception_message}}.
+          Make sure your function call doesn't include any extra arguments that are not in the allowed arguments, and only use the allowed commands.
+          {%- else -%}
+          Your action could not be parsed properly: {{exception_message}}.
+          {% endif %}
+        type: function_calling
+      enable_bash_tool: true
+      format_error_template: |
+        {%- if error_code == "missing" -%}
+        Your last output did not use any tool calls!
+        Please make sure your output includes exactly _ONE_ function call!
+        You must invoke the function directly using the function call format.
+        You cannot invoke commands with ```, you have to use the function call format.
+        If you think you have already resolved the issue, please submit your changes by running the `submit` command.
+        If you think you cannot solve the problem, please run `exit_forfeit` (if available) or `submit`.
+        Else, please continue with a new tool call!
+        {%- elif error_code == "multiple" -%}
+        Your last output included multiple tool calls!
+        Please make sure your output includes a thought and exactly _ONE_ function call.
+        {%- elif error_code == "unexpected_arg" -%}
+        Your action could not be parsed properly: {{exception_message}}.
+        Make sure your function call doesn't include any extra arguments that are not in the allowed arguments, and only use the allowed commands.
+        {%- else -%}
+        Your action could not be parsed properly: {{exception_message}}.
+        {% endif %}
+      command_docs: |+
+        bash:
+          docstring: runs the given command directly in bash
+          signature: <command>
+          arguments:
+            - command (string) [required]: The bash command to execute.
+
+        str_replace_editor:
+          docstring: Custom editing tool for viewing, creating and editing files * State is persistent across command calls and discussions with the user * If `path` is a file, `view` displays the result of applying `cat -n`. If `path` is a directory, `view` lists non-hidden files and directories up to 2 levels deep * The `create` command cannot be used if the specified `path` already exists as a file * If a `command` generates a long output, it will be truncated and marked with `<response clipped>` * The `undo_edit` command will revert the last edit made to the file at `path`
+        Notes for using the `str_replace` command: * The `old_str` parameter should match EXACTLY one or more consecutive lines from the original file. Be mindful of whitespaces! * If the `old_str` parameter is not unique in the file, the replacement will not be performed. Make sure to include enough context in `old_str` to make it unique * The `new_str` parameter should contain the edited lines that should replace the `old_str`
+
+          signature: str_replace_editor <command> <path> [<file_text>] [<view_range>] [<old_str>] [<new_str>] [<insert_line>]
+
+          arguments:
+            - command (string) [required]: The commands to run. Allowed options are: `view`, `create`, `str_replace`, `insert`, `undo_edit`.
+            - path (string) [required]: Absolute path to file or directory, e.g. `/testbed/file.py` or `/testbed`.
+            - file_text (string) [optional]: Required parameter of `create` command, with the content of the file to be created.
+            - old_str (string) [optional]: Required parameter of `str_replace` command containing the string in `path` to replace.
+            - new_str (string) [optional]: Optional parameter of `str_replace` command containing the new string (if not given, no string will be added). Required parameter of `insert` command containing the string to insert.
+            - insert_line (integer) [optional]: Required parameter of `insert` command. The `new_str` will be inserted AFTER the line `insert_line` of `path`.
+            - view_range (array) [optional]: Optional parameter of `view` command when `path` points to a file. If none is given, the full file is shown. If provided, the file will be shown in the indicated line number range, e.g. [11, 12] will show lines 11 and 12. Indexing at 1 to start. Setting `[start_line, -1]` shows all lines from `start_line` to the end of the file.
+
+        handoff:
+          docstring: For instructor only. Call this only when you have finished writing the plan to plan.txt.
+          signature: handoff
+
+        submit:
+          docstring: submits the current file
+          signature: submit
+
+      multi_line_command_endings: {}
+      submit_command_end_name:
+      reset_commands: []
+      execution_timeout: 30
+      install_timeout: 300
+      total_execution_timeout: 1800
+      max_consecutive_execution_timeouts: 3
+    history_processors:
+      - type: cache_control
+        last_n_messages: 2
+        last_n_messages_offset: 0
+        tagged_roles:
+          - user
+          - tool
+    model:
+      name: ollama/mistral:7b-instruct-v0.3-q4_K_M
+      per_instance_cost_limit: 0.0
+      total_cost_limit: 0.0
+      per_instance_call_limit: 20
+      temperature: 0.1
+      top_p: 1.0
+      api_base: http://localhost:11434
+      api_version:
+      api_key: '**********'
+      stop: []
+      completion_kwargs: {}
+      convert_system_to_user: false
+      retry:
+        retries: 20
+        min_wait: 10.0
+        max_wait: 120.0
+      delay: 0.0
+      fallbacks: []
+      choose_api_key_by_thread: true
+      max_input_tokens: 32000
+      max_output_tokens:
+      litellm_model_registry:
+      custom_tokenizer:
+    roles:
+      planner:
+        system_template: |-
+          You are a software instructor. Your are an expert in reading PR Descriptions, researching repositories and writing step-by-step implementation plans.
+          You excel at writing plans to teach other programmers how to solve problems.
+          If you have already executed a command and received the desired output (or no error), DO NOT repeat it. Move to the next step in your plan immediately. 
+          Check your history: if your last action was viewing or editing a file, your next action must be a different command (e.g., running a test or editing a different line).
+        instance_template: |-
+          <uploaded_files>
+          {{working_dir}}
+          </uploaded_files>
+          I've uploaded a python code repository in the directory {{working_dir}}. Consider the following PR description:
+
+          In the top directory, write a plan in a file named plan.txt to teach another programmer how to resolve this:
+          <pr_description>
+          {{problem_statement}}
+          </pr_description>
+
+          Be sure to copy the <pr_description> into 'plan.txt'
+
+          When you are finished, do not call submit. Instead call handoff to send that plan to the other programmer.
+          As a first step, find and read code relevant to the <pr_description>
+          Your thinking should be thorough and so it's fine if it's very long.
+
+          If you run a command and it doesn't work, try running a different command. A command that did not work once will not work the second time!
+          If you have already read a file, do not read it again unless you have a specific new line number to target. Redundancy is a failure. 
+
+          CRITICAL RESTRICTIONS:
+          -DO NOT WRITE ANY CODE OTHER THAN plan.txt
+          -ANY DEVIATION WILL RESULT IN FAILURE
+
+          (Open: {{open_file}})
+          (Dir: {{working_dir}})
+          bash-$
+        next_step_template: |-
+          OBSERVATION:
+          {{observation}}
+          (Open: {{open_file}})
+          (Dir: {{working_dir}})
+          bash-$
+        next_step_truncated_observation_template: 'Observation: {{observation[:max_observation_length]}}<response clipped><NOTE>Observations should not exceeded {{max_observation_length}} characters. {{elided_chars}} characters were elided. Please try a different command that produces less output or use head/tail/grep/redirect the output to a file. Do not use interactive pagers.</NOTE>'
+        max_observation_length: 100000
+        next_step_no_output_template: |-
+          Your command ran successfully and did not produce any output.
+          (Open: {{open_file}})
+          (Dir: {{working_dir}})
+          bash-$
+        strategy_template:
+        demonstration_template: |
+          --- DEMONSTRATION ---
+          {{demonstration}}
+          --- END OF DEMONSTRATION ---
+        demonstrations:
+          - /home/szvollmer/eecs545/Project/SWE-agent/trajectories/multi_agent_demonstrations/multi_agent_planner_2.demo.yaml
+          - /home/szvollmer/eecs545/Project/SWE-agent/trajectories/multi_agent_demonstrations/multi_agent_test_3_planner.demo.yaml
+          - /home/szvollmer/eecs545/Project/SWE-agent/trajectories/multi_agent_demonstrations/multi_agent_test_4_planner.demo.yaml
+        put_demos_in_history: false
+        disable_image_processing: false
+        shell_check_error_template: |-
+          Your bash command contained syntax errors and was NOT executed. Please fix the syntax errors and try again. This can be the result of not adhering to the syntax for multi-line commands. Here is the output of `bash -n`:
+          {{bash_stdout}}
+          {{bash_stderr}}
+        command_cancelled_timeout_template: "The command '{{command}}' was cancelled because it took more than {{timeout}} seconds. Please try a different command that completes more quickly. Note: A common source of this error is if the command is interactive or requires user input (it is impossible to receive user input in the current environment, so the command will never complete)."
+      coder:
+        system_template: You are a senior software engineer. Your goal is to execute the implementation plan provided to you. You have access to a bash shell and file editing tools.
+        instance_template: |-
+          CRITICAL: A technical plan has been prepared for you in 'plan.txt'. 
+
+          YOUR FIRST ACTION MUST BE:
+          1. Run `ls -F` to confirm the location of 'plan.txt'.
+          2. Run `cat plan.txt` to read the instructions.
+
+          After reading the plan, execute the steps precisely. Do not skip the reproduction script phase if the plan calls for it.
+
+          Mandatory Constraints:
+          - Work only in the {{working_dir}} directory.
+          - If a command fails, do not repeat it; try a different approach.
+          - Do not 'view' or 'cat' the same file twice in a row.
+          - Once the you have completed every step in the plan and the code is verified, use the submit command.
+          - DO NOT call the handoff command.
+
+          (Open: {{open_file}})
+          (Dir: {{working_dir}})
+          bash-$
+        next_step_template: |-
+          OBSERVATION:
+          {{observation}}
+        next_step_truncated_observation_template: 'Observation: {{observation[:max_observation_length]}}<response clipped><NOTE>Observations should not exceeded {{max_observation_length}} characters. {{elided_chars}} characters were elided. Please try a different command that produces less output or use head/tail/grep/redirect the output to a file. Do not use interactive pagers.</NOTE>'
+        max_observation_length: 100000
+        next_step_no_output_template: Your command ran successfully and did not produce any output.
+        strategy_template:
+        demonstration_template: |
+          --- DEMONSTRATION ---
+          {{demonstration}}
+          --- END OF DEMONSTRATION ---
+        demonstrations:
+          - /home/szvollmer/eecs545/Project/SWE-agent/trajectories/multi_agent_demonstrations/multi_agent_test_3_coder.demo.yaml
+          - /home/szvollmer/eecs545/Project/SWE-agent/trajectories/multi_agent_demonstrations/multi_agent_test_4_coder.demo.yaml
+        put_demos_in_history: false
+        disable_image_processing: false
+        shell_check_error_template: |-
+          Your bash command contained syntax errors and was NOT executed. Please fix the syntax errors and try again. This can be the result of not adhering to the syntax for multi-line commands. Here is the output of `bash -n`:
+          {{bash_stdout}}
+          {{bash_stderr}}
+        command_cancelled_timeout_template: "The command '{{command}}' was cancelled because it took more than {{timeout}} seconds. Please try a different command that completes more quickly. Note: A common source of this error is if the command is interactive or requires user input (it is impossible to receive user input in the current environment, so the command will never complete)."
+    max_requeries: 3
+    action_sampler:
+    type: multi
+  problem_statement:
+    text: Add a simple hello world function to a new file named hello.py.
+    extra_fields: {}
+    type: text
+    id: multi_agent_test_4
+  output_dir: trajectories/multi_agent
+  actions:
+    open_pr: false
+    pr_config:
+      skip_if_commits_reference_issue: true
+    apply_patch_locally: false
+  env_var_path:

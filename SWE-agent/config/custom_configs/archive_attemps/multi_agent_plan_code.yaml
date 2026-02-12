@@ -1,0 +1,144 @@
+# CUSTOM config for MultiAgent with local ollama qwen model
+# 
+# This is base on SWE-agent/config/sweagent_0_7/07_thought_action.yaml
+# 
+# call with:
+# 
+# sweagent run --config SWE-agent/config/custom_configs/multi_agent_plan_code_test.yaml
+env:
+  repo:
+    github_url: "https://github.com/SWE-agent/test-repo"
+
+problem_statement:
+  id: "multi_agent_plan_code_test"
+  type: "text"
+  text: "Create a file called hello.py with a hello world function in it."
+
+agent:
+  type: multi
+  model:
+    name: ollama/qwen2.5-coder:7b-instruct
+    api_base: http://localhost:11434
+    per_instance_call_limit: 8
+    temperature: 0.0
+    max_input_tokens: 120000
+
+  templates:
+    system_template: ""
+    instance_template: ""
+
+  roles:
+    planner:
+      system_template: |-
+        You are a lead architect. Your ONLY goal is to research the repo and write a step-by-step implementation plan into 'plan.txt' in the root directory.
+        
+        You're working directly in the command line with a special interface.
+        The special interface consists of a file editor that shows you {{WINDOW}} lines of a file at a time.
+        In addition to typical bash commands, you can also use the following commands to help you navigate and edit files.
+
+        COMMANDS:
+        {{command_docs}}
+
+        Please note that THE EDIT COMMAND REQUIRES PROPER INDENTATION.
+        If you'd like to add the line '        print(x)' you must fully write that out, with all those spaces before the code! Indentation is important and code that is not indented correctly will fail and require fixing before it can be run.
+        You're free to use any other bash commands you want (e.g. find, grep, cat, ls, cd) in addition to the special commands listed above.
+        However, the environment does NOT support interactive session commands (e.g. python, vim), so please do not invoke them.
+
+        RESPONSE FORMAT:
+        Your shell prompt is formatted as follows:
+        (Open file: <path>) <cwd> $
+        
+        CONSTRAINTS-Output Format:
+        You must format your output exactly as follows. Do not deviate from this format. Critically, in each output include 
+        only one command and it must be inside triple backticks. Do not use triple backticks anywhere else in your response 
+        or the text parser will reject your output. End your output with your single command.
+
+        Example Output:
+
+        DISCUSSION:
+        I have finished writing my plan in plan.txt, verified it, and will now handoff to the coder.
+
+        ACTION:
+        ```
+        handoff
+        ```
+
+
+      instance_template: |-
+        Repo: {{working_dir}}
+        Task: {{problem_statement}}
+
+        Step 1: Research the codebase and develop a step by step plan to solve the provided Task. Do not execute your plan!
+        Step 2: Write your plan to 'plan.txt'.
+        Step 3: Run `ls plan.txt` to verify.
+        Step 4: Call 'handoff'.
+
+        Do not attempt to execute your plan. You must call 'handoff' to send your plan to a programmer who will execute it.
+
+      next_step_template: |-
+        {{observation}}
+        (Open file: {{open_file}})
+        (Current directory: {{working_dir}})
+        bash-$
+
+      next_step_no_output_template: |-
+        Command successful, no output.
+        (Open file: {{open_file}})
+        (Current directory: {{working_dir}})
+        bash-$
+
+      max_observation_length: 3000
+
+    coder:
+      system_template: |-
+        You are the CODER. Your first command MUST be: cat plan.txt
+        If plan.txt is missing/empty, stop and report it.
+
+        Available commands:
+        {{command_docs}}
+
+        OUTPUT FORMAT (MANDATORY):
+        DISCUSSION:
+        <one short paragraph>
+
+        ACTION:
+        ```
+        <exactly one command>
+        ```
+
+      instance_template: |-
+        Task: {{problem_statement}}
+
+        (Open file: {{open_file}})
+        (Current directory: {{working_dir}})
+        bash-$
+
+      next_step_template: |-
+        {{observation}}
+        (Open file: {{open_file}})
+        (Current directory: {{working_dir}})
+        bash-$
+
+      next_step_no_output_template: |-
+        Command successful, no output.
+        (Open file: {{open_file}})
+        (Current directory: {{working_dir}})
+        bash-$
+
+      max_observation_length: 3000
+
+  tools:
+    env_variables:
+      WINDOW: 100
+      OVERLAP: 2
+    bundles:
+      - path: tools/registry
+      - path: tools/windowed
+      - path: tools/search
+      - path: tools/windowed_edit_linting
+      - path: tools/submit
+      - path: tools/handoff
+    enable_bash_tool: true
+    parse_function:
+      type: thought_action
+    execution_timeout: 60

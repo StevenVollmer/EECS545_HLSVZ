@@ -1,0 +1,120 @@
+# CUSTOM config for MultiAgent with local ollama qwen model
+# 
+# This is base on SWE-agent/config/sweagent_0_7/07_thought_action.yaml
+# 
+# call with:
+# 
+# sweagent run --config SWE-agent/config/custom_configs/multi_agent_planner_coder.yaml
+# 
+# Example useage:
+# sweagent run \
+#   --config config/custom_configs/multi_agent.yaml
+#   --env.repo.github_url=https://github.com/SWE-agent/test-repo \
+#   --problem_statement.github_url=https://github.com/SWE-agent/test-repo/issues/1
+
+# or
+
+# sweagent run \
+#   --config config/custom_configs/multi_agent_planner.yaml
+#   --env.repo.github_url=https://github.com/SWE-agent/test-repo \
+#   --problem_statement.text="Add a simple hello world function to a new file named hello.py."
+
+# used for running on run-batch on swe bench test
+# instances:
+#   type: swe_bench
+#   subset: lite # can also be verified, full
+#   split: dev # can also be test
+#   slice: :1 # just the first problem
+
+# This config shows the use of the thought_action action parser together with the line-range based replace tools
+# This config is close to SWE-agent 0.7
+
+env:
+  repo:
+    github_url: "https://github.com/SWE-agent/test-repo"
+
+problem_statement:
+  id: "multi_agent_planner_coder_test"
+  type: "text"
+  text: "Add a simple hello world function to a new file named hello.py. Within the file, call your new function to check that it outputs the expected test."
+
+agent:
+  type: multi
+  model:
+    name: ollama/qwen2.5-coder:7b-instruct
+    api_base: http://localhost:11434
+    per_instance_call_limit: 20
+    temperature: 0.0
+  templates:
+    system_template: ""
+    instance_template: ""
+  roles:
+    planner:
+      system_template: |-
+        You are a lead architect. Your ONLY goal is to research the repo and write a step-by-step implementation plan into a file named 'plan.txt' in the root directory.
+        
+        COMMANDS:
+        {{command_docs}}
+
+        CONSTRAINTS:
+        1. Only create/edit 'plan.txt'. Do not touch source code.
+        2. Once 'plan.txt' is written, you MUST call 'handoff' immediately.
+        3. Output format: 
+           DISCUSSION: <brief thought>
+           ACTION: ``` <one command> ```
+
+      instance_template: |-
+        Repo: {{working_dir}}
+        Task: {{problem_statement}}
+
+        Research the codebase, write your detailed plan to 'plan.txt', then call 'handoff'.
+
+      next_step_template: "Observation: {{observation}}\n(Open: {{open_file}}) (Dir: {{working_dir}})\nbash-$"
+      max_observation_length: 3000
+
+    coder:
+      system_template: |-
+        You are a senior software engineer. Your goal is to execute the instructions found in 'plan.txt'.
+        
+        COMMANDS:
+        {{command_docs}}
+
+        CONSTRAINTS:
+        1. Always read 'plan.txt' before starting.
+        2. Ensure proper indentation when using 'edit'.
+        3. Only one command per turn.
+        4. When the task is complete and verified, run 'submit'.
+
+        FORMAT:
+        DISCUSSION: <brief status update>
+        ACTION: ``` <one command> ```
+
+      instance_template: |-
+        Task: {{problem_statement}}
+        Plan: Read 'plan.txt' in the root directory for specific instructions.
+        
+        (Open: {{open_file}}) (Dir: {{working_dir}})
+        bash-$
+      
+      next_step_template: |-
+        {{observation}}
+        (Open: {{open_file}}) (Dir: {{working_dir}})
+        bash-$
+      next_step_no_output_template: "Command successful, no output.\nbash-$"
+      max_observation_length: 3000
+      
+  tools:
+    env_variables:
+      WINDOW: 100
+      OVERLAP: 2
+    bundles:
+      - path: tools/registry
+      - path: tools/windowed
+      - path: tools/search
+      - path: tools/windowed_edit_linting
+      - path: tools/submit
+      - path: tools/handoff
+    enable_bash_tool: true
+    parse_function:
+      type: thought_action
+    execution_timeout: 60

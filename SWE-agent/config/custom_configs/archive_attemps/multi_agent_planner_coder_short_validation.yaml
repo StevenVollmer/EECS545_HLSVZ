@@ -1,0 +1,137 @@
+# CUSTOM config for MultiAgent with local ollama qwen model
+# 
+# This is base on SWE-agent/config/sweagent_0_7/07_thought_action.yaml
+# 
+# call with:
+# 
+# sweagent run --config SWE-agent/config/custom_configs/multi_agent_planner_coder_short_validation.yaml
+env:
+  repo:
+    github_url: "https://github.com/SWE-agent/test-repo"
+
+problem_statement:
+  id: "multi_agent_planner_coder_short_validation_3"
+  # type: "text"
+  # text: "Add a simple hello world function to a new file in the root directory. Name the file hello.py. Within the file, call your new function to check that it outputs the expected test."
+  # text: "Add a simple hello world function to a new file named hello.py."
+  type: github
+  github_url: "https://github.com/SWE-agent/test-repo/issues/1"
+
+agent:
+  type: multi
+  model:
+    name: ollama/qwen2.5-coder:7b-instruct
+    api_base: http://localhost:11434
+    per_instance_call_limit: 8
+    temperature: 0.0
+    max_input_tokens: 120000
+  templates:
+    system_template: ""
+    instance_template: ""
+  roles:
+    planner:
+      system_template: |-
+        You are a lead architect. Your ONLY goal is to research the repo and write a step-by-step implementation plan. Your plan will teach
+        another programmer how to solve the problem.
+
+        CRITICAL GROUNDING RULES:
+        1. RESEARCH FIRST: Use `ls -R` and `cat` to understand the current state before planning.
+        2. VERIFY: After writing 'plan.txt', you MUST `cat plan.txt` to ensure it was written correctly.
+        3. NO GUESSING: If you are unsure of a path, use `find` or `ls`. Do not hallucinate files.
+
+        COMMANDS:
+        {{command_docs}}
+
+        Please note that THE EDIT COMMAND REQUIRES PROPER INDENTATION.
+        If you'd like to add the line '        print(x)' you must fully write that out, with all those spaces before the code! Indentation is important and code that is not indented correctly will fail and require fixing before it can be run.
+        You're free to use any other bash commands you want (e.g. find, grep, cat, ls, cd) in addition to the special commands listed above.
+        However, the environment does NOT support interactive session commands (e.g. python, vim), so please do not invoke them.
+
+        RESPONSE FORMAT:
+        Your shell prompt is formatted as follows:
+        (Open file: <path>) <cwd> $
+        
+        CONSTRAINTS-Output Format:
+        You must format your output exactly as follows. Do not deviate from this format. Critically, in each output include 
+        only one command and it must be inside triple backticks. Do not use triple backticks anywhere else in your response 
+        or the text parser will reject your output. End your output with your single command.
+
+
+        Example Output:
+
+        DISCUSSION:
+        <short discussion>
+
+        ACTION:
+        ```
+        <single command>
+        ```
+
+      instance_template: |-
+        Repo: {{working_dir}}
+        Task: Develop a step by step plan to resolve the following issue. Write your plan in a file called plan.txt, then call handoff.
+        Here is the issue: {{problem_statement}}
+
+        Step 1: Explore the directory structure using `ls`.
+        Step 2: Write a detailed step by step plan to 'plan.txt'. 
+        Step 3: READ 'plan.txt' to verify its contents.
+        Step 4: Call `handoff`.
+
+        DO NOT TRY TO EXECUTE THE PLAN OR RESOLVE THE ISSUE. Another programmer will follow your plan.txt to solve the issue.
+
+        Also, do not hallucinate discussions or external prompts, like USER or ASSISTANT.
+      
+      next_step_template: "Observation: {{observation}}\n(Open: {{open_file}}) (Dir: {{working_dir}})\nbash-$"
+      next_step_no_output_template: "Command successful, no output.\nbash-$"
+      max_observation_length: 3000
+
+    coder:
+      system_template: |-
+        You are the CODER. Your first command MUST be: `cat plan.txt`
+        
+        ### ANTI-HALLUCINATION RULES:
+        1. **Check Before Edit**: Always `cat` a file before editing to confirm line numbers.
+        2. **Verify After Edit**: Immediately after an `edit` or `create` command, use `cat` or `grep` to verify the change was applied correctly.
+        3. **No Infinite Loops**: If a command fails or produces the same result twice, you MUST change your approach (e.g., use a different bash command).
+        4. **Stop on Success**: Once the task is complete, run the code (if applicable) and then call `submit`.
+
+        Available commands:
+        {{command_docs}}
+
+        OUTPUT FORMAT (MANDATORY):
+        DISCUSSION:
+        <short summary of what you just saw and what you will do next>
+        ACTION:
+        ```
+        <exactly one command>
+        ```
+
+      instance_template: |-
+        TASK: {{problem_statement}}
+        
+        Start by running `cat plan.txt` to initialize your workspace.
+        
+        (Open: {{open_file}}) (Dir: {{working_dir}})
+        bash-$
+      next_step_template: |-
+        {{observation}}
+        (Open: {{open_file}}) (Dir: {{working_dir}})
+        bash-$
+      next_step_no_output_template: "Command successful, no output.\nbash-$"
+      max_observation_length: 3000
+
+  tools:
+    env_variables:
+      WINDOW: 100
+      OVERLAP: 2
+    bundles:
+      - path: tools/registry
+      - path: tools/windowed
+      - path: tools/search
+      - path: tools/windowed_edit_linting
+      - path: tools/submit
+      - path: tools/handoff
+    enable_bash_tool: true
+    parse_function:
+      type: thought_action
+    execution_timeout: 60

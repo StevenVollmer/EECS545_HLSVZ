@@ -18,6 +18,8 @@ sweagent run \
     --problem_statement.text="Add a simple hello world function to a new file named hello.py."
 """
 
+import json
+import yaml
 import pprint
 from jinja2 import Template
 from dataclasses import dataclass
@@ -49,6 +51,9 @@ class Role:
         self.next_step_no_output_template = template.next_step_no_output_template
         self.next_step_truncated_observation_template = (template.next_step_truncated_observation_template)
         self.max_observation_length = template.max_observation_length
+        self.demonstrations = template.demonstrations
+        self.demonstration_template = template.demonstration_template
+        self.put_demos_in_history = template.put_demos_in_history
         self.history = []
 
     def reset(self):
@@ -84,9 +89,7 @@ class MultiAgent(DefaultAgent):
         role_templates = RoleTemplatesConfig(roles=config.roles)
 
         return cls(
-            templates=next(
-                iter(role_templates.roles.values())
-            ),  # not used, but avoids creating error with parent class DefaultAgent
+            templates=config.templates,  # not used, but avoids creating error with parent class DefaultAgent
             tools=ToolHandler(config.tools),
             history_processors=config.history_processors,
             model=model,
@@ -132,8 +135,9 @@ class MultiAgent(DefaultAgent):
 
     def _init_role_history(self, role: Role):
         self.add_system_message_to_role_history(role)
-        self.add_role_instance_template_to_history(
-            state=self.tools.get_state(self._env), role=role)
+        self.add_demonstrations_to_role_history(role)
+        self.add_instance_template_to_role_history(
+            state=self.tools.get_state(self._env), role=role)  # type: ignore
 
     def _append_role_history(self, item: dict[str, Any], role: Role) -> None:
         """Adds an item to the role specific history.
@@ -162,7 +166,49 @@ class MultiAgent(DefaultAgent):
             },
             role)
 
-    def add_role_instance_template_to_history(self, state: dict[str, str], role: Role) -> None:
+    def add_demonstrations_to_role_history(self, role: Role) -> None:
+        """Add demonstrations to history"""
+        for demonstration_path in role.demonstrations:
+            self._add_demonstration_to_role_history(role, demonstration_path)
+
+    def _add_demonstration_to_role_history(self, role: Role, demonstration_path: Path) -> None:
+        """Load demonstration from disk and add to history"""
+        if role.demonstration_template is None and not role.put_demos_in_history:
+            msg = "Cannot use demonstrations without a demonstration template or put_demos_in_history=True"
+            raise ValueError(msg)
+
+        # Load history
+        self.logger.info(f"DEMONSTRATION: {demonstration_path}")
+        _demo_text = Path(demonstration_path).read_text()
+        if demonstration_path.suffix == ".yaml":
+            demo_history = yaml.safe_load(_demo_text)["history"]
+        else:
+            demo_history = json.loads(_demo_text)["history"]
+
+        if self.templates.put_demos_in_history:
+            # Add demonstrations to history step-by-step
+            for entry in demo_history:
+                if entry["role"] != "system":
+                    entry["is_demo"] = True
+                    self._append_role_history(entry, role)
+        else:
+            # Add demonstration as single message to history
+            demo_history = [entry for entry in demo_history if entry["role"] != "system"]
+            demo_message = "\n".join([entry["content"] for entry in demo_history])
+            assert role.demonstration_template is not None
+            demonstration = Template(role.demonstration_template).render(demonstration=demo_message)
+            self._append_role_history(
+                {
+                    "agent": self.name,
+                    "content": demonstration,
+                    "is_demo": True,
+                    "role": "user",
+                    "message_type": "demonstration",
+                },
+                role
+            )
+
+    def add_instance_template_to_role_history(self, state: dict[str, str], role: Role) -> None:
         """Add observation to role specific history, as well as the instance template or demonstrations if we're
         at the start of a new attempt.
         NOTE: This mirrors DefaultAgent.add_instance_message_to_history
@@ -268,56 +314,60 @@ class MultiAgent(DefaultAgent):
     def get_active_history(self) -> list[dict[str, Any]]:
         return self.current_role.history
 
-    def advance_current_role(self) -> None:
+    def advance_current_role(self, step_output: StepOutput) -> None:
+        """Designed to advance from planner to coder specifically. Can generalize later"""
         # 1. Find the current index based on the name
         current_idx = self.role_order.index(self.current_role.name)
         # 2. Use modulo to wrap around automatically
         next_idx = (current_idx + 1) % len(self.role_order)
         # 3. Update to the next Role object
-        self.current_role = self.roles[self.role_order[next_idx]]
 
-    def run_role_forward(self, role: Role) -> StepOutput:
-        # Use communicate instead of execute. 
-        # Also check if self._env is not None to satisfy the Pylance warning.
-        if self._env is not None:
-            res = self._env.communicate(input="cat hello.py")
-            print(f"DEBUG: File Content of hello.py:\n{res}")
-        else:
-            print("DEBUG: Environment is None!")
-        
-        self.history = role.history
-        try:
+        if "handoff" in step_output.action and current_idx == 0:
+            # Check if the tool reported success
 
-            self.messages
-
-            # pp = pprint.PrettyPrinter(indent=2)
-            # print("--- FULL SELF OBJECT STATE ---")
-            # pp.pprint(vars(self))
-            # print("------------------------------")
-            
-            # print(f"\n{'='*20} AGENT STATE {'='*20}")
-            # for attr, value in self.__dict__.items():
-            #     # We skip history to keep the output focused, as you already know it
-            #     if attr == "history":
-            #         print(f"{attr}: <list of {len(value)} items>")
-            #         continue
-            #     print(f"{attr}: {repr(value)[:10]}...") # truncate very long strings
-            # print(f"{'='*53}\n")
-            
-            print(f"\n{'='*20} AGENT STATE {'='*20}")
-            print(f"DEBUG: Formatted messages for {role.name}:")
-            # pprint.pprint(self.messages)
+            print(f"\n{'='*20} Handoff Attempt {'='*20}")
+            print(f'current index is {current_idx}')
+            print(step_output.observation)
             print(f"{'='*53}\n")
 
-            step_output = self.forward_with_handling(self.messages)
+            if "Plan finalized" in step_output.observation:
+                self.current_role = self.roles[self.role_order[next_idx]]
+                print("Role switched to CODER successfully.")
+            else:
+                print("Planner attempted to finish, but the script failed.")
 
-            # For planner: use raw model output as thought
-            if role.name == "planner" and not step_output.thought:
-                step_output.thought = step_output.output
+    def run_role_forward(self, role: Role) -> StepOutput:
+        
+        #####################################################
+        # optional debug printing to help see role transition
+        print(f"\n{'='*20} AGENT STATE {'='*20}")
+        print(f"DEBUG: Current role: {role.name}:")
+        res = self._env.communicate(input="cat plan.txt")  # type: ignore    # Use communicate instead of execute.
+        print(f"DEBUG: File Content of plan.txt:\n{res}")
+        # pprint.pprint(self.messages)
+        print(f"{'='*53}\n")
+        # optional printing to help see role transition
+        #####################################################
 
-            return step_output
-        finally:
-            pass
+        self.history = role.history
+        step_output = self.forward_with_handling(self.messages)
+        return step_output
+
+    def concat_histories(self):
+        """Used at end of a run to concatenate histories together for proper saving to trajectory file"""
+        # Convert dict_values to a list so we can access by index
+        roles_list = list(self.roles.values())
+        
+        if not roles_list:
+            self.history = []  # or "" depending on your data type
+            return
+
+        # Start with the history of the first role
+        self.history = roles_list[0].history
+        
+        # Loop through the rest (starting from the second item)
+        for role in roles_list[1:]:
+            self.history += role.history
 
     def step(self) -> StepOutput:
         """Run a step of the agent. This is a wrapper around `self.forward_with_handling`
@@ -339,7 +389,7 @@ class MultiAgent(DefaultAgent):
 
         # CUSTOM modified these 2 functions for managing current role
         step_output = self.run_role_forward(self.current_role)
-        # step_output.info["role_name"] = self.current_role.name
+        # step_output.info["role_name"] = self.current_role.name #StepOutput class will need to include role_name before we can add this
         self.add_step_to_role_history(step_output, self.current_role)
 
         self.info["submission"] = step_output.submission
@@ -350,7 +400,9 @@ class MultiAgent(DefaultAgent):
 
         # change current_role to next in order for the next step call (only if you have more than one)
         if len(self.role_order) > 1:
-            self.advance_current_role()
+            self.advance_current_role(step_output)
+
+        if step_output.done: self.concat_histories()
 
         self._chook.on_step_done(step=step_output, info=self.info)
         return step_output

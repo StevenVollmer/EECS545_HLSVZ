@@ -2,7 +2,7 @@
 # This template is heavily inspired by anthropic's computer use demo, but you can use it with any LM.
 # CUSTOM config for local ollama qwen model
 
-# sweagent run --config SWE-agent/config/custom_configs/multi_agent.yaml
+# sweagent run --config SWE-agent/config/custom_configs/multi_agent_repo_test.yaml
 # sweagent traj-to-demo trajectories/multi_agent/multi_agent_test_1/multi_agent_test_1.traj --overwrite
 # sweagent run-replay --traj_path demos/multi_agent_test_1/multi_agent_planner.demo.yaml
 
@@ -18,7 +18,7 @@ env:
       github_url: "https://github.com/SWE-agent/test-repo"
 
 problem_statement:
-  id: "multi_agent_repo_test_1"
+  id: "multi_agent_repo_test_2"
   # type: "text"
   # text: "Add a simple hello world function to a new file named hello.py."
   type: github
@@ -33,14 +33,12 @@ agent:
     # name: ollama/codellama:7b-instruct # thought_action only
     # name: ollama/deepseek-r1:7b # thought_action only
     per_instance_cost_limit: 0
-    per_instance_call_limit: 20
+    per_instance_call_limit: 30
     temperature: 0.1
     api_key: ollama
     api_base: http://localhost:11434
     max_input_tokens: 100000
     total_cost_limit: 0
-    # options:
-    #   repeat_penalty: 1.1
   templates:
       system_template: |-
         Empty
@@ -103,12 +101,15 @@ agent:
         # - trajectories/multi_agent_demonstrations/multi_agent_planner.demo.yaml
         # - trajectories/multi_agent_demonstrations/multi_agent_test_2_planner.demo.yaml
         # - trajectories/multi_agent_demonstrations/multi_agent_test_3_planner.demo.yaml
-        - trajectories/multi_agent_demonstrations/multi_agent_test_4_planner.demo.yaml
+        # - trajectories/multi_agent_demonstrations/multi_agent_test_4_planner.demo.yaml
         - trajectories/multi_agent_demonstrations/multi_agent_test_5_planner.demo.yaml
+        - trajectories/multi_agent_demonstrations/multi_agent_repo_test_1_planner.demo.yaml
+        - trajectories/multi_agent_demonstrations/multi_agent_repo_test_2_planner.demo.yaml
     coder:
       system_template: |-
         You are a senior software engineer. Your goal is to execute the implementation plan provided to you. You have access to a bash shell and file editing tools.
         You're working directly in the command line with a special interface. In particular, there is a special submit which handles all git add and commit interactions.
+        Do not install any additional tools or libraries, like nano or vim. The environment will not support it.
       instance_template: |-
         CRITICAL: A technical plan has been prepared for you in 'plan.txt'. 
         
@@ -122,8 +123,9 @@ agent:
         - Work only in the {{working_dir}} directory.
         - If a command fails, do not repeat it; try a different approach.
         - Do not 'view' or 'cat' the same file twice in a row.
-        - Once the you have completed every step in the plan and the code is verified, use the submit command.
+        - Once you have completed every step in the plan and the code is verified, use the submit command.
         - DO NOT call the handoff command.
+        - DO NOT INSTALL nano.
 
         (Open: {{open_file}})
         (Dir: {{working_dir}})
@@ -144,6 +146,7 @@ agent:
         # - trajectories/multi_agent_demonstrations/multi_agent_test_1_coder.demo.yaml
         - trajectories/multi_agent_demonstrations/multi_agent_test_3_coder.demo.yaml
         - trajectories/multi_agent_demonstrations/multi_agent_test_5_coder.demo.yaml
+        - trajectories/multi_agent_demonstrations/SWE-agent__test-repo-i1.demo.yaml
   tools:
     env_variables:
       PAGER: cat
@@ -153,8 +156,8 @@ agent:
       TQDM_DISABLE: '1'
       GIT_PAGER: cat
     bundles:
-      - path: tools/registry
       - path: tools/edit_anthropic
+      - path: tools/registry
       - path: tools/handoff
       - path: tools/submit
     registry_variables:
@@ -179,9 +182,9 @@ agent:
     enable_bash_tool: true
     parse_function:
       type: function_calling # thought_action
-  history_processors:
-    - type: cache_control
-      last_n_messages: 2
+  # history_processors:
+  #   - type: cache_control
+  #     last_n_messages: 2
 
 
 
