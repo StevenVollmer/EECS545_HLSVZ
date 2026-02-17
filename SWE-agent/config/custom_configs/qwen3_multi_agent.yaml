@@ -1,0 +1,214 @@
+# Formerly called: anthropic_filemap.yaml
+# This template is heavily inspired by anthropic's computer use demo, but you can use it with any LM.
+# CUSTOM config for local ollama qwen model
+
+# sweagent run --config SWE-agent/config/custom_configs/qwen3_multi_agent.yaml
+# sweagent traj-to-demo trajectories/multi_agent/multi_agent_test_1/qwen3_multi_agent_test_1.traj --overwrite
+# sweagent run-replay --traj_path demos/multi_agent_test_1/qwen3_multi_agent_planner.demo.yaml
+
+# ollama pull ministral:8b
+# ollama pull granite-code:8b
+# ollama pull codellama:7b-instruct
+
+
+output_dir: "trajectories/multi_agent/"
+
+env: 
+  repo:
+      github_url: "https://github.com/SWE-agent/test-repo"
+
+problem_statement:
+  id: "multi_agent_repo_test_1"
+  # type: "text"
+  # text: "Add a simple hello world function to a new file named hello.py."
+  type: github
+  github_url: "https://github.com/SWE-agent/test-repo/issues/1"
+
+agent:
+  type: multi
+  model:
+    name: ollama/qwen3:8b
+    # name: ollama/qwen2.5-coder:7b-instruct
+    # name: ollama/mistral:7b-instruct-v0.3-q4_K_M
+    # name: ollama/granite-code:8b # thought_action only
+    # name: ollama/codellama:7b-instruct # thought_action only
+    # name: ollama/deepseek-r1:7b # thought_action only
+    per_instance_cost_limit: 0
+    per_instance_call_limit: 20
+    temperature: 0.1
+    api_key: ollama
+    api_base: http://localhost:11434
+    max_input_tokens: 100000
+    total_cost_limit: 0
+    # options:
+    #   repeat_penalty: 1.1
+  templates:
+      system_template: |-
+        Empty
+      instance_template: |-
+        Empty
+  roles:
+    planner:
+      system_template: |-
+        You are a software instructor. Your are an expert in reading PR Descriptions, researching repositories and writing step-by-step implementation plans.
+        You excel at writing plans to teach other programmers how to solve problems.
+        If you have already executed a command and received the desired output (or no error), DO NOT repeat it. Move to the next step in your plan immediately. 
+        Check your history: if your last action was viewing or editing a file, your next action must be a different command (e.g., running a test or editing a different line).
+      instance_template: |-
+        <uploaded_files>
+        {{working_dir}}
+        </uploaded_files>
+        I've uploaded a python code repository in the directory {{working_dir}}. Consider the following PR description:
+
+        In the top directory, write a plan in a file named plan.txt to teach another programmer how to resolve this:
+        <pr_description>
+        {{problem_statement}}
+        </pr_description>
+
+        Be sure to copy the <pr_description> into the top of 'plan.txt', then write your plan for resolving it.
+
+        When you are finished, do not call submit. Instead call handoff to send that plan to the other programmer.
+        As a first step, find and read code relevant to the <pr_description>
+        Your thinking should be thorough and so it's fine if it's very long.
+
+        If you run a command and it doesn't work, try running a different command. A command that did not work once will not work the second time!
+        If you have already read a file, do not read it again unless you have a specific new line number to target. Redundancy is a failure. 
+
+        CRITICAL RESTRICTIONS:
+        -DO NOT WRITE ANY CODE OTHER THAN plan.txt
+        -ANY DEVIATION WILL RESULT IN FAILURE
+
+        (Open: {{open_file}})
+        (Dir: {{working_dir}})
+        bash-$
+      next_step_template: |-
+        OBSERVATION:
+        {{observation}}
+        (Open: {{open_file}})
+
+        (Dir: {{working_dir}})
+        bash-$
+      next_step_no_output_template: |-
+        Your command ran successfully and did not produce any output.
+        (Open: {{open_file}})
+        (Dir: {{working_dir}})
+        bash-$
+      demonstration_template: |
+        Here is a demonstration of how to correctly accomplish this task.
+        It is included to show you how to correctly use the interface.
+        You do not need to follow exactly what is done in the demonstration.
+        --- DEMONSTRATION ---
+        {{demonstration}}
+        --- END OF DEMONSTRATION ---
+      demonstrations:
+        # - trajectories/multi_agent_demonstrations/multi_agent_planner.demo.yaml
+        # - trajectories/multi_agent_demonstrations/multi_agent_test_2_planner.demo.yaml
+        # - trajectories/multi_agent_demonstrations/multi_agent_test_3_planner.demo.yaml
+        - trajectories/multi_agent_demonstrations/multi_agent_test_4_planner.demo.yaml
+        - trajectories/multi_agent_demonstrations/multi_agent_test_5_planner.demo.yaml
+    coder:
+      system_template: |-
+        You are a senior software engineer. Your goal is to execute the implementation plan provided to you. You have access to a bash shell and file editing tools.
+        You're working directly in the command line with a special interface. In particular, there is a special submit which handles all git add and commit interactions.
+      instance_template: |-
+        CRITICAL: A technical plan has been prepared for you in 'plan.txt'. 
+        
+        YOUR FIRST ACTION MUST BE:
+        1. Run `ls -F` to confirm the location of 'plan.txt'.
+        2. Run `cat plan.txt` to read the instructions.
+        
+        After reading the plan, execute the steps precisely. Do not skip the reproduction script phase if the plan calls for it.
+        
+        Mandatory Constraints:
+        - Work only in the {{working_dir}} directory.
+        - If a command fails, do not repeat it; try a different approach.
+        - Do not 'view' or 'cat' the same file twice in a row.
+        - Once the you have completed every step in the plan and the code is verified, use the submit command.
+        - DO NOT call the handoff command.
+
+        (Open: {{open_file}})
+        (Dir: {{working_dir}})
+        bash-$
+      next_step_template: |-
+        OBSERVATION:
+        {{observation}}
+      next_step_no_output_template: |-
+        Your command ran successfully and did not produce any output.
+      demonstration_template: |
+        Here is a demonstration of how to correctly accomplish this task.
+        It is included to show you how to correctly use the interface.
+        You do not need to follow exactly what is done in the demonstration.
+        --- DEMONSTRATION ---
+        {{demonstration}}
+        --- END OF DEMONSTRATION ---
+      demonstrations:
+        # - trajectories/multi_agent_demonstrations/multi_agent_test_1_coder.demo.yaml
+        - trajectories/multi_agent_demonstrations/multi_agent_test_3_coder.demo.yaml
+        - trajectories/multi_agent_demonstrations/multi_agent_test_5_coder.demo.yaml
+  tools:
+    env_variables:
+      PAGER: cat
+      MANPAGER: cat
+      LESS: -R
+      PIP_PROGRESS_BAR: 'off'
+      TQDM_DISABLE: '1'
+      GIT_PAGER: cat
+    bundles:
+      - path: tools/registry
+      - path: tools/edit_anthropic
+      - path: tools/handoff
+      - path: tools/submit
+    registry_variables:
+      USE_FILEMAP: 'true'
+      # SUBMIT_REVIEW_MESSAGES:
+      #   - |
+      #     Thank you for your work on this issue. Please carefully follow the steps below to help review your changes.
+
+      #     1. If you made any changes to your code after running the reproduction script, please run the reproduction script again.
+      #       If the reproduction script is failing, please revisit your changes and make sure they are correct.
+      #       If you have already removed your reproduction script, please ignore this step.
+      #     2. Remove your reproduction script (if you haven't done so already).
+      #     3. If you have modified any TEST files, please revert them to the state they had before you started fixing the issue.
+      #       You can do this with `git checkout -- /path/to/test/file.py`. Use below <diff> to find the files you need to revert.
+      #     4. Run the submit command again to confirm.
+
+      #     Here is a list of all of your changes:
+
+      #     <diff>
+      #     {{diff}}
+      #     </diff>
+    enable_bash_tool: true
+    parse_function:
+      type: function_calling # thought_action or function_calling
+  history_processors:
+    - type: cache_control
+      last_n_messages: 2
+
+
+
+# old coder instance template
+
+#         <uploaded_files>
+#         {{working_dir}}
+#         </uploaded_files>
+#         I've uploaded a python code repository in the directory {{working_dir}}. Consider the following PR description:
+
+#         <pr_description>
+#         {{problem_statement}}
+#         </pr_description>
+
+#         An expert programming instructor created a plan in plan.txt to resolve the above <pr_description>. Open plan.txt, read it, and follow it step by step.
+
+#         Can you help me implement the necessary changes to the repository so that the requirements specified in the <pr_description> are met?
+#         I've already taken care of all changes to any of the test files described in the <pr_description>. This means you DON'T have to modify the testing logic or any of the tests in any way!
+#         Your task is to make the minimal changes to non-tests files in the {{working_dir}} directory to ensure the <pr_description> is satisfied.
+#         Follow these steps to resolve the issue:
+#         1. As a first step, it might be a good idea to find and read code relevant to the <pr_description>
+#         2. Create a script to reproduce the error and execute it with `python <filename.py>` using the bash tool, to confirm the error
+#         3. Edit the sourcecode of the repo to resolve the issue
+#         4. Rerun your reproduce script and confirm that the error is fixed!
+#         5. Think about edgecases and make sure your fix handles them as well
+#         Your thinking should be thorough and so it's fine if it's very long.
+
+#         CRITICAL: Before running any command, check if you just ran it. 
+#         If the 'OBSERVATION' shows you already saw the file content, proceed to the reproduction script or the fix. Do not 'view' the same file twice in a row.

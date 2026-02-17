@@ -35,16 +35,74 @@ if sys.version_info < PYTHON_MINIMUM_VERSION:
     raise RuntimeError(msg)
 
 assert PACKAGE_DIR.is_dir(), PACKAGE_DIR
-REPO_ROOT = PACKAGE_DIR.parent
-assert REPO_ROOT.is_dir(), REPO_ROOT
-CONFIG_DIR = Path(os.getenv("SWE_AGENT_CONFIG_DIR", PACKAGE_DIR.parent / "config"))
-assert CONFIG_DIR.is_dir(), CONFIG_DIR
 
-TOOLS_DIR = Path(os.getenv("SWE_AGENT_TOOLS_DIR", PACKAGE_DIR.parent / "tools"))
-assert TOOLS_DIR.is_dir(), TOOLS_DIR
 
-TRAJECTORY_DIR = Path(os.getenv("SWE_AGENT_TRAJECTORY_DIR", PACKAGE_DIR.parent / "trajectories"))
-assert TRAJECTORY_DIR.is_dir(), TRAJECTORY_DIR
+def _candidate_bases() -> list[Path]:
+    candidates: list[Path] = [PACKAGE_DIR.parent, PACKAGE_DIR.parent.parent]
+    cwd = Path.cwd().resolve()
+    for path in [cwd, *cwd.parents]:
+        candidates.extend([path, path / "SWE-agent", path / "swe-agent"])
+    return candidates
+
+
+def _resolve_repo_root() -> Path:
+    env_path = os.getenv("SWE_AGENT_REPO_ROOT")
+    if env_path:
+        path = Path(env_path).expanduser().resolve()
+        if not path.is_dir():
+            msg = f"SWE_AGENT_REPO_ROOT points to a non-directory path: {path}"
+            raise RuntimeError(msg)
+        return path
+
+    for base in _candidate_bases():
+        if (base / "sweagent").is_dir() and (base / "config").is_dir() and (base / "tools").is_dir():
+            return base
+
+    return PACKAGE_DIR.parent
+
+
+def _resolve_existing_dir(env_var: str, subdir: str) -> Path:
+    env_path = os.getenv(env_var)
+    if env_path:
+        path = Path(env_path).expanduser().resolve()
+        if not path.is_dir():
+            msg = f"{env_var} points to a non-directory path: {path}"
+            raise RuntimeError(msg)
+        return path
+
+    for base in _candidate_bases():
+        candidate = base / subdir
+        if candidate.is_dir():
+            return candidate
+
+    msg = (
+        f"Could not find required '{subdir}' directory for SWE-agent. "
+        f"Set {env_var} explicitly to the correct path."
+    )
+    raise RuntimeError(msg)
+
+
+def _resolve_writable_dir(env_var: str, subdir: str) -> Path:
+    env_path = os.getenv(env_var)
+    if env_path:
+        path = Path(env_path).expanduser().resolve()
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    for base in _candidate_bases():
+        candidate = base / subdir
+        if candidate.is_dir():
+            return candidate
+
+    fallback = PACKAGE_DIR.parent / subdir
+    fallback.mkdir(parents=True, exist_ok=True)
+    return fallback
+
+
+CONFIG_DIR = _resolve_existing_dir("SWE_AGENT_CONFIG_DIR", "config")
+TOOLS_DIR = _resolve_existing_dir("SWE_AGENT_TOOLS_DIR", "tools")
+TRAJECTORY_DIR = _resolve_writable_dir("SWE_AGENT_TRAJECTORY_DIR", "trajectories")
+REPO_ROOT = _resolve_repo_root()
 
 
 def get_agent_commit_hash() -> str:
