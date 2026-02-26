@@ -184,11 +184,13 @@ class ShellAgentConfig(BaseModel):
     # pydantic config
     model_config = ConfigDict(extra="forbid")
 
+
 class MultiAgentConfig(BaseModel):
     """CUSTOM: Custom config class for our multi-agent structure"""
+
     name: str = "main"
-    templates: TemplateConfig = Field(default_factory=TemplateConfig) # type: ignore
-    tools: ToolConfig = Field(default_factory=ToolConfig) # type: ignore
+    templates: TemplateConfig = Field(default_factory=TemplateConfig)  # type: ignore
+    tools: ToolConfig = Field(default_factory=ToolConfig)  # type: ignore
     history_processors: list[HistoryProcessor] = Field(default_factory=lambda: [DefaultHistoryProcessor()])
     model: ModelConfig = Field(description="Model options.")
     roles: dict[str, TemplateConfig]
@@ -197,13 +199,40 @@ class MultiAgentConfig(BaseModel):
     """Maximum number of times to requery the model after an error, such as a
     formatting error, a blocked action, or a bash syntax error.
     """
-    
+
     action_sampler: ActionSamplerConfig | None = None
 
     type: Literal["multi"] = "multi"
 
     # pydantic config
     model_config = ConfigDict(extra="forbid")
+
+
+class MultiAgentConfigMultiModel(BaseModel):
+    """CUSTOM: Custom config class for our multi-agent structure"""
+
+    name: str = "main"
+    templates: TemplateConfig = Field(default_factory=TemplateConfig)  # type: ignore
+    tools: ToolConfig = Field(default_factory=ToolConfig)  # type: ignore
+    history_processors: list[HistoryProcessor] = Field(default_factory=lambda: [DefaultHistoryProcessor()])
+    model: ModelConfig = Field(description="Model options.")
+    roles: dict[str, TemplateConfig]
+
+    max_requeries: int = 3
+    """Maximum number of times to requery the model after an error, such as a
+    formatting error, a blocked action, or a bash syntax error.
+    """
+
+    action_sampler: ActionSamplerConfig | None = None
+
+    type: Literal["multi_2_models"] = "multi_2_models"
+
+    planner: str
+    coder: str
+
+    # pydantic config
+    model_config = ConfigDict(extra="forbid")
+
 
 class RetryAgentConfig(BaseModel):
     name: str = "retry_main"
@@ -212,8 +241,12 @@ class RetryAgentConfig(BaseModel):
     type: Literal["retry"] = "retry"
     model_config = ConfigDict(extra="forbid")
 
+
 # CUSTOM added MultiAgentConfig to the union below
-AgentConfig = Annotated[DefaultAgentConfig | RetryAgentConfig | ShellAgentConfig | MultiAgentConfig, Field(union_mode="left_to_right")]
+AgentConfig = Annotated[
+    DefaultAgentConfig | RetryAgentConfig | ShellAgentConfig | MultiAgentConfig | MultiAgentConfigMultiModel,
+    Field(discriminator="type"),
+]
 
 
 class _BlockedActionError(Exception):
@@ -270,10 +303,16 @@ def get_agent_from_config(config: AgentConfig) -> AbstractAgent:
 
         return ShellAgent.from_config(config)
     elif config.type == "multi":
-        #CUSTOM Added to enable configuration for our custom multi agent
+        # CUSTOM Added to enable configuration for our custom multi agent
         from sweagent.agent.custom.multi_agent import MultiAgent
 
         return MultiAgent.from_config(config)
+
+    elif config.type == "multi_2_models":
+        from sweagent.agent.custom.multi_agent_with_2_models import MultiAgent
+
+        return MultiAgent.from_config(config)
+
     else:
         msg = f"Unknown agent type: {config.type}"
         raise ValueError(msg)

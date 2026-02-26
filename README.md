@@ -20,3 +20,16 @@ is successful, then it calls submit. If the coder never reached a conclusion, th
 determines if the plan was impossible to execute, which it then calls the planner to revise its 
 plan. Or if the plan is valid, but the coder failed, the reviewer recalls the coder with an
 explanation of the failure and suggests corrective actions.
+
+## Installation
+
+To set up the project locally for development, we recommend using a virtual environment. The submodules (`SWE-agent` and `SWE-bench`) should be installed in **editable mode** so that changes to the local code are immediately reflected when you run the tools.
+
+```bash
+# Create and activate your virtual environment
+python3 -m venv env
+source env/bin/activate
+
+# Install the projects in editable mode
+pip install -r requirements.txt
+```
