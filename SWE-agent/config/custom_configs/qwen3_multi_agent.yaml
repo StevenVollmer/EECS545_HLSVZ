@@ -1,15 +1,4 @@
-# Formerly called: anthropic_filemap.yaml
-# This template is heavily inspired by anthropic's computer use demo, but you can use it with any LM.
-# CUSTOM config for local ollama qwen model
-
 # sweagent run --config SWE-agent/config/custom_configs/qwen3_multi_agent.yaml
-# sweagent traj-to-demo trajectories/multi_agent/multi_agent_test_1/qwen3_multi_agent_test_1.traj --overwrite
-# sweagent run-replay --traj_path demos/multi_agent_test_1/qwen3_multi_agent_planner.demo.yaml
-
-# ollama pull ministral:8b
-# ollama pull granite-code:8b
-# ollama pull codellama:7b-instruct
-
 
 output_dir: "trajectories/multi_agent/"
 
@@ -25,19 +14,16 @@ problem_statement:
   github_url: "https://github.com/SWE-agent/test-repo/issues/1"
 
 agent:
-  type: multi
+  type: multi_2_models
+
+  planner: ollama/qwen3:8b
+  coder: ollama/qwen2.5:3b
+
   model:
-    name: ollama/qwen3:8b
-    # name: ollama/qwen2.5-coder:7b-instruct
     # name: ollama/mistral:7b-instruct-v0.3-q4_K_M
-    # name: ollama/granite-code:8b # thought_action only
-    # name: ollama/codellama:7b-instruct # thought_action only
-    # name: ollama/deepseek-r1:7b # thought_action only
     per_instance_cost_limit: 0
     per_instance_call_limit: 20
     temperature: 0.1
-    api_key: ollama
-    api_base: http://localhost:11434
     max_input_tokens: 100000
     total_cost_limit: 0
     # options:
@@ -100,12 +86,12 @@ agent:
         --- DEMONSTRATION ---
         {{demonstration}}
         --- END OF DEMONSTRATION ---
-      demonstrations:
+      # demonstrations:
         # - trajectories/multi_agent_demonstrations/multi_agent_planner.demo.yaml
         # - trajectories/multi_agent_demonstrations/multi_agent_test_2_planner.demo.yaml
         # - trajectories/multi_agent_demonstrations/multi_agent_test_3_planner.demo.yaml
-        - trajectories/multi_agent_demonstrations/multi_agent_test_4_planner.demo.yaml
-        - trajectories/multi_agent_demonstrations/multi_agent_test_5_planner.demo.yaml
+        # - trajectories/multi_agent_demonstrations/multi_agent_test_4_planner.demo.yaml
+        # - trajectories/multi_agent_demonstrations/multi_agent_test_5_planner.demo.yaml
     coder:
       system_template: |-
         You are a senior software engineer. Your goal is to execute the implementation plan provided to you. You have access to a bash shell and file editing tools.
@@ -141,10 +127,10 @@ agent:
         --- DEMONSTRATION ---
         {{demonstration}}
         --- END OF DEMONSTRATION ---
-      demonstrations:
+      # demonstrations:
         # - trajectories/multi_agent_demonstrations/multi_agent_test_1_coder.demo.yaml
-        - trajectories/multi_agent_demonstrations/multi_agent_test_3_coder.demo.yaml
-        - trajectories/multi_agent_demonstrations/multi_agent_test_5_coder.demo.yaml
+        # - trajectories/multi_agent_demonstrations/multi_agent_test_3_coder.demo.yaml
+        # - trajectories/multi_agent_demonstrations/multi_agent_test_5_coder.demo.yaml
   tools:
     env_variables:
       PAGER: cat
@@ -160,55 +146,12 @@ agent:
       - path: tools/submit
     registry_variables:
       USE_FILEMAP: 'true'
-      # SUBMIT_REVIEW_MESSAGES:
-      #   - |
-      #     Thank you for your work on this issue. Please carefully follow the steps below to help review your changes.
-
-      #     1. If you made any changes to your code after running the reproduction script, please run the reproduction script again.
-      #       If the reproduction script is failing, please revisit your changes and make sure they are correct.
-      #       If you have already removed your reproduction script, please ignore this step.
-      #     2. Remove your reproduction script (if you haven't done so already).
-      #     3. If you have modified any TEST files, please revert them to the state they had before you started fixing the issue.
-      #       You can do this with `git checkout -- /path/to/test/file.py`. Use below <diff> to find the files you need to revert.
-      #     4. Run the submit command again to confirm.
-
-      #     Here is a list of all of your changes:
-
-      #     <diff>
-      #     {{diff}}
-      #     </diff>
     enable_bash_tool: true
     parse_function:
-      type: function_calling # thought_action or function_calling
+      type: function_calling # thought_action
   history_processors:
     - type: cache_control
       last_n_messages: 2
 
 
 
-# old coder instance template
-
-#         <uploaded_files>
-#         {{working_dir}}
-#         </uploaded_files>
-#         I've uploaded a python code repository in the directory {{working_dir}}. Consider the following PR description:
-
-#         <pr_description>
-#         {{problem_statement}}
-#         </pr_description>
-
-#         An expert programming instructor created a plan in plan.txt to resolve the above <pr_description>. Open plan.txt, read it, and follow it step by step.
-
-#         Can you help me implement the necessary changes to the repository so that the requirements specified in the <pr_description> are met?
-#         I've already taken care of all changes to any of the test files described in the <pr_description>. This means you DON'T have to modify the testing logic or any of the tests in any way!
-#         Your task is to make the minimal changes to non-tests files in the {{working_dir}} directory to ensure the <pr_description> is satisfied.
-#         Follow these steps to resolve the issue:
-#         1. As a first step, it might be a good idea to find and read code relevant to the <pr_description>
-#         2. Create a script to reproduce the error and execute it with `python <filename.py>` using the bash tool, to confirm the error
-#         3. Edit the sourcecode of the repo to resolve the issue
-#         4. Rerun your reproduce script and confirm that the error is fixed!
-#         5. Think about edgecases and make sure your fix handles them as well
-#         Your thinking should be thorough and so it's fine if it's very long.
-
-#         CRITICAL: Before running any command, check if you just ran it. 
-#         If the 'OBSERVATION' shows you already saw the file content, proceed to the reproduction script or the fix. Do not 'view' the same file twice in a row.

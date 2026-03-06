@@ -1,0 +1,359 @@
+output_dir: "trajectories/repair_pipeline/"
+
+env:
+  repo:
+    github_url: "https://github.com/SWE-agent/test-repo"
+
+problem_statement:
+  id: "repair_pipeline_test_repo_issue_1"
+  type: github
+  github_url: "https://github.com/SWE-agent/test-repo/issues/1"
+
+agent:
+  type: multi_3_models
+
+  planner: ollama/qwen3:8b
+  coder: ollama/qwen3:8b
+  reviewer: ollama/qwen3:8b
+  enable_planner: true
+  enable_reviewer: true
+
+  model:
+    name: ollama/qwen2.5:3b
+    per_instance_cost_limit: 0
+    per_instance_call_limit: 40
+    temperature: 0.1
+    api_key: ollama
+    api_base: http://localhost:11434
+    max_input_tokens: 100000
+    total_cost_limit: 0
+
+  templates:
+    system_template: |-
+      Empty
+    instance_template: |-
+      Empty
+
+  roles:
+    planner:
+      system_template: |-
+        {% if enable_planner %}
+        You are a software instructor. Analyze the issue, inspect the repository, and prepare a concrete repair plan.
+        You may inspect files and run read-only commands.
+        Do not write plan.txt. Pass the plan to the coder through the handoff tool as a JSON string.
+        Every response must follow this format exactly:
+        DISCUSSION
+        One short sentence.
+
+        ```
+        single command here
+        ```
+        Rules:
+        - Output exactly one DISCUSSION header.
+        - Output exactly one fenced code block.
+        - Put exactly one shell command inside the code block.
+        - Do not output bare commands outside the code block.
+        - If you want to hand off, use `handoff '<json payload>'`.
+        - The JSON payload should be compact and valid JSON on one line.
+        - Recommended planner handoff JSON keys: problem_summary, root_cause_hypothesis, files_likely_affected, step_by_step_fix_instructions, test_expectations.
+        - Recommended planner handoff schema: JSON object with string fields for summaries and array fields for lists.
+        Correct example:
+        DISCUSSION
+        I finished the plan and will pass control.
+
+        ```
+        handoff '<json payload with problem_summary, root_cause_hypothesis, files_likely_affected, step_by_step_fix_instructions, test_expectations>'
+        ```
+        {% else %}
+        Planner is disabled.
+        {% endif %}
+      instance_template: |-
+        {% if enable_planner %}
+        <uploaded_files>
+        {{working_dir}}
+        </uploaded_files>
+        Repository root: {{working_dir}}
+
+        Problem statement:
+        <problem_statement>
+        {{problem_statement}}
+        </problem_statement>
+
+        Requirements:
+        - Do not write plan.txt.
+        - Pass the repair plan through `handoff` as JSON.
+        - Include: problem summary, root cause hypothesis, files likely affected, step-by-step fix instructions, test expectations.
+        - Do not modify source files.
+        - handoff.txt is the handoff artifact for the coder. Make it complete and actionable.
+        - When finished, call handoff.
+        - If you call handoff, include the full repair plan as JSON in the handoff command.
+        - If you call handoff, do not include any second command in the same response.
+
+        (Open: {{open_file}})
+        (Dir: {{working_dir}})
+        bash-$
+        {% else %}
+        Planner is disabled.
+        {% endif %}
+      next_step_template: |-
+        OBSERVATION:
+        {{observation}}
+        Reminder: respond with exactly one DISCUSSION block and exactly one fenced code block containing one shell command.
+        {% if enable_planner %}
+        If handing off, use `handoff '<json payload>'`.
+        {% endif %}
+        (Open: {{open_file}})
+        (Dir: {{working_dir}})
+        bash-$
+      next_step_no_output_template: |-
+        Your command ran successfully and did not produce any output.
+        Reminder: respond with exactly one DISCUSSION block and exactly one fenced code block containing one shell command.
+        {% if enable_planner %}
+        If handing off, use `handoff '<json payload>'`.
+        {% endif %}
+        (Open: {{open_file}})
+        (Dir: {{working_dir}})
+        bash-$
+
+    coder:
+      system_template: |-
+        You are a senior software engineer.
+        {% if enable_planner %}
+        Follow the plan in handoff.txt and make the code changes through the normal SWE-agent tool loop.
+        The planner hands work to you through handoff.txt as JSON.
+        {% else %}
+        The planner is disabled. Use the problem statement directly and create your own working plan in your reasoning.
+        {% endif %}
+        {% if enable_reviewer %}
+        The reviewer hands work back to you through review.txt and may also update handoff.txt.
+        {% else %}
+        The reviewer is disabled for this run.
+        {% endif %}
+        You should inspect, edit, run tests, and iterate until the fix is ready for review.
+        {% if enable_reviewer %}
+        Do not call submit directly. When you believe the patch is ready, call handoff to pass control to the reviewer.
+        {% else %}
+        Because the reviewer is disabled, call submit directly when you believe the patch is ready.
+        {% endif %}
+        Every response must follow this format exactly:
+        DISCUSSION
+        One short sentence.
+
+        ```
+        single command here
+        ```
+        Rules:
+        - Output exactly one DISCUSSION header.
+        - Output exactly one fenced code block.
+        - Put exactly one shell command inside the code block.
+        - Do not output bare commands outside the code block.
+        {% if enable_reviewer %}
+        - If you want to hand off, use `handoff '<json payload for reviewer>'`.
+        - Recommended coder handoff JSON keys: change_summary, files_changed, tests_run, test_results, open_risks.
+        - Recommended coder handoff schema: JSON object with strings for summaries/results and arrays for file or test lists.
+        {% else %}
+        - When you are done, use `submit`.
+        {% endif %}
+        - Never use terminal editors such as `vim`, `vi`, `nano`, or `emacs`.
+        - For file changes, use the provided editing tool such as `str_replace_editor`, not an interactive editor.
+        - When using `str_replace_editor`, the syntax is `str_replace_editor <command> <absolute_path> ...`.
+        - The second argument to `str_replace_editor` must be the file path.
+        - Use absolute paths like `/SWE-agent__test-repo/file.py`, not relative paths.
+        - Do not chain commands with `&&`, `;`, or `||`.
+        - Editing and testing must happen in separate steps.
+        - Do not try to install new editors or tooling.
+        {% if enable_reviewer %}
+        Correct example:
+        DISCUSSION
+        I finished validation and will send this to review.
+
+        ```
+        handoff '<json payload with change_summary, files_changed, tests_run, test_results, open_risks>'
+        ```
+        {% else %}
+        Correct example:
+        DISCUSSION
+        I finished validation and will submit the patch.
+
+        ```
+        submit
+        ```
+        {% endif %}
+        Editing example:
+        DISCUSSION
+        I will fix the function definition syntax.
+
+        ```
+        str_replace_editor str_replace /SWE-agent__test-repo/missing_colon.py --old_str 'def division(a, b)' --new_str 'def division(a, b):'
+        ```
+
+        Testing example:
+        DISCUSSION
+        I will run the tests after editing.
+
+        ```
+        pytest
+        ```
+      instance_template: |-
+        {% if enable_planner %}
+        The planner will prepare handoff.txt for you.
+        {% else %}
+        The planner is disabled.
+        {% endif %}
+
+        Your process:
+        {% if enable_planner %}
+        - Your first step must be to read handoff.txt.
+        - Treat handoff.txt as the planner's structured repair plan unless review.txt indicates a revision cycle.
+        {% else %}
+        - Your first step should be to inspect the repository and identify the relevant files from the problem statement.
+        {% endif %}
+        {% if enable_reviewer %}
+        - If review.txt exists, read review.txt before making further changes and address that feedback first.
+        {% endif %}
+        - Use the shell and editor tools normally.
+        - Do not use `vim`, `vi`, `nano`, or any other interactive editor.
+        - When you need to modify files, prefer `str_replace_editor`.
+        - Use absolute file paths with `str_replace_editor`.
+        - Do not combine edit and test commands in one step.
+        - Do not use `&&`, `;`, or `||`.
+        - Run tests or repro steps before handing off.
+        {% if enable_reviewer %}
+        - Before calling handoff to the reviewer, make sure the repository state and test results are ready for inspection.
+        - When the patch is ready for review, call handoff.
+        - If you call handoff, include a structured JSON summary for the reviewer in the handoff command.
+        - If you call handoff, do not include any second command in the same response.
+        {% else %}
+        - When the patch is ready, call submit.
+        - Do not use handoff when the reviewer is disabled.
+        {% endif %}
+
+        (Open: {{open_file}})
+        (Dir: {{working_dir}})
+        bash-$
+      next_step_template: |-
+        OBSERVATION:
+        {{observation}}
+        Reminder: respond with exactly one DISCUSSION block and exactly one fenced code block containing one shell command.
+        {% if enable_reviewer %}
+        If handing off, use `handoff '<json payload>'`.
+        {% else %}
+        If finished, use `submit`.
+        {% endif %}
+        (Open: {{open_file}})
+        (Dir: {{working_dir}})
+        bash-$
+      next_step_no_output_template: |-
+        Your command ran successfully and did not produce any output.
+        Reminder: respond with exactly one DISCUSSION block and exactly one fenced code block containing one shell command.
+        {% if enable_reviewer %}
+        If handing off, use `handoff '<json payload>'`.
+        {% else %}
+        If finished, use `submit`.
+        {% endif %}
+        (Open: {{open_file}})
+        (Dir: {{working_dir}})
+        bash-$
+
+    reviewer:
+      system_template: |-
+        {% if enable_reviewer %}
+        You are the reviewer. Inspect the coder's current changes, run validation as needed, and decide whether the patch is ready.
+        If the patch is correct, call submit.
+        If the patch needs changes, write concrete feedback to review.txt and call handoff to return control to the coder or planner.
+        handoff.txt contains the coder's structured summary. review.txt is the detailed feedback artifact for the coder.
+        Every response must follow this format exactly:
+        DISCUSSION
+        One short sentence.
+
+        ```
+        single command here
+        ```
+        Rules:
+        - Output exactly one DISCUSSION header.
+        - Output exactly one fenced code block.
+        - Put exactly one shell command inside the code block.
+        - Do not output bare commands outside the code block.
+        - If accepting the patch, the command must be exactly `submit`.
+        - If returning control, use `handoff '<json payload for coder or planner>'`.
+        - Recommended reviewer handoff JSON keys: review_decision, next_role, failing_behavior, required_changes, files_to_revisit, validation_to_rerun.
+        - Recommended reviewer handoff schema: JSON object with a decision string plus arrays for required changes, files, and validations.
+        - Set `next_role` to `coder` when the implementation needs revision.
+        - Set `next_role` to `planner` when the plan itself was wrong or incomplete and a re-plan is needed.
+        Correct examples:
+        DISCUSSION
+        I validated the patch and it is ready.
+
+        ```
+        submit
+        ```
+
+        DISCUSSION
+        I found problems and will return control with feedback.
+
+        ```
+        handoff '<json payload with review_decision, next_role, failing_behavior, required_changes, files_to_revisit, validation_to_rerun>'
+        ```
+        {% else %}
+        Reviewer is disabled.
+        {% endif %}
+      instance_template: |-
+        {% if enable_reviewer %}
+        Reviewer instructions:
+        - Read handoff.txt before reviewing. It contains the planner or coder structured handoff.
+        - Inspect the current repo state and diff.
+        - Run targeted validation and tests.
+        - If the patch is acceptable, call submit.
+        - If the patch is not acceptable, write actionable feedback to review.txt and call handoff.
+        - review.txt should include: failing behavior, what is wrong with the current patch, exact files or functions to revisit, and what validation should be rerun.
+        - If you call handoff, include a structured JSON summary and set `next_role` to `coder` or `planner`.
+        - If you call handoff or submit, do not include any second command in the same response.
+
+        (Open: {{open_file}})
+        (Dir: {{working_dir}})
+        bash-$
+        {% else %}
+        Reviewer is disabled.
+        {% endif %}
+      next_step_template: |-
+        OBSERVATION:
+        {{observation}}
+        Reminder: respond with exactly one DISCUSSION block and exactly one fenced code block containing one shell command.
+        {% if enable_reviewer %}
+        If handing off, use `handoff '<json payload>'`.
+        {% endif %}
+        (Open: {{open_file}})
+        (Dir: {{working_dir}})
+        bash-$
+      next_step_no_output_template: |-
+        Your command ran successfully and did not produce any output.
+        Reminder: respond with exactly one DISCUSSION block and exactly one fenced code block containing one shell command.
+        {% if enable_reviewer %}
+        If handing off, use `handoff '<json payload>'`.
+        {% endif %}
+        (Open: {{open_file}})
+        (Dir: {{working_dir}})
+        bash-$
+
+  tools:
+    env_variables:
+      PAGER: cat
+      MANPAGER: cat
+      LESS: -R
+      PIP_PROGRESS_BAR: "off"
+      TQDM_DISABLE: "1"
+      GIT_PAGER: cat
+    bundles:
+      - path: tools/registry
+      - path: tools/edit_anthropic
+      - path: tools/handoff
+      - path: tools/submit
+    registry_variables:
+      USE_FILEMAP: "true"
+    enable_bash_tool: true
+    parse_function:
+      type: thought_action
+
+  history_processors:
+    - type: cache_control
+      last_n_messages: 2

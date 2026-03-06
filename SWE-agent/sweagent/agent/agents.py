@@ -234,6 +234,30 @@ class MultiAgentConfigMultiModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class MultiAgentConfigThreeModels(BaseModel):
+    """CUSTOM: Custom config class for a planner/coder/reviewer multi-agent structure"""
+
+    name: str = "main"
+    templates: TemplateConfig = Field(default_factory=TemplateConfig)  # type: ignore
+    tools: ToolConfig = Field(default_factory=ToolConfig)  # type: ignore
+    history_processors: list[HistoryProcessor] = Field(default_factory=lambda: [DefaultHistoryProcessor()])
+    model: ModelConfig = Field(description="Shared model options.")
+    roles: dict[str, TemplateConfig]
+
+    max_requeries: int = 3
+    action_sampler: ActionSamplerConfig | None = None
+
+    type: Literal["multi_3_models"] = "multi_3_models"
+
+    planner: str
+    coder: str
+    reviewer: str
+    enable_planner: bool = True
+    enable_reviewer: bool = True
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class RetryAgentConfig(BaseModel):
     name: str = "retry_main"
     agent_configs: list[DefaultAgentConfig]
@@ -244,7 +268,12 @@ class RetryAgentConfig(BaseModel):
 
 # CUSTOM added MultiAgentConfig to the union below
 AgentConfig = Annotated[
-    DefaultAgentConfig | RetryAgentConfig | ShellAgentConfig | MultiAgentConfig | MultiAgentConfigMultiModel,
+    DefaultAgentConfig
+    | RetryAgentConfig
+    | ShellAgentConfig
+    | MultiAgentConfig
+    | MultiAgentConfigMultiModel
+    | MultiAgentConfigThreeModels,
     Field(discriminator="type"),
 ]
 
@@ -310,6 +339,10 @@ def get_agent_from_config(config: AgentConfig) -> AbstractAgent:
 
     elif config.type == "multi_2_models":
         from sweagent.agent.custom.multi_agent_with_2_models import MultiAgent
+
+        return MultiAgent.from_config(config)
+    elif config.type == "multi_3_models":
+        from sweagent.agent.custom.multi_agent_with_3_models import MultiAgent
 
         return MultiAgent.from_config(config)
 

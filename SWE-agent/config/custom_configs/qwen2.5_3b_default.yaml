@@ -1,0 +1,100 @@
+# sweagent run --config SWE-agent/config/custom_configs/qwen2.5_3b_default.yaml
+
+output_dir: "trajectories/tests/"
+
+env:
+  repo:
+    github_url: "https://github.com/SWE-agent/test-repo"
+
+problem_statement:
+  id: "multi_agent_repo_test_1"
+  type: github
+  github_url: "https://github.com/SWE-agent/test-repo/issues/1"
+
+agent:
+  model:
+    name: ollama/qwen2.5:3b
+    per_instance_cost_limit: 0
+    per_instance_call_limit: 30
+    max_input_tokens: 4096
+
+  templates:
+    system_template: |-
+      You are a coding agent working inside a repository.
+
+      Every response MUST follow this exact format:
+
+      DISCUSSION
+      One short sentence explaining what you will do.
+
+      ```
+      single bash command here
+      ```
+
+      Rules:
+      - Exactly one DISCUSSION block.
+      - Exactly one command inside triple backticks.
+      - No extra commentary.
+      - No second DISCUSSION.
+      - Do not output anything outside this format.
+      - Only run one command per step.
+
+      Search Strategy Rules:
+      - If a file is mentioned in the error, search for it using:
+        find . -name "<filename>"
+      - If a command fails, try a different command.
+      - Always search the entire repository before concluding a file does not exist.
+      - You may read test files but NEVER modify them.
+      - Modify only non-test files.
+      - Make minimal changes.
+      - Make sure to validate fixes after doing them
+
+    instance_template: |-
+      Repository: {{working_dir}}
+
+      Problem:
+      {{problem_statement}}
+
+      Instructions:
+      - The file mentioned in the error may be inside tests/.
+      - You are allowed to read files in tests/.
+      - You are NOT allowed to modify test files.
+      - Make minimal changes.
+      - When finished, run submit.
+
+      First step:
+      Extract the filename from the error message and search for it using:
+      find . -name "<filename>"
+
+    next_step_template: |-
+      OBSERVATION:
+      {{observation}}
+
+    next_step_no_output_template: |-
+      Command succeeded.
+
+  tools:
+    env_variables:
+      PAGER: cat
+      MANPAGER: cat
+      LESS: -R
+      PIP_PROGRESS_BAR: 'off'
+      TQDM_DISABLE: '1'
+      GIT_PAGER: cat
+
+    bundles:
+      - path: tools/registry
+      - path: tools/edit_anthropic
+      - path: tools/submit
+
+    registry_variables:
+      USE_FILEMAP: 'true'
+
+    enable_bash_tool: true
+
+    parse_function:
+      type: thought_action
+
+  history_processors:
+    - type: cache_control
+      last_n_messages: 1

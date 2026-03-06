@@ -3,22 +3,23 @@
 # The Shebang: The #!/bin/bash must be the very first line of the file. It tells the system 
 # which interpreter to use. It cannot be inside a function.
 
-# handoff - Signals that the plan.txt is ready and switches roles
+# handoff - Signals that a role is ready to hand work to the next role
 
 main() {
     # 1. Navigate to the repository root
-    cd $ROOT
+    cd "$ROOT" || return 1
 
-    # 2. Check if the plan exists and is non-empty
-    # We use -s to check that the file exists AND has a size greater than zero
-    if [ -s "plan.txt" ]; then
-        echo "Plan finalized. Transitioning to Coder role."
-        # No 'exit 0' inside the function; just let it finish
+    local message="$*"
+
+    if [ -n "$message" ]; then
+        printf '%s\n' "$message" > handoff.txt
+        echo "Handoff message saved to handoff.txt"
+        echo "Handoff summary: $message"
     else
-        echo "Error: plan.txt is missing or empty. Please write your plan before calling handoff."
-        # Return 1 to indicate failure to the caller
-        return 1
+        : > handoff.txt
+        echo "No handoff message provided."
     fi
+    echo "Transitioning to next role."
 }
 
 # This executes the function and passes any arguments (like file paths) to it
