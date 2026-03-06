@@ -55,14 +55,16 @@ agent:
         - Do not output bare commands outside the code block.
         - If you want to hand off, use `handoff '<json payload>'`.
         - The JSON payload should be compact and valid JSON on one line.
-        - Recommended planner handoff JSON keys: problem_summary, root_cause_hypothesis, files_likely_affected, step_by_step_fix_instructions, test_expectations.
-        - Recommended planner handoff schema: JSON object with string fields for summaries and array fields for lists.
+        - The planner handoff is a binding execution contract for the coder, not a loose suggestion.
+        - Do not include patch text, replacement code, diff hunks, or line-by-line edits.
+        - Recommended planner handoff JSON keys: problem_summary, root_cause_hypothesis, files_likely_affected, target_symbols, allowed_change_types, forbidden_edits, required_validations, escalate_if.
+        - Recommended planner handoff schema: JSON object with string fields for summaries and array fields for files, symbols, constraints, and validations.
         Correct example:
         DISCUSSION
         I finished the plan and will pass control.
 
         ```
-        handoff '<json payload with problem_summary, root_cause_hypothesis, files_likely_affected, step_by_step_fix_instructions, test_expectations>'
+        handoff '<json payload with problem_summary, root_cause_hypothesis, files_likely_affected, target_symbols, allowed_change_types, forbidden_edits, required_validations, escalate_if>'
         ```
         {% else %}
         Planner is disabled.
@@ -82,9 +84,10 @@ agent:
         Requirements:
         - Do not write plan.txt.
         - Pass the repair plan through `handoff` as JSON.
-        - Include: problem summary, root cause hypothesis, files likely affected, step-by-step fix instructions, test expectations.
+        - Include: problem summary, root cause hypothesis, files likely affected, target symbols, allowed change types, forbidden edits, required validations, and escalate conditions.
         - Do not modify source files.
         - handoff.txt is the handoff artifact for the coder. Make it complete and actionable.
+        - Keep the plan semantic. Do not write patch text or exact replacement code.
         - When finished, call handoff.
         - If you call handoff, include the full repair plan as JSON in the handoff command.
         - If you call handoff, do not include any second command in the same response.
@@ -121,6 +124,7 @@ agent:
         {% if enable_planner %}
         Follow the plan in handoff.txt and make the code changes through the normal SWE-agent tool loop.
         The planner hands work to you through handoff.txt as JSON.
+        The planner handoff is a binding contract unless review feedback explicitly overrides it.
         {% else %}
         The planner is disabled. Use the problem statement directly and create your own working plan in your reasoning.
         {% endif %}
@@ -149,8 +153,8 @@ agent:
         - Do not output bare commands outside the code block.
         {% if enable_reviewer %}
         - If you want to hand off, use `handoff '<json payload for reviewer>'`.
-        - Recommended coder handoff JSON keys: change_summary, files_changed, tests_run, test_results, open_risks.
-        - Recommended coder handoff schema: JSON object with strings for summaries/results and arrays for file or test lists.
+        - Recommended coder handoff JSON keys: change_summary, files_changed, tests_run, test_results, plan_followed, scope_deviations, open_risks.
+        - Recommended coder handoff schema: JSON object with strings for summaries/results plus arrays for files, tests, and deviations.
         {% else %}
         - When you are done, use `submit`.
         {% endif %}
@@ -168,7 +172,7 @@ agent:
         I finished validation and will send this to review.
 
         ```
-        handoff '<json payload with change_summary, files_changed, tests_run, test_results, open_risks>'
+        handoff '<json payload with change_summary, files_changed, tests_run, test_results, plan_followed, scope_deviations, open_risks>'
         ```
         {% else %}
         Correct example:
@@ -204,7 +208,10 @@ agent:
         Your process:
         {% if enable_planner %}
         - Your first step must be to read handoff.txt.
-        - Treat handoff.txt as the planner's structured repair plan unless review.txt indicates a revision cycle.
+        - Treat handoff.txt as the planner's structured repair contract unless review.txt indicates a revision cycle.
+        - Before editing, inspect the files and symbols named in the planner contract.
+        - Stay within `files_likely_affected` unless you have strong evidence the plan is wrong.
+        - If the apparent fix requires files outside the planner file list, or the root cause does not match the code you inspect, do not freelance. Hand off for replanning or review.
         {% else %}
         - Your first step should be to inspect the repository and identify the relevant files from the problem statement.
         {% endif %}
@@ -218,10 +225,16 @@ agent:
         - Do not combine edit and test commands in one step.
         - Do not use `&&`, `;`, or `||`.
         - Run tests or repro steps before handing off.
+        {% if enable_planner %}
+        - Your edits must match the planner's `allowed_change_types`.
+        - Avoid the planner's `forbidden_edits`.
+        - Run the planner's `required_validations` before handoff whenever possible.
+        - If you cannot satisfy the planner contract, explicitly report the mismatch in your handoff JSON.
+        {% endif %}
         {% if enable_reviewer %}
         - Before calling handoff to the reviewer, make sure the repository state and test results are ready for inspection.
         - When the patch is ready for review, call handoff.
-        - If you call handoff, include a structured JSON summary for the reviewer in the handoff command.
+        - If you call handoff, include a structured JSON summary for the reviewer in the handoff command, including whether you followed the planner contract and any scope deviations.
         - If you call handoff, do not include any second command in the same response.
         {% else %}
         - When the patch is ready, call submit.
@@ -276,8 +289,8 @@ agent:
         - Do not output bare commands outside the code block.
         - If accepting the patch, the command must be exactly `submit`.
         - If returning control, use `handoff '<json payload for coder or planner>'`.
-        - Recommended reviewer handoff JSON keys: review_decision, next_role, failing_behavior, required_changes, files_to_revisit, validation_to_rerun.
-        - Recommended reviewer handoff schema: JSON object with a decision string plus arrays for required changes, files, and validations.
+        - Recommended reviewer handoff JSON keys: review_decision, next_role, failing_behavior, required_changes, files_to_revisit, validation_to_rerun, plan_adherence, scope_violations.
+        - Recommended reviewer handoff schema: JSON object with a decision string plus arrays for required changes, files, validations, and any plan drift.
         - Set `next_role` to `coder` when the implementation needs revision.
         - Set `next_role` to `planner` when the plan itself was wrong or incomplete and a re-plan is needed.
         - If you do not include a valid `next_role`, the run will stop instead of continuing.
@@ -305,11 +318,16 @@ agent:
         {% if enable_reviewer %}
         Reviewer instructions:
         - Read handoff.txt before reviewing. It contains the planner or coder structured handoff.
+        - Compare the coder's actual files and validations against the planner contract in handoff.txt.
         - Inspect the current repo state and diff.
         - Run targeted validation and tests.
         - If the patch is acceptable, call submit.
         - If the patch is not acceptable, write actionable feedback to review.txt and call handoff.
         - review.txt should include: failing behavior, what is wrong with the current patch, exact files or functions to revisit, and what validation should be rerun.
+        - Reject the patch if the coder changed files outside the planner scope without justification.
+        - Reject the patch if the coder skipped required validations without justification.
+        - Route back to the planner when the planner contract itself was wrong or incomplete.
+        - Route back to the coder when the implementation drifted from the contract or the patch is incomplete.
         - If you call handoff, include a structured JSON summary and set `next_role` to `coder` or `planner`.
         - If you do not want another turn, do not call handoff. The run should end unless you explicitly route it onward.
         - If you call handoff or submit, do not include any second command in the same response.
