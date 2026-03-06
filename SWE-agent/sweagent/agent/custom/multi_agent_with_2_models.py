@@ -64,17 +64,14 @@ class MultiAgent(DefaultAgent):
     role_templates: RoleTemplatesConfig | None = None
     roles: dict[str, Role]
 
-    def __init__(self, *args, role_templates: RoleTemplatesConfig | None = None, **kwargs):
+    def __init__(self, *args, role_templates: RoleTemplatesConfig | None = None, models: dict = None, **kwargs):
         """The agent handles the behaviour of the model and how it interacts with the environment.
         To run the agent, either call `self.run` or `self.setup` and then `self.step` in a loop.
         """
+        # Call the parent __init__ method, but don't pass the model argument
         super().__init__(*args, **kwargs)
         self.role_templates = role_templates
-        # TODO may need to change parsing functions , for example to extract list from planner's output
-        # if isinstance(self.model, HumanThoughtModel):
-        #     self.tools.config.parse_function = ThoughtActionParser()
-        # elif isinstance(self.model, HumanModel):
-        #     self.tools.config.parse_function = ActionOnlyParser()
+        self.models = models
 
     @property
     def current_role_name(self) -> str:
@@ -83,14 +80,29 @@ class MultiAgent(DefaultAgent):
     @classmethod
     def from_config(cls, config: MultiAgentConfigMultiModel) -> Self:
         config = config.model_copy(deep=True)
-        model = get_model(config.model, config.tools)
+        # Create a dictionary to hold the models
+        models = {}
+        # Get the planner and coder model names from the config
+        planner_model_name = config.planner
+        coder_model_name = config.coder
+        # Load the planner and coder models
+        models["planner"] = get_model(
+            model_name=planner_model_name,
+            model_args=config.model,
+            tools=config.tools,
+        )
+        models["coder"] = get_model(
+            model_name=coder_model_name,
+            model_args=config.model,
+            tools=config.tools,
+        )
         role_templates = RoleTemplatesConfig(roles=config.roles)
 
         return cls(
-            templates=config.templates,  # not used, but avoids creating error with parent class DefaultAgent
+            templates=config.templates,
             tools=ToolHandler(config.tools),
             history_processors=config.history_processors,
-            model=model,
+            models=models,
             max_requeries=config.max_requeries,
             action_sampler_config=config.action_sampler,
             role_templates=role_templates,
@@ -336,6 +348,8 @@ class MultiAgent(DefaultAgent):
         #####################################################
 
         self.history = role.history
+        # Set the model for the current role
+        self.model = self.models[role.name]
         step_output = self.forward_with_handling(self.messages)
         return step_output
 

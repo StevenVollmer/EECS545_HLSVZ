@@ -316,6 +316,37 @@ class MultiAgent(DefaultAgent):
         self.logger.info("Reviewer disabled: converting coder handoff into submission")
         return self.attempt_autosubmission_after_error(step_output)
 
+    def _handle_reviewer_handoff_policy(self, step_output: StepOutput) -> StepOutput:
+        assert self.current_role is not None
+        if self.current_role.name != "reviewer":
+            return step_output
+        if "handoff" not in (step_output.action or "").lower():
+            return step_output
+
+        payload = self._read_handoff_payload() or {}
+        next_role = str(payload.get("next_role", "")).lower().strip()
+        valid_targets = {"coder"}
+        if self.enable_planner:
+            valid_targets.add("planner")
+
+        if next_role in valid_targets:
+            return step_output
+
+        self.logger.info("Reviewer handoff missing valid next_role; stopping run instead of continuing")
+        step_output = step_output.model_copy(deep=True)
+        step_output.done = True
+        if not step_output.exit_status:
+            step_output.exit_status = "review_stopped"
+        message = (
+            "Reviewer did not request another agent turn. "
+            "Stopping run. Include next_role=coder or next_role=planner in handoff JSON to continue."
+        )
+        if step_output.observation:
+            step_output.observation = f"{step_output.observation}\n{message}"
+        else:
+            step_output.observation = message
+        return step_output
+
     def advance_current_role(self, step_output: StepOutput) -> None:
         assert self.current_role is not None
         action = (step_output.action or "").lower()
@@ -364,6 +395,7 @@ class MultiAgent(DefaultAgent):
 
         step_output = self.run_role_forward(self.current_role)
         step_output = self._handle_disabled_reviewer_handoff(step_output)
+        step_output = self._handle_reviewer_handoff_policy(step_output)
         self.add_step_to_role_history(step_output, self.current_role)
 
         self.info["submission"] = step_output.submission
