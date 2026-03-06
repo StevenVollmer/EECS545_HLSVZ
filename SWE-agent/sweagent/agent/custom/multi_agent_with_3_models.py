@@ -362,7 +362,9 @@ class MultiAgent(DefaultAgent):
         if not self._is_handoff_action(action):
             return
         observation_lines = [line.strip() for line in observation.splitlines() if line.strip()]
-        if any(line.startswith("Error:") for line in observation_lines):
+        # Only treat explicit tool failures as handoff failures. The handoff JSON can
+        # legitimately contain strings like "SyntaxError", which should not block a role switch.
+        if any(line.lower().startswith("error:") for line in observation_lines):
             self.logger.info("Handoff failed for role %s", self.current_role.name)
             return
 
