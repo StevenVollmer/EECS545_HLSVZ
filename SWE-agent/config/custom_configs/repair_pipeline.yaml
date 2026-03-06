@@ -162,10 +162,11 @@ agent:
         - For file changes, use the provided editing tool such as `str_replace_editor`, not an interactive editor.
         - When using `str_replace_editor`, the syntax is `str_replace_editor <command> <absolute_path> ...`.
         - The second argument to `str_replace_editor` must be the file path.
-        - Use absolute paths like `/SWE-agent__test-repo/file.py`, not relative paths.
+        - Use absolute paths rooted at `{{working_dir}}`, not hardcoded repo names and not relative paths.
         - Do not chain commands with `&&`, `;`, or `||`.
         - Editing and testing must happen in separate steps.
         - Do not try to install new editors or tooling.
+        - If a command fails because a path does not exist, do not repeat it unchanged. Correct the path using `{{working_dir}}`.
         {% if enable_reviewer %}
         Correct example:
         DISCUSSION
@@ -188,7 +189,7 @@ agent:
         I will fix the function definition syntax.
 
         ```
-        str_replace_editor str_replace /SWE-agent__test-repo/missing_colon.py --old_str 'def division(a, b)' --new_str 'def division(a, b):'
+        str_replace_editor str_replace {{working_dir}}/path/to/file.py --old_str 'old text' --new_str 'new text'
         ```
 
         Testing example:
@@ -200,15 +201,15 @@ agent:
         ```
       instance_template: |-
         {% if enable_planner %}
-        The planner will prepare handoff.txt for you.
+        The planner will prepare `{{working_dir}}/handoff.txt` for you.
         {% else %}
         The planner is disabled.
         {% endif %}
 
         Your process:
         {% if enable_planner %}
-        - Your first step must be to read handoff.txt.
-        - Treat handoff.txt as the planner's structured repair contract unless review.txt indicates a revision cycle.
+        - Your first step must be to read `{{working_dir}}/handoff.txt`.
+        - Treat `{{working_dir}}/handoff.txt` as the planner's structured repair contract unless `{{working_dir}}/review.txt` indicates a revision cycle.
         - Before editing, inspect the files and symbols named in the planner contract.
         - Stay within `files_likely_affected` unless you have strong evidence the plan is wrong.
         - If the apparent fix requires files outside the planner file list, or the root cause does not match the code you inspect, do not freelance. Hand off for replanning or review.
@@ -216,7 +217,7 @@ agent:
         - Your first step should be to inspect the repository and identify the relevant files from the problem statement.
         {% endif %}
         {% if enable_reviewer %}
-        - If review.txt exists, read review.txt before making further changes and address that feedback first.
+        - If `{{working_dir}}/review.txt` exists, read it before making further changes and address that feedback first.
         {% endif %}
         - Use the shell and editor tools normally.
         - Do not use `vim`, `vi`, `nano`, or any other interactive editor.
@@ -274,7 +275,7 @@ agent:
         You are the reviewer. Inspect the coder's current changes, run validation as needed, and decide whether the patch is ready.
         If the patch is correct, call submit.
         If the patch needs changes, write concrete feedback to review.txt and call handoff to return control to the coder or planner.
-        handoff.txt contains the coder's structured summary. review.txt is the detailed feedback artifact for the coder.
+        `{{working_dir}}/handoff.txt` contains the coder's structured summary. `{{working_dir}}/review.txt` is the detailed feedback artifact for the coder.
         Every response must follow this format exactly:
         DISCUSSION
         One short sentence.
@@ -317,8 +318,8 @@ agent:
       instance_template: |-
         {% if enable_reviewer %}
         Reviewer instructions:
-        - Read handoff.txt before reviewing. It contains the planner or coder structured handoff.
-        - Compare the coder's actual files and validations against the planner contract in handoff.txt.
+        - Read `{{working_dir}}/handoff.txt` before reviewing. It contains the planner or coder structured handoff.
+        - Compare the coder's actual files and validations against the planner contract in `{{working_dir}}/handoff.txt`.
         - Inspect the current repo state and diff.
         - Run targeted validation and tests.
         - If the patch is acceptable, call submit.
