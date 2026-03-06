@@ -282,6 +282,13 @@ class MultiAgent(DefaultAgent):
             return f"/{filename}"
         return f"/{self._env.repo.repo_name}/{filename}"
 
+    def _is_handoff_action(self, action: str) -> bool:
+        stripped = (action or "").strip()
+        if not stripped:
+            return False
+        first_token = stripped.split(maxsplit=1)[0]
+        return first_token == "handoff"
+
     def _read_handoff_payload(self) -> dict[str, Any] | None:
         assert self._env is not None
         try:
@@ -311,7 +318,7 @@ class MultiAgent(DefaultAgent):
         assert self.current_role is not None
         if self.current_role.name != "coder":
             return step_output
-        if "handoff" not in (step_output.action or "").lower():
+        if not self._is_handoff_action(step_output.action or ""):
             return step_output
         self.logger.info("Reviewer disabled: converting coder handoff into submission")
         return self.attempt_autosubmission_after_error(step_output)
@@ -320,7 +327,7 @@ class MultiAgent(DefaultAgent):
         assert self.current_role is not None
         if self.current_role.name != "reviewer":
             return step_output
-        if "handoff" not in (step_output.action or "").lower():
+        if not self._is_handoff_action(step_output.action or ""):
             return step_output
 
         payload = self._read_handoff_payload() or {}
@@ -352,9 +359,10 @@ class MultiAgent(DefaultAgent):
         action = (step_output.action or "").lower()
         observation = step_output.observation or ""
 
-        if "handoff" not in action:
+        if not self._is_handoff_action(action):
             return
-        if "error:" in observation.lower():
+        observation_lines = [line.strip() for line in observation.splitlines() if line.strip()]
+        if any(line.startswith("Error:") for line in observation_lines):
             self.logger.info("Handoff failed for role %s", self.current_role.name)
             return
 
