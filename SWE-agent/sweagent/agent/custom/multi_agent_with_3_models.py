@@ -19,7 +19,7 @@ from jinja2 import Template
 from typing_extensions import Self
 
 from sweagent.agent.agents import DefaultAgent, MultiAgentConfigThreeModels, TemplateConfig
-from sweagent.agent.models import get_model
+from sweagent.agent.models import InstanceStats, get_model
 from sweagent.agent.problem_statement import ProblemStatement, ProblemStatementConfig
 from sweagent.environment.swe_env import SWEEnv
 from sweagent.tools.tools import ToolHandler
@@ -395,6 +395,15 @@ class MultiAgent(DefaultAgent):
         for role in roles_list[1:]:
             self.history += role.history
 
+    def _aggregate_model_stats(self) -> tuple[dict[str, dict[str, int | float]], InstanceStats]:
+        role_stats: dict[str, dict[str, int | float]] = {}
+        total = InstanceStats()
+        for role_name, model in self.models.items():
+            stats = model.stats
+            role_stats[role_name] = stats.model_dump()
+            total = total + stats
+        return role_stats, total
+
     def step(self) -> StepOutput:
         assert self._env is not None
         assert self.current_role is not None
@@ -411,7 +420,9 @@ class MultiAgent(DefaultAgent):
         self.info["submission"] = step_output.submission
         self.info["exit_status"] = step_output.exit_status  # type: ignore[assignment]
         self.info.update(self._get_edited_files_with_context(patch=step_output.submission or ""))  # type: ignore[arg-type]
-        self.info["model_stats"] = self.model.stats.model_dump()
+        role_model_stats, total_model_stats = self._aggregate_model_stats()
+        self.info["role_model_stats"] = role_model_stats
+        self.info["model_stats"] = total_model_stats.model_dump()
         self.add_step_to_trajectory(step_output)
 
         if len(self.role_order) > 1 and not step_output.done:
