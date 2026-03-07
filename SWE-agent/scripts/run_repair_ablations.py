@@ -103,8 +103,9 @@ def _estimate_size_weighted_cost(role_model_stats: dict, role_models: dict[str, 
             continue
         tokens_sent = float(stats.get("tokens_sent", 0) or 0)
         tokens_received = float(stats.get("tokens_received", 0) or 0)
-        # Output tokens are generally more expensive to generate than prompt tokens.
-        proxy = size_b * (tokens_sent + 3.0 * tokens_received)
+        # Report size-weighted token units in billions-of-params times millions-of-tokens.
+        # This keeps the values readable while still reflecting both model size and usage.
+        proxy = size_b * ((tokens_sent + 3.0 * tokens_received) / 1_000_000.0)
         per_role[role_name] = proxy
         total += proxy
         seen = True
@@ -120,6 +121,14 @@ def _flatten_role_stats(role_model_stats: dict) -> dict[str, int | float | None]
         flat[f"{role}_api_calls"] = stats.get("api_calls")
         flat[f"{role}_instance_cost"] = stats.get("instance_cost")
     return flat
+
+
+def _sum_role_api_calls(role_model_stats: dict) -> int:
+    total = 0
+    for role in ("planner", "coder", "reviewer"):
+        stats = role_model_stats.get(role, {}) or {}
+        total += int(stats.get("api_calls", 0) or 0)
+    return total
 
 
 def _is_validation_command(action: str) -> bool:
@@ -179,6 +188,8 @@ def _extract_validation_summary(trajectory: list[dict]) -> dict:
     commands_run = 0
     pass_count = 0
     fail_count = 0
+    self_report_pass = 0
+    self_report_fail = 0
 
     for step in trajectory:
         action = str(step.get("action", "") or "")
@@ -195,18 +206,28 @@ def _extract_validation_summary(trajectory: list[dict]) -> dict:
         if "handoff" in action and ("tests_run" in action or "test_results" in action):
             lowered = action.lower()
             if "passed" in lowered:
-                pass_count += 1
+                self_report_pass += 1
             if "failed" in lowered or "error" in lowered:
-                fail_count += 1
+                self_report_fail += 1
 
     if commands_run == 0 and pass_count == 0 and fail_count == 0:
         status = "not_run"
     elif fail_count > 0:
         status = "failed"
-    elif pass_count > 0:
+    elif commands_run > 0 and pass_count > 0:
         status = "passed"
+    elif commands_run > 0 and self_report_pass > 0:
+        status = "ran_self_reported_passed"
+    elif commands_run > 0 and self_report_fail > 0:
+        status = "ran_self_reported_failed"
+    elif commands_run > 0:
+        status = "ran_no_signal"
+    elif self_report_pass > 0:
+        status = "self_reported_passed"
+    elif self_report_fail > 0:
+        status = "self_reported_failed"
     else:
-        status = "unknown"
+        status = "indeterminate"
 
     return {
         "validation_commands_run": commands_run,
@@ -214,6 +235,8 @@ def _extract_validation_summary(trajectory: list[dict]) -> dict:
         "validation_fail_count": fail_count,
         "validation_status": status,
         "validation_examples": examples,
+        "validation_self_report_pass_count": self_report_pass,
+        "validation_self_report_fail_count": self_report_fail,
     }
 
 
@@ -271,9 +294,13 @@ def _write_indexes(experiment_root: Path, rows: list[dict]) -> None:
         "validation_commands_run",
         "validation_pass_count",
         "validation_fail_count",
+        "validation_self_report_pass_count",
+        "validation_self_report_fail_count",
         "tokens_sent",
         "tokens_received",
         "api_calls",
+        "api_calls_from_roles",
+        "api_calls_consistent",
         "instance_cost",
         "planner_tokens_sent",
         "planner_tokens_received",
@@ -284,9 +311,6 @@ def _write_indexes(experiment_root: Path, rows: list[dict]) -> None:
         "reviewer_tokens_sent",
         "reviewer_tokens_received",
         "reviewer_api_calls",
-        "estimated_size_cost_proxy",
-        "relative_cost_vs_coder_only",
-        "relative_cost_vs_big_coder_only",
         "returncode",
     ]
     with csv_path.open("w", newline="") as f:
@@ -301,29 +325,34 @@ def _write_indexes(experiment_root: Path, rows: list[dict]) -> None:
         f"- Total runs: {len(rows)}",
         f"- JSON index: `{json_path}`",
         f"- CSV index: `{csv_path}`",
-        "- `relative_cost_vs_coder_only` is normalized within each problem, where coder-only = 1.0",
-        "- `relative_cost_vs_big_coder_only` is normalized within each problem, where big_coder_only = 1.0",
         "- `validation_status` is inferred from trajectory/log evidence and is heuristic, not a full benchmark evaluator",
+        "- `api_calls_consistent` checks whether aggregate calls equal the sum of planner/coder/reviewer calls",
+        "- hidden JSON fields still include internal pricing proxies and relative cost baselines",
         "",
-        "| Problem | Mode | Exit | Validation | Patch | Total Proxy | Rel Cost | P/C/R Proxy | P/C/R Calls | Run Dir |",
-        "| --- | --- | --- | --- | --- | ---: | ---: | --- | --- | --- |",
+        "| Problem | Mode | Exit | Validation | Calls | Tokens | P/C/R Tokens | Patch | Run Dir |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for row in rows:
-        per_role_proxy = row.get("per_role_size_cost_proxy", {}) or {}
         per_role_calls = row.get("role_model_stats", {}) or {}
         lines.append(
-            "| {problem_id} | {mode} | {exit_status} | {validation_status} ({validation_commands_run}) | {submission_present} | {estimated_size_cost_proxy} | {relative_cost_vs_coder_only} | p={planner_proxy}, c={coder_proxy}, r={reviewer_proxy} | p={planner_calls}, c={coder_calls}, r={reviewer_calls} | `{run_output_dir}` |".format(
+            "| {problem_id} | {mode} | {exit_status} | {validation_status} ({validation_commands_run}) | total={api_calls}, roles={api_calls_from_roles}, ok={api_calls_consistent} | total in={tokens_sent}, out={tokens_received} | p=({planner_in}/{planner_out}), c=({coder_in}/{coder_out}), r=({reviewer_in}/{reviewer_out}); calls p={planner_calls}, c={coder_calls}, r={reviewer_calls} | {submission_present} | `{run_output_dir}` |".format(
                 problem_id=row.get("problem_id"),
                 mode=row.get("mode"),
                 exit_status=row.get("exit_status"),
                 validation_status=row.get("validation_status"),
                 validation_commands_run=row.get("validation_commands_run"),
+                api_calls=row.get("api_calls"),
+                api_calls_from_roles=row.get("api_calls_from_roles"),
+                api_calls_consistent=row.get("api_calls_consistent"),
                 submission_present=row.get("submission_present"),
-                estimated_size_cost_proxy=row.get("estimated_size_cost_proxy"),
-                relative_cost_vs_coder_only=row.get("relative_cost_vs_coder_only"),
-                planner_proxy=per_role_proxy.get("planner"),
-                coder_proxy=per_role_proxy.get("coder"),
-                reviewer_proxy=per_role_proxy.get("reviewer"),
+                tokens_sent=row.get("tokens_sent"),
+                tokens_received=row.get("tokens_received"),
+                planner_in=row.get("planner_tokens_sent"),
+                planner_out=row.get("planner_tokens_received"),
+                coder_in=row.get("coder_tokens_sent"),
+                coder_out=row.get("coder_tokens_received"),
+                reviewer_in=row.get("reviewer_tokens_sent"),
+                reviewer_out=row.get("reviewer_tokens_received"),
                 planner_calls=(per_role_calls.get("planner", {}) or {}).get("api_calls"),
                 coder_calls=(per_role_calls.get("coder", {}) or {}).get("api_calls"),
                 reviewer_calls=(per_role_calls.get("reviewer", {}) or {}).get("api_calls"),
@@ -404,6 +433,9 @@ def main() -> int:
                 role_models,
             )
             flat_role_stats = _flatten_role_stats(summary.get("role_model_stats", {}))
+            api_calls_from_roles = _sum_role_api_calls(summary.get("role_model_stats", {}))
+            total_api_calls = summary.get("api_calls")
+            api_calls_consistent = None if total_api_calls is None else int(total_api_calls) == api_calls_from_roles
             rows.append(
                 {
                     "problem_id": problem_id,
@@ -421,6 +453,8 @@ def main() -> int:
                     "returncode": None if result is None else result.returncode,
                     "estimated_size_cost_proxy": estimated_size_cost_proxy,
                     "per_role_size_cost_proxy": per_role_size_proxy,
+                    "api_calls_from_roles": api_calls_from_roles,
+                    "api_calls_consistent": api_calls_consistent,
                     **flat_role_stats,
                     **summary,
                 }

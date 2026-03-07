@@ -404,6 +404,29 @@ class MultiAgent(DefaultAgent):
             total = total + stats
         return role_stats, total
 
+    def _should_stop_for_repetition(self) -> bool:
+        if len(self.trajectory) < 3:
+            return False
+        recent = self.trajectory[-3:]
+        actions = [str(step.get("action", "") or "").strip() for step in recent]
+        observations = [str(step.get("observation", "") or "").strip() for step in recent]
+        if not actions[0]:
+            return False
+        if len(set(actions)) == 1 and len(set(observations)) == 1:
+            return True
+
+        hard_failure_markers = [
+            "no such file or directory",
+            "command not found",
+            "usage:",
+            "error: the following arguments are required",
+            "your output was not formatted correctly",
+        ]
+        lowered_observations = [obs.lower() for obs in observations]
+        if len(set(lowered_observations)) == 1 and any(marker in lowered_observations[0] for marker in hard_failure_markers):
+            return True
+        return False
+
     def step(self) -> StepOutput:
         assert self._env is not None
         assert self.current_role is not None
@@ -424,6 +447,17 @@ class MultiAgent(DefaultAgent):
         self.info["role_model_stats"] = role_model_stats
         self.info["model_stats"] = total_model_stats.model_dump()
         self.add_step_to_trajectory(step_output)
+
+        if not step_output.done and self._should_stop_for_repetition():
+            step_output.done = True
+            step_output.exit_status = "stuck_repetition"
+            message = "Stopping run after repeated identical action/observation loop."
+            if step_output.observation:
+                step_output.observation = f"{step_output.observation}\n{message}"
+            else:
+                step_output.observation = message
+            self.info["exit_status"] = step_output.exit_status
+            self.trajectory[-1] = step_output.model_dump()
 
         if len(self.role_order) > 1 and not step_output.done:
             self.advance_current_role(step_output)
