@@ -199,7 +199,7 @@ def main() -> int:
         config = json.loads(json.dumps(base_config))
         config["agent"]["enable_planner"] = enable_planner
         config["agent"]["enable_reviewer"] = enable_reviewer
-        config["agent"]["model"]["per_instance_call_limit"] = 100
+        config["agent"]["model"]["per_instance_call_limit"] = 50
         if big_coder:
             config["agent"]["coder"] = config["agent"]["planner"]
 
