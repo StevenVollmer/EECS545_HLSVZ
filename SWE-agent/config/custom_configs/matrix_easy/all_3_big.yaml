@@ -1,4 +1,4 @@
-output_dir: "trajectories/repair_batch_easy_lmstudio/"
+output_dir: "trajectories/all_3_big/"
 
 instances:
   type: swe_bench
@@ -8,13 +8,9 @@ instances:
   evaluate: false
   deployment:
     type: docker
-    # Disable per-run standalone-Python image rebuilds and reuse the base SWE-bench images.
     python_standalone_dir: ""
     pull: missing
-  # Curated easier SWE-bench dev instances for local-model debugging.
-  # These come from the repo's own easy/dev fixture references, not the official Lite eval set.
-  # Because this uses the full SWE-bench subset, the built-in sb-cli evaluation hook is disabled here.
-  filter: "pydicom__pydicom-1458|marshmallow-code__marshmallow-1867"
+  filter: "pydicom__pydicom-1458"
 
 agent:
   type: multi_3_models
@@ -22,8 +18,8 @@ agent:
   planner: openai/qwen/qwen3.5-35b-a3b
   coder: openai/qwen/qwen3.5-35b-a3b
   reviewer: openai/qwen/qwen3.5-35b-a3b
-  enable_planner: false
-  enable_reviewer: false
+  enable_planner: true
+  enable_reviewer: true
 
   model:
     name: openai/local-model
@@ -65,14 +61,12 @@ agent:
         - The planner handoff is a binding execution contract for the coder, not a loose suggestion.
         - Do not include patch text, replacement code, diff hunks, or line-by-line edits.
         - Recommended planner handoff JSON keys: problem_summary, root_cause_hypothesis, files_likely_affected, target_symbols, allowed_change_types, forbidden_edits, required_validations, escalate_if.
-        - Recommended planner handoff schema: JSON object with string fields for summaries and array fields for files, symbols, constraints, and validations.
-        Correct example:
-        DISCUSSION
-        I finished the plan and will pass control.
-
-        ```
-        handoff '<json payload with problem_summary, root_cause_hypothesis, files_likely_affected, target_symbols, allowed_change_types, forbidden_edits, required_validations, escalate_if>'
-        ```
+        - Prefer to hand off once you have identified the target file, likely root cause, and concrete validation goals.
+        - `numpy_handler.py` is the most likely primary edit site for this bug; inspect supporting files only if they materially change the plan.
+        - Prefer targeted commands such as `grep -n "PixelRepresentation|required_elements|FloatPixelData|DoubleFloatPixelData" /testbed/pydicom/pixel_data_handlers/numpy_handler.py` or `str_replace_editor view /testbed/pydicom/pixel_data_handlers/numpy_handler.py --view_range 280 310` over full-file reads.
+        - Before inspecting a new file, prefer first extracting the relevant lines from the current file and ask whether the new file would change the handoff materially.
+        - Example handoff command:
+          `handoff '{"problem_summary":"...","root_cause_hypothesis":"...","files_likely_affected":["pydicom/pixel_data_handlers/numpy_handler.py"],"target_symbols":["get_pixeldata","required_elements"],"allowed_change_types":["conditional requirement update"],"forbidden_edits":["unrelated refactors"],"required_validations":["repro for float pixel data without PixelRepresentation"],"escalate_if":"if util.py must change"}'`
         {% else %}
         Planner is disabled.
         {% endif %}
@@ -93,15 +87,10 @@ agent:
         - Pass the repair plan through `handoff` as JSON.
         - Include: problem summary, root cause hypothesis, files likely affected, target symbols, allowed change types, forbidden edits, required validations, and escalate conditions.
         - Do not modify source files.
-        - handoff.txt is the handoff artifact for the coder. Make it complete and actionable.
         - Keep the plan semantic. Do not write patch text or exact replacement code.
         - When finished, call handoff.
-        - If you call handoff, include the full repair plan as JSON in the handoff command.
-        - If you call handoff, do not include any second command in the same response.
-
-        (Open: {{open_file}})
-        (Dir: {{working_dir}})
-        bash-$
+        - Prefer inspecting `pydicom/pixel_data_handlers/numpy_handler.py` first.
+        - Use enough inspection to make the handoff precise, but favor a concise execution contract over exhaustive proof gathering.
         {% else %}
         Planner is disabled.
         {% endif %}
@@ -111,6 +100,7 @@ agent:
         Reminder: respond with exactly one DISCUSSION block and exactly one fenced code block containing one shell command.
         {% if enable_planner %}
         If handing off, use `handoff '<json payload>'`.
+        If the observation already identifies the target file, likely root cause, and validation needs, consider handing off now.
         {% endif %}
         (Open: {{open_file}})
         (Dir: {{working_dir}})
@@ -120,6 +110,7 @@ agent:
         Reminder: respond with exactly one DISCUSSION block and exactly one fenced code block containing one shell command.
         {% if enable_planner %}
         If handing off, use `handoff '<json payload>'`.
+        If you already know the target file, likely root cause, and validation needs, consider handing off now.
         {% endif %}
         (Open: {{open_file}})
         (Dir: {{working_dir}})
@@ -136,15 +127,15 @@ agent:
         The planner is disabled. Use the problem statement directly and create your own working plan in your reasoning.
         {% endif %}
         {% if enable_reviewer %}
-        The reviewer hands work back to you through review.txt and may also update handoff.txt.
+        The reviewer is enabled for this run.
         {% else %}
         The reviewer is disabled for this run.
         {% endif %}
-        You should inspect, edit, run tests, and iterate until the fix is ready for review.
+        You should inspect, edit, run tests, and iterate until the fix is ready.
         {% if enable_reviewer %}
-        Do not call submit directly. When you believe the patch is ready, call handoff to pass control to the reviewer.
+        When the patch is ready for review, call handoff with a structured JSON summary for the reviewer.
         {% else %}
-        Because the reviewer is disabled, call submit directly when you believe the patch is ready.
+        Call submit directly when you believe the patch is ready.
         {% endif %}
         Every response must follow this format exactly:
         DISCUSSION
@@ -159,9 +150,8 @@ agent:
         - Put exactly one shell command inside the code block.
         - Do not output bare commands outside the code block.
         {% if enable_reviewer %}
-        - If you want to hand off, use `handoff '<json payload for reviewer>'`.
+        - When you are done with implementation, use `handoff '<json payload>'` for the reviewer.
         - Recommended coder handoff JSON keys: change_summary, files_changed, tests_run, test_results, plan_followed, scope_deviations, open_risks.
-        - Recommended coder handoff schema: JSON object with strings for summaries/results plus arrays for files, tests, and deviations.
         {% else %}
         - When you are done, use `submit`.
         {% endif %}
@@ -169,71 +159,49 @@ agent:
         - For file changes, use the provided editing tool such as `str_replace_editor`, not an interactive editor.
         - When using `str_replace_editor`, the syntax is `str_replace_editor <command> <absolute_path> ...`.
         - The second argument to `str_replace_editor` must be the file path.
-        - Use absolute paths rooted at `{{working_dir}}`, not hardcoded repo names and not relative paths.
+        - Use absolute file paths rooted at `{{working_dir}}`, not hardcoded repo names and not relative paths.
         - Do not chain commands with `&&`, `;`, or `||`.
         - Editing and testing must happen in separate steps.
-        - Do not try to install new editors or tooling.
-        - If a command fails because a path does not exist, do not repeat it unchanged. Correct the path using `{{working_dir}}`.
         - Do not repeat the same read-only command unless the file changed.
-        - Do not read `handoff.txt` more than once unless the planner or reviewer updates it.
+        - Do not read `handoff.txt` more than once unless it changed.
         - Prefer targeted inspection commands such as `grep -n` or `sed -n` over `cat` on whole files.
-        - After at most 2 read-only inspection commands, your next command must be one of: `str_replace_editor ...`, a targeted test/repro command, or `handoff ...` explaining why you cannot proceed.
-        - Once you have identified the target lines, do not inspect the same full file again. Edit it or validate it.
-        - If the observation already contains the file content you needed, do not request the same file again.
-        - If you are stuck repeating inspection, stop and use `handoff` with a JSON payload that explains the blocker.
+        - Keep the original bug statement and the planner contract grounded together; if they conflict, trust the explicit bug statement plus direct code evidence.
+        - Stay anchored to `files_likely_affected` and `target_symbols` from the planner handoff unless direct evidence in the inspected file proves the handoff incomplete.
+        - Before editing, prefer `grep -n` or `str_replace_editor view <path> --view_range start end` to inspect only the relevant lines.
+        - Correct `str_replace_editor` example:
+          `str_replace_editor str_replace {{working_dir}}/path/to/file.py --old_str 'old text' --new_str 'new text'`
+        - Correct targeted view example:
+          `str_replace_editor view {{working_dir}}/path/to/file.py --view_range 280 310`
+        - If you are unsure about the target file, inspect the file named in the handoff again with a targeted command instead of jumping to a new file.
+        {% if enable_reviewer %}
+        - Before handing off to review, make sure the repository state and test results are ready for inspection.
+        {% endif %}
       instance_template: |-
         {% if enable_planner %}
         The planner will prepare `{{working_dir}}/handoff.txt` for you.
+        - Your first step must be to read `{{working_dir}}/handoff.txt`.
+        - Reading `{{working_dir}}/handoff.txt` satisfies the mandatory first-step requirement. Do not read it again unless it changes.
+        - Treat `{{working_dir}}/handoff.txt` as the repair contract.
+        - Before editing, inspect only the files and symbols named in the planner contract.
+        Original problem statement:
+        <problem_statement>
+        {{problem_statement}}
+        </problem_statement>
         {% else %}
-        The planner is disabled.
-
         Problem statement:
         <problem_statement>
         {{problem_statement}}
         </problem_statement>
         {% endif %}
 
-        Your process:
-        {% if enable_planner %}
-        - Your first step must be to read `{{working_dir}}/handoff.txt`.
-        - Reading `{{working_dir}}/handoff.txt` satisfies the mandatory first-step requirement. Do not read it again unless it changes.
-        - Treat `{{working_dir}}/handoff.txt` as the planner's structured repair contract unless `{{working_dir}}/review.txt` indicates a revision cycle.
-        - Before editing, inspect the files and symbols named in the planner contract with narrow commands such as `grep -n` or `sed -n`, not full-file `cat`, unless a targeted command is impossible.
-        - Stay within `files_likely_affected` unless you have strong evidence the plan is wrong.
-        - If the apparent fix requires files outside the planner file list, or the root cause does not match the code you inspect, do not freelance. Hand off for replanning or review.
-        {% else %}
-        - Your first step should be to inspect the repository and identify the relevant files from the problem statement above.
-        - Do not search for a different task. Solve the problem statement shown above.
-        - Prefer the file named by the issue text before doing broad repository exploration.
-        {% endif %}
-        {% if enable_reviewer %}
-        - If `{{working_dir}}/review.txt` exists, read it before making further changes and address that feedback first.
-        {% endif %}
-        - Use the shell and editor tools normally.
-        - Do not use `vim`, `vi`, `nano`, or any other interactive editor.
-        - When you need to modify files, prefer `str_replace_editor`.
-        - Use absolute file paths with `str_replace_editor`.
-        - Do not combine edit and test commands in one step.
-        - Do not use `&&`, `;`, or `||`.
-        - Run tests or repro steps before handing off.
-        - Use a short inspect -> edit -> validate cycle. Do not stay in inspect mode after you know the target lines.
-        - You may use at most 2 read-only commands after the initial handoff read before you must either edit, run a targeted repro/test, or hand off with a blocker report.
-        - Never alternate between `handoff.txt` and the same source file repeatedly.
+        - Use a short inspect -> edit -> validate cycle.
         - If the previous observation already showed the relevant code, move to `str_replace_editor` instead of re-reading.
-        {% if enable_planner %}
-        - Your edits must match the planner's `allowed_change_types`.
-        - Avoid the planner's `forbidden_edits`.
-        - Run the planner's `required_validations` before handoff whenever possible.
-        - If you cannot satisfy the planner contract, explicitly report the mismatch in your handoff JSON.
-        {% endif %}
+        - Prefer line-range views around the target symbols instead of reading entire files.
+        - If you inspect a file, prefer `grep -n` or `str_replace_editor view` around `required_elements`, `PixelRepresentation`, `FloatPixelData`, and `DoubleFloatPixelData`.
         {% if enable_reviewer %}
-        - Before calling handoff to the reviewer, make sure the repository state and test results are ready for inspection.
-        - When the patch is ready for review, call handoff.
-        - If you call handoff, include a structured JSON summary for the reviewer in the handoff command, including whether you followed the planner contract and any scope deviations.
-        - If you call handoff, do not include any second command in the same response.
+        - When the patch is ready, call handoff with a structured reviewer summary.
         {% else %}
         - When the patch is ready, call submit.
-        - Do not use handoff when the reviewer is disabled.
         {% endif %}
 
         (Open: {{open_file}})
@@ -243,11 +211,12 @@ agent:
         OBSERVATION:
         {{observation}}
         Reminder: respond with exactly one DISCUSSION block and exactly one fenced code block containing one shell command.
-        If the last 2 commands were read-only inspections, the next command must be an edit, a targeted validation, or a handoff with a blocker explanation.
         Do not re-read `handoff.txt` unless it changed.
-        Do not `cat` the same full source file again if the needed lines are already visible above.
+        Do not lose track of the planner's `files_likely_affected` and `target_symbols`.
+        Prefer targeted views or `grep -n` over full-file `cat` if the needed lines are already visible above.
+        If an edit command fails, correct the command syntax before reconsidering the diagnosis.
         {% if enable_reviewer %}
-        If handing off, use `handoff '<json payload>'`.
+        If finished, use `handoff '<json payload>'`.
         {% else %}
         If finished, use `submit`.
         {% endif %}
@@ -257,10 +226,10 @@ agent:
       next_step_no_output_template: |-
         Your command ran successfully and did not produce any output.
         Reminder: respond with exactly one DISCUSSION block and exactly one fenced code block containing one shell command.
-        If the last 2 commands were read-only inspections, the next command must be an edit, a targeted validation, or a handoff with a blocker explanation.
         Do not re-read `handoff.txt` unless it changed.
+        Stay grounded in the planner contract and original bug statement.
         {% if enable_reviewer %}
-        If handing off, use `handoff '<json payload>'`.
+        If finished, use `handoff '<json payload>'`.
         {% else %}
         If finished, use `submit`.
         {% endif %}
@@ -290,11 +259,8 @@ agent:
         - If accepting the patch, the command must be exactly `submit`.
         - If returning control, use `handoff '<json payload for coder or planner>'`.
         - Recommended reviewer handoff JSON keys: review_decision, next_role, failing_behavior, required_changes, files_to_revisit, validation_to_rerun, plan_adherence, scope_violations.
-        - Recommended reviewer handoff schema: JSON object with a decision string plus arrays for required changes, files, validations, and any plan drift.
         - Set `next_role` to `coder` when the implementation needs revision.
         - Set `next_role` to `planner` when the plan itself was wrong or incomplete and a re-plan is needed.
-        - If you do not include a valid `next_role`, the run will stop instead of continuing.
-        - Do not chain commands with `&&`, `;`, or `||`.
         - Use one inspection or validation command per step.
         - Prefer `git diff` over `git diff HEAD~1`.
         {% else %}
@@ -303,21 +269,14 @@ agent:
       instance_template: |-
         {% if enable_reviewer %}
         Reviewer instructions:
-        - Read `{{working_dir}}/handoff.txt` before reviewing. It contains the planner or coder structured handoff.
-        - Compare the coder's actual files and validations against the planner contract in `{{working_dir}}/handoff.txt`.
+        - Read `{{working_dir}}/handoff.txt` before reviewing.
+        - Compare the coder's actual files and validations against the planner contract.
         - Inspect the current repo state and diff.
         - Run targeted validation and tests.
         - If the patch is acceptable, call submit.
         - If the patch is not acceptable, write actionable feedback to review.txt and call handoff.
-        - review.txt should include: failing behavior, what is wrong with the current patch, exact files or functions to revisit, and what validation should be rerun.
-        - Reject the patch if the coder changed files outside the planner scope without justification.
-        - Reject the patch if the coder skipped required validations without justification.
         - Route back to the planner when the planner contract itself was wrong or incomplete.
         - Route back to the coder when the implementation drifted from the contract or the patch is incomplete.
-        - If you call handoff, include a structured JSON summary and set `next_role` to `coder` or `planner`.
-        - If you do not want another turn, do not call handoff. The run should end unless you explicitly route it onward.
-        - If you call handoff or submit, do not include any second command in the same response.
-        - Do not combine reading files and diff inspection in the same step.
         - Use `git diff` to inspect current changes.
 
         (Open: {{open_file}})

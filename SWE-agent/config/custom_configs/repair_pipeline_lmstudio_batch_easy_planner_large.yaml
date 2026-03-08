@@ -1,0 +1,176 @@
+output_dir: "trajectories/repair_batch_easy_lmstudio_planner_large_v2/"
+
+instances:
+  type: swe_bench
+  subset: full
+  split: dev
+  shuffle: false
+  evaluate: false
+  deployment:
+    type: docker
+    python_standalone_dir: ""
+    pull: missing
+  filter: "pydicom__pydicom-1458"
+
+agent:
+  type: multi_3_models
+
+  planner: openai/qwen/qwen3.5-35b-a3b
+  coder: openai/qwen/qwen3.5-35b-a3b
+  reviewer: openai/qwen/qwen3.5-35b-a3b
+  enable_planner: true
+  enable_reviewer: false
+
+  model:
+    name: openai/local-model
+    per_instance_cost_limit: 0
+    per_instance_call_limit: 100
+    temperature: 0.1
+    api_key: lm-studio
+    api_base: http://127.0.0.1:1234/v1
+    max_input_tokens: 300000
+    total_cost_limit: 0
+
+  templates:
+    system_template: |-
+      Empty
+    instance_template: |-
+      Empty
+
+  roles:
+    planner:
+      system_template: |-
+        {% if enable_planner %}
+        You are a software instructor. Analyze the issue, inspect the repository, and prepare a concrete repair plan.
+        You may inspect files and run read-only commands.
+        Do not write plan.txt. Pass the plan to the coder through the handoff tool as a JSON string.
+        Every response must follow this format exactly:
+        DISCUSSION
+        One short sentence.
+
+        ```
+        single command here
+        ```
+        - If you want to hand off, use `handoff '<json payload>'`.
+        - After at most 2 read-only inspection commands, your next command must be `handoff`.
+        - If you confirm that `numpy_handler.py` treats `PixelRepresentation` as required for the float pixel path, stop inspecting and hand off immediately.
+        - Do not inspect secondary files such as `util.py` unless `numpy_handler.py` alone is insufficient to state the root cause.
+        {% endif %}
+      instance_template: |-
+        {% if enable_planner %}
+        Repository root: {{working_dir}}
+
+        Problem statement:
+        <problem_statement>
+        {{problem_statement}}
+        </problem_statement>
+        Requirements:
+        - Prefer inspecting `pydicom/pixel_data_handlers/numpy_handler.py` first.
+        - Once you have a plausible root cause and target file, hand off instead of gathering extra confirming evidence.
+        {% endif %}
+      next_step_template: |-
+        OBSERVATION:
+        {{observation}}
+        Reminder: respond with exactly one DISCUSSION block and exactly one fenced code block containing one shell command.
+        {% if enable_planner %}
+        If handing off, use `handoff '<json payload>'`.
+        If the observation already identifies the target file and why the bug occurs, hand off now.
+        Do not spend more than 2 inspection steps before handing off.
+        {% endif %}
+        (Open: {{open_file}})
+        (Dir: {{working_dir}})
+        bash-$
+      next_step_no_output_template: |-
+        Your command ran successfully and did not produce any output.
+        Reminder: respond with exactly one DISCUSSION block and exactly one fenced code block containing one shell command.
+        {% if enable_planner %}
+        If handing off, use `handoff '<json payload>'`.
+        If you already know the target file and root cause, hand off now.
+        {% endif %}
+        (Open: {{open_file}})
+        (Dir: {{working_dir}})
+        bash-$
+
+    coder:
+      system_template: |-
+        You are a senior software engineer.
+        Follow the plan in handoff.txt and make the code changes through the normal SWE-agent tool loop.
+        The reviewer is disabled for this run.
+        Call submit directly when you believe the patch is ready.
+        Every response must follow this format exactly:
+        DISCUSSION
+        One short sentence.
+
+        ```
+        single command here
+        ```
+        - Use `str_replace_editor` for edits.
+        - Prefer targeted inspection commands.
+        - Do not read `handoff.txt` more than once unless it changed.
+        - After at most 2 read-only inspection commands, your next command must be an edit, a targeted test/repro command, or `submit`.
+      instance_template: |-
+        The planner will prepare `{{working_dir}}/handoff.txt` for you.
+
+        Original problem statement:
+        <problem_statement>
+        {{problem_statement}}
+        </problem_statement>
+
+        Your first step must be to read `{{working_dir}}/handoff.txt`.
+        Then inspect only the relevant files, edit, validate, and submit.
+
+        (Open: {{open_file}})
+        (Dir: {{working_dir}})
+        bash-$
+      next_step_template: |-
+        OBSERVATION:
+        {{observation}}
+        Reminder: respond with exactly one DISCUSSION block and exactly one fenced code block containing one shell command.
+        If the last 2 commands were read-only inspections, the next command must be an edit, a targeted validation, or `submit` if finished.
+        Do not re-read `handoff.txt` unless it changed.
+        If finished, use `submit`.
+        (Open: {{open_file}})
+        (Dir: {{working_dir}})
+        bash-$
+      next_step_no_output_template: |-
+        Your command ran successfully and did not produce any output.
+        Reminder: respond with exactly one DISCUSSION block and exactly one fenced code block containing one shell command.
+        If the last 2 commands were read-only inspections, the next command must be an edit, a targeted validation, or `submit` if finished.
+        Do not re-read `handoff.txt` unless it changed.
+        If finished, use `submit`.
+        (Open: {{open_file}})
+        (Dir: {{working_dir}})
+        bash-$
+
+    reviewer:
+      system_template: |-
+        Reviewer is disabled.
+      instance_template: |-
+        Reviewer is disabled.
+      next_step_template: |-
+        Reviewer is disabled.
+      next_step_no_output_template: |-
+        Reviewer is disabled.
+
+  tools:
+    env_variables:
+      PAGER: cat
+      MANPAGER: cat
+      LESS: -R
+      PIP_PROGRESS_BAR: "off"
+      TQDM_DISABLE: "1"
+      GIT_PAGER: cat
+    bundles:
+      - path: tools/registry
+      - path: tools/edit_anthropic
+      - path: tools/handoff
+      - path: tools/submit
+    registry_variables:
+      USE_FILEMAP: "true"
+    enable_bash_tool: true
+    parse_function:
+      type: thought_action
+
+  history_processors:
+    - type: cache_control
+      last_n_messages: 2
