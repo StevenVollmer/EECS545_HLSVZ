@@ -1,0 +1,22 @@
+diff --git a/astroid/raw_building.py b/astroid/raw_building.py
+index cc3aa015..cff66437 100644
+--- a/astroid/raw_building.py
++++ b/astroid/raw_building.py
+@@ -471,7 +471,9 @@ class InspectBuilder:
+             # check if it sounds valid and then add an import node, else use a
+             # dummy node
+             try:
+-                getattr(sys.modules[modname], name)
++                with warnings.catch_warnings():
++                    warnings.simplefilter("ignore")
++                    getattr(sys.modules[modname], name)
+             except (KeyError, AttributeError):
+                 attach_dummy_node(node, name, member)
+             else:
+diff --git a/handoff.txt b/handoff.txt
+new file mode 100644
+index 00000000..2f379750
+--- /dev/null
++++ b/handoff.txt
+@@ -0,0 +1 @@
++{"problem_summary":"astroid/raw_building.py triggers numpy FutureWarning when accessing np.long via getattr in imported_member method","root_cause_hypothesis":"The getattr(sys.modules[modname], name) call at line 474 does not suppress warnings, unlike the similar call in object_build which uses warnings.catch_warnings()","files_likely_affected":["/testbed/astroid/raw_building.py"],"target_symbols":["imported_member"],"allowed_change_types":["add warning suppression around getattr"],"forbidden_edits":["remove existing warning handling","change logic flow"],"required_validations":["run pylint on test case with np.random.seed to verify no FutureWarning","ensure existing tests still pass"],"escalate_if":"if the fix breaks other numpy attribute access patterns"}

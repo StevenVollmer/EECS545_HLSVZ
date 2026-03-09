@@ -114,8 +114,8 @@ def config_path(variant: str) -> Path:
 
 def default_sweagent_bin() -> Path:
     candidates = [
-        project_root() / ".venv" / "bin" / "sweagent",
         project_root() / "env" / "bin" / "sweagent",
+        project_root() / ".venv" / "bin" / "sweagent",
         repo_root() / "env" / "bin" / "sweagent",
     ]
     for candidate in candidates:

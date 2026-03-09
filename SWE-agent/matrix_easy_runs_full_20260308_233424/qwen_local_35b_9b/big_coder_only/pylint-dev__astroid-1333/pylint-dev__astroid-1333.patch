@@ -1,0 +1,18 @@
+diff --git a/astroid/modutils.py b/astroid/modutils.py
+index 6d698469..63898f98 100644
+--- a/astroid/modutils.py
++++ b/astroid/modutils.py
+@@ -627,8 +627,11 @@ def _spec_from_modpath(modpath, path=None, context=None):
+         # integrated builtin module
+         return found_spec._replace(location=None)
+     elif found_spec.type == spec.ModuleType.PKG_DIRECTORY:
+-        location = _has_init(found_spec.location)
+-        return found_spec._replace(location=location, type=spec.ModuleType.PY_SOURCE)
++        init_path = _has_init(found_spec.location)
++        if init_path is None:
++            # No __init__.py means this is a namespace package
++            return found_spec._replace(location=None, type=spec.ModuleType.PY_NAMESPACE)
++        return found_spec._replace(location=init_path, type=spec.ModuleType.PY_SOURCE)
+     return found_spec
+ 
+ 

@@ -3,6 +3,7 @@
 Will be automatically added to `run_batch` if `SWEBenchInstances.evaluate` is set to true
 """
 
+import shutil
 import subprocess
 import sys
 from datetime import datetime
@@ -32,14 +33,19 @@ class SweBenchEvaluate(RunHook):
         self._running_calls = []
         # We need to add a suffix to the run_id to avoid collisions when you reuse the name of your run
         self._time_suffix = datetime.now().strftime("%Y%m%d%H%M%S%f")
+        self._sb_cli_path = shutil.which("sb-cli")
+        if self._sb_cli_path is None:
+            self.logger.warning("sb-cli not found on PATH. SWE-Bench evaluation submission will be skipped.")
 
     @property
     def run_id(self) -> str:
         return f"{self.output_dir.name}_{self._time_suffix}"
 
     def _get_sb_call(self, preds_path: Path, submit_only: bool = False) -> list[str]:
+        if self._sb_cli_path is None:
+            raise FileNotFoundError("sb-cli")
         args = [
-            "sb-cli",
+            self._sb_cli_path,
             "submit",
             self._SUBSET_MAP[self.subset],
             self.split,
@@ -63,6 +69,8 @@ class SweBenchEvaluate(RunHook):
                 self._running_calls.remove(call)
 
     def on_instance_completed(self, *, result: AgentRunResult):
+        if self._sb_cli_path is None:
+            return
         if self.evaluation_interval == 0:
             return
 
@@ -96,6 +104,9 @@ class SweBenchEvaluate(RunHook):
         reports[0].rename(self.output_dir / "results.json")
 
     def on_end(self) -> None:
+        if self._sb_cli_path is None:
+            self.logger.info("Skipping SWE-Bench submission because sb-cli is unavailable")
+            return
         self.logger.info("Submitting results to SWE-Bench")
         try:
             subprocess.run(

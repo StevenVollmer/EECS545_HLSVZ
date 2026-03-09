@@ -1,0 +1,46 @@
+diff --git a/astroid/nodes/node_classes.py b/astroid/nodes/node_classes.py
+index 11136f8c..ef2862e6 100644
+--- a/astroid/nodes/node_classes.py
++++ b/astroid/nodes/node_classes.py
+@@ -2362,7 +2362,11 @@ class Dict(NodeNG, Instance):
+             if isinstance(key, DictUnpack):
+                 try:
+                     return value.getitem(index, context)
+-                except (AstroidTypeError, AstroidIndexError):
++                except (AstroidTypeError, AstroidIndexError, AttributeError):
++                    for inferred_value in value.infer(context):
++                        if inferred_value is util.Uninferable:
++                            continue
++                        return inferred_value.getitem(index, context)
+                     continue
+             for inferredkey in key.infer(context):
+                 if inferredkey is util.Uninferable:
+diff --git a/test_getitem.py b/test_getitem.py
+new file mode 100644
+index 00000000..7f6475d5
+--- /dev/null
++++ b/test_getitem.py
+@@ -0,0 +1,23 @@
++from astroid import parse
++
++
++source = """
++X = {
++    'A': 'B'
++}
++
++Y = {
++    **X
++}
++
++KEY = 'A'
++"""
++
++tree = parse(source)
++
++first_dict = tree.body[0].value
++second_dict = tree.body[1].value
++key = tree.body[2].value
++
++print(f'{first_dict.getitem(key).value = }')
++print(f'{second_dict.getitem(key).value = }')

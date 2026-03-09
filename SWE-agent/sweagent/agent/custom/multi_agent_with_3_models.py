@@ -9,6 +9,7 @@ This follows the same shape as the existing custom multi-agent agents:
 
 from __future__ import annotations
 
+import copy
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -80,14 +81,35 @@ class MultiAgent(DefaultAgent):
     @classmethod
     def from_config(cls, config: MultiAgentConfigThreeModels) -> Self:
         config = config.model_copy(deep=True)
-        def build_role_model(role_name: str, role_model_name: str, override: ModelConfig | None):
-            model_config = override.model_copy(deep=True) if override is not None else config.model.model_copy(deep=True)
+        role_override_fields = (
+            "api_base",
+            "api_key",
+            "api_version",
+            "max_input_tokens",
+            "max_output_tokens",
+            "litellm_model_registry",
+            "custom_tokenizer",
+            "completion_kwargs",
+            "convert_system_to_user",
+            "fallbacks",
+            "delay",
+            "choose_api_key_by_thread",
+            "retry",
+        )
+
+        def build_role_model(role_model_name: str, override: ModelConfig | None):
+            model_config = config.model.model_copy(deep=True)
+            if override is not None:
+                for field_name in role_override_fields:
+                    value = getattr(override, field_name, None)
+                    if value is not None:
+                        setattr(model_config, field_name, copy.deepcopy(value))
             return get_model(model_config.model_copy(update={"name": role_model_name}), config.tools)
 
         models = {
-            "planner": build_role_model("planner", config.planner, config.planner_model_config),
-            "coder": build_role_model("coder", config.coder, config.coder_model_config),
-            "reviewer": build_role_model("reviewer", config.reviewer, config.reviewer_model_config),
+            "planner": build_role_model(config.planner, config.planner_model_config),
+            "coder": build_role_model(config.coder, config.coder_model_config),
+            "reviewer": build_role_model(config.reviewer, config.reviewer_model_config),
         }
         role_templates = RoleTemplatesConfig(roles=config.roles)
 
@@ -461,7 +483,16 @@ class MultiAgent(DefaultAgent):
             else:
                 step_output.observation = message
             self.info["exit_status"] = step_output.exit_status
-            self.trajectory[-1] = step_output.model_dump()
+            self.trajectory[-1] = {
+                "action": step_output.action,
+                "observation": step_output.observation,
+                "response": step_output.output,
+                "thought": step_output.thought,
+                "execution_time": step_output.execution_time,
+                "state": step_output.state,
+                "query": step_output.query,
+                "extra_info": step_output.extra_info,
+            }
 
         if len(self.role_order) > 1 and not step_output.done:
             self.advance_current_role(step_output)
