@@ -1,32 +1,32 @@
 #!/usr/bin/env python3
-"""Summarize how close a trajectory got to the intended bug fix."""
+"""Summarize generic trajectory quality signals for SWE-agent runs."""
 
 from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 
 
-TARGET_FILE = "/testbed/pydicom/pixel_data_handlers/numpy_handler.py"
-WRONG_FILE_HINTS = [
-    "/testbed/pydicom/pixels/pixel_array.py",
-]
-TARGET_TOKENS = [
-    "PixelRepresentation",
-    "required_elements",
-    "FloatPixelData",
-    "DoubleFloatPixelData",
-]
 QUALITY_SCALE = 10
 EFFICIENCY_SCALE = 5
 COMPLETION_SCALE = 5
+ABS_PATH_RE = re.compile(r"(/(?:testbed|workspace|repo)[^\s'\"`]+)")
 EDIT_FAILURE_HINTS = (
     "no replacement was performed",
     "usage: str_replace_editor",
     "invalid `view_range`",
+    "traceback",
     "error:",
 )
+INSPECTION_PREFIXES = (
+    "str_replace_editor view ",
+    "grep ",
+    "sed ",
+    "cat ",
+)
+MODEL_SIZE_RE = re.compile(r"(?P<size>\d+(?:\.\d+)?)b\b", re.IGNORECASE)
 
 
 def _iter_query_texts(step: dict) -> list[str]:
@@ -68,8 +68,40 @@ def load_traj(path: Path) -> dict:
     return json.loads(path.read_text())
 
 
+def parse_replay_config(data: dict) -> dict:
+    config = data.get("replay_config")
+    if isinstance(config, dict):
+        return config
+    if isinstance(config, str) and config:
+        try:
+            return json.loads(config)
+        except json.JSONDecodeError:
+            return {}
+    return {}
+
+
+def model_size_weight(model_name: str) -> float:
+    match = MODEL_SIZE_RE.search(model_name)
+    if not match:
+        return 1.0
+    return float(match.group("size"))
+
+
+def estimate_relative_cost(tokens_in: int, tokens_out: int, model_name: str) -> float:
+    size_weight = model_size_weight(model_name)
+    return (tokens_in * size_weight) + (tokens_out * size_weight * 2.0)
+
+
+def _extract_paths(text: str) -> list[str]:
+    return [match.rstrip(".,:") for match in ABS_PATH_RE.findall(text)]
+
+
 def _is_edit_action(action: str) -> bool:
     return action.startswith("str_replace_editor str_replace ")
+
+
+def _is_inspection_action(action: str) -> bool:
+    return action.startswith(INSPECTION_PREFIXES)
 
 
 def _is_validation_action(action: str) -> bool:
@@ -85,20 +117,41 @@ def _is_validation_action(action: str) -> bool:
     )
 
 
+def _format_score(value: int | float, scale: int, precision: int = 0) -> str:
+    if precision == 0:
+        return f"{int(value)}/{scale}"
+    return f"{value:.{precision}f}/{scale}"
+
+
 def score_traj(data: dict) -> dict:
     trajectory = data.get("trajectory", [])
+    info = data.get("info", {}) if isinstance(data.get("info"), dict) else {}
+    replay_config = parse_replay_config(data)
+    agent_cfg = replay_config.get("agent", {}) if isinstance(replay_config, dict) else {}
+    role_model_names = {
+        "planner": agent_cfg.get("planner", ""),
+        "coder": agent_cfg.get("coder", ""),
+        "reviewer": agent_cfg.get("reviewer", ""),
+    }
+    role_model_stats = info.get("role_model_stats", {}) if isinstance(info.get("role_model_stats"), dict) else {}
+    total_model_stats = info.get("model_stats", {}) if isinstance(info.get("model_stats"), dict) else {}
+    planner_enabled = planner_phase_enabled(data)
     progress_score = 0
     penalty_score = 0
-    planner_enabled = planner_phase_enabled(data)
     applicable_progress_max = 0
+    inspected_files: set[str] = set()
+    edited_files: set[str] = set()
+    inspected_before_first_edit = False
+    saw_edit_attempt = False
     summary: dict[str, object] = {
         "steps": len(trajectory),
         "planner_phase_enabled": planner_enabled,
         "planner_handoff": False,
         "coder_started": False,
-        "target_file_reads": 0,
-        "target_token_hits": 0,
-        "wrong_file_edits": 0,
+        "inspection_steps": 0,
+        "unique_files_inspected": 0,
+        "unique_files_edited": 0,
+        "inspected_before_first_edit": False,
         "edit_attempts": 0,
         "successful_edit_steps": 0,
         "failed_edit_steps": 0,
@@ -108,10 +161,25 @@ def score_traj(data: dict) -> dict:
         "empty_steps": 0,
         "command_error_steps": 0,
         "syntax_errors": 0,
-        "off_target_drift": False,
+        "tokens_in": int(total_model_stats.get("tokens_sent", 0) or 0),
+        "tokens_out": int(total_model_stats.get("tokens_received", 0) or 0),
+        "api_calls": int(total_model_stats.get("api_calls", 0) or 0),
+        "token_total": 0,
+        "tokens_per_step": "0.0",
+        "relative_cost_estimate": 0.0,
+        "planner_model": role_model_names["planner"],
+        "coder_model": role_model_names["coder"],
+        "reviewer_model": role_model_names["reviewer"],
+        "planner_tokens_in": 0,
+        "planner_tokens_out": 0,
+        "coder_tokens_in": 0,
+        "coder_tokens_out": 0,
+        "reviewer_tokens_in": 0,
+        "reviewer_tokens_out": 0,
         "applicable_progress_max": 0,
         "progress_score": 0,
         "penalty_score": 0,
+        "quality_score": "0/10",
         "grounding_score": "0/5",
         "completion_score": "0/5",
         "efficiency_score": "0/5",
@@ -125,38 +193,56 @@ def score_traj(data: dict) -> dict:
         if not action.strip():
             summary["empty_steps"] = int(summary["empty_steps"]) + 1
 
-        if "handoff " in action:
+        if action.startswith("handoff "):
             summary["planner_handoff"] = True
         if "cat /testbed/handoff.txt" in action:
             summary["coder_started"] = True
-        if TARGET_FILE in action or TARGET_FILE in observation:
-            summary["target_file_reads"] = int(summary["target_file_reads"]) + 1
-        if any(token in action or token in observation for token in TARGET_TOKENS):
-            summary["target_token_hits"] = int(summary["target_token_hits"]) + 1
+
+        if _is_inspection_action(action):
+            summary["inspection_steps"] = int(summary["inspection_steps"]) + 1
+            action_paths = _extract_paths(action)
+            inspected_files.update(action_paths)
+            if not saw_edit_attempt and action_paths:
+                inspected_before_first_edit = True
+
         if _is_edit_action(action):
+            saw_edit_attempt = True
             summary["edit_attempts"] = int(summary["edit_attempts"]) + 1
+            action_paths = _extract_paths(action)
+            edited_files.update(action_paths)
             if any(hint in observation_lower for hint in EDIT_FAILURE_HINTS):
                 summary["failed_edit_steps"] = int(summary["failed_edit_steps"]) + 1
                 summary["command_error_steps"] = int(summary["command_error_steps"]) + 1
             else:
                 summary["successful_edit_steps"] = int(summary["successful_edit_steps"]) + 1
+
         if _is_validation_action(action):
             summary["validation_runs"] = int(summary["validation_runs"]) + 1
         if action.strip() == "submit":
             summary["submitted"] = True
         if "autosubmitted" in observation_lower:
             summary["autosubmitted"] = True
-        if any(hint in action for hint in WRONG_FILE_HINTS) and "str_replace_editor" in action:
-            summary["wrong_file_edits"] = int(summary["wrong_file_edits"]) + 1
-            summary["off_target_drift"] = True
-        if "syntax error" in observation_lower or "usage: str_replace_editor" in observation:
+        if "syntax error" in observation_lower or "usage: str_replace_editor" in observation_lower:
             summary["syntax_errors"] = int(summary["syntax_errors"]) + 1
-        if (
-            "invalid `view_range`" in observation_lower
-            or "traceback" in observation_lower
-            or "error:" in observation_lower
-        ):
+        if "invalid `view_range`" in observation_lower or "traceback" in observation_lower or "error:" in observation_lower:
             summary["command_error_steps"] = int(summary["command_error_steps"]) + 1
+
+    summary["unique_files_inspected"] = len(inspected_files)
+    summary["unique_files_edited"] = len(edited_files)
+    summary["inspected_before_first_edit"] = inspected_before_first_edit
+    summary["token_total"] = int(summary["tokens_in"]) + int(summary["tokens_out"])
+    if trajectory:
+        summary["tokens_per_step"] = f"{int(summary['token_total']) / len(trajectory):.1f}"
+
+    relative_cost = 0.0
+    for role in ("planner", "coder", "reviewer"):
+        stats = role_model_stats.get(role, {}) if isinstance(role_model_stats.get(role), dict) else {}
+        role_in = int(stats.get("tokens_sent", 0) or 0)
+        role_out = int(stats.get("tokens_received", 0) or 0)
+        summary[f"{role}_tokens_in"] = role_in
+        summary[f"{role}_tokens_out"] = role_out
+        relative_cost += estimate_relative_cost(role_in, role_out, str(role_model_names.get(role, "")))
+    summary["relative_cost_estimate"] = round(relative_cost, 1)
 
     if planner_enabled:
         applicable_progress_max += 3
@@ -166,10 +252,10 @@ def score_traj(data: dict) -> dict:
             progress_score += 1
 
     applicable_progress_max += 8
-    if int(summary["target_file_reads"]) > 0:
+    if int(summary["inspection_steps"]) > 0:
         progress_score += 2
-    if int(summary["target_token_hits"]) > 1:
-        progress_score += 2
+    if int(summary["unique_files_inspected"]) > 0:
+        progress_score += 1
     if int(summary["successful_edit_steps"]) > 0:
         progress_score += 2
     elif int(summary["edit_attempts"]) > 0:
@@ -177,12 +263,11 @@ def score_traj(data: dict) -> dict:
     if int(summary["validation_runs"]) > 0:
         progress_score += 1
     if summary["submitted"]:
-        progress_score += 1
-    if int(summary["wrong_file_edits"]) > 0:
-        penalty_score += min(3, int(summary["wrong_file_edits"]))
+        progress_score += 2
+
     if int(summary["command_error_steps"]) > 0:
         penalty_score += min(3, int(summary["command_error_steps"]))
-    if summary["off_target_drift"]:
+    if int(summary["failed_edit_steps"]) > 1:
         penalty_score += 1
     if int(summary["empty_steps"]) > 0:
         penalty_score += 1
@@ -194,11 +279,13 @@ def score_traj(data: dict) -> dict:
     net_score = max(0, min(QUALITY_SCALE, normalized_score))
 
     grounding = 0
-    if int(summary["target_file_reads"]) > 0:
+    if int(summary["inspection_steps"]) > 0:
         grounding += 2
-    if int(summary["wrong_file_edits"]) == 0:
-        grounding += 2
-    if not summary["off_target_drift"]:
+    if inspected_before_first_edit:
+        grounding += 1
+    if edited_files and edited_files.issubset(inspected_files):
+        grounding += 1
+    if int(summary["unique_files_edited"]) <= 2:
         grounding += 1
 
     completion = 0
@@ -220,19 +307,21 @@ def score_traj(data: dict) -> dict:
         efficiency -= 1
     if int(summary["empty_steps"]) > 0:
         efficiency -= 1
-    if int(summary["target_file_reads"]) > 8:
+    if int(summary["inspection_steps"]) > 10:
         efficiency -= 1
-    if len(trajectory) > 25:
+    if len(trajectory) > 25 or int(summary["token_total"]) > 100000:
+        efficiency -= 1
+    if trajectory and (int(summary["token_total"]) / len(trajectory)) > 4000:
         efficiency -= 1
     efficiency = max(0, min(EFFICIENCY_SCALE, efficiency))
 
     summary["applicable_progress_max"] = applicable_progress_max
     summary["progress_score"] = progress_score
     summary["penalty_score"] = penalty_score
-    summary["quality_score"] = f"{net_score}/{QUALITY_SCALE}"
-    summary["grounding_score"] = f"{grounding}/5"
-    summary["completion_score"] = f"{completion}/{COMPLETION_SCALE}"
-    summary["efficiency_score"] = f"{efficiency}/{EFFICIENCY_SCALE}"
+    summary["quality_score"] = _format_score(net_score, QUALITY_SCALE)
+    summary["grounding_score"] = _format_score(grounding, 5)
+    summary["completion_score"] = _format_score(completion, COMPLETION_SCALE)
+    summary["efficiency_score"] = _format_score(efficiency, EFFICIENCY_SCALE)
     return summary
 
 

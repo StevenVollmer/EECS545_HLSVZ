@@ -1,77 +1,29 @@
-# Latest Matrix Easy Results
+# Matrix Batch Results
 
-| Variant | Exit | Quality | Completion | Efficiency | Grounding | Validations | Good Edits | Failed Edits | Submitted | Planner | Steps |
-| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | --- | --- | ---: |
-| small_coder_only | exit_format | 0/10 | 0/5 | 2/5 | 5/5 | 0 | 0 | 0 | False | False | 17 |
-| big_coder_only | exit_format | 1/10 | 0/5 | 3/5 | 5/5 | 0 | 0 | 0 | False | False | 11 |
-| big_planner_small_coder | Uncaught ValidationError | 5/10 | 3/5 | 0/5 | 5/5 | 2 | 1 | 4 | False | True | 26 |
-| big_planner_big_coder | submitted | 7/10 | 5/5 | 1/5 | 5/5 | 3 | 1 | 2 | True | True | 29 |
-| big_planner_small_coder_small_reviewer | submitted (exit_format) | 6/10 | 3/5 | 2/5 | 5/5 | 0 | 1 | 0 | False | True | 18 |
-| big_planner_small_coder_big_reviewer | submitted (exit_format) | 4/10 | 1/5 | 2/5 | 5/5 | 0 | 0 | 0 | False | True | 22 |
-| all_3_big | submitted | 7/10 | 5/5 | 1/5 | 5/5 | 8 | 1 | 2 | True | True | 45 |
+- variants: `7`
+- projects: `1`
+- issues: `1`
+
+## Variant Aggregate
+
+| Variant | Instances | Submitted | Avg Quality | Avg Completion | Avg Efficiency | Avg Grounding | Avg In Tok | Avg Out Tok | Avg Rel Cost | Avg Steps |
+| --- | ---: | ---: | --- | --- | --- | --- | ---: | ---: | ---: | ---: |
+| all_3_big | 1 | 1/1 | 6.0/10 | 5.0/5 | 0.0/5 | 5.0/5 | 292673.0 | 4786.0 | 10578575.0 | 45.0 |
+| big_coder_only | 1 | 0/1 | 0.0/10 | 0.0/5 | 2.0/5 | 4.0/5 | 62808.0 | 1865.0 | 2328830.0 | 11.0 |
+| big_planner_big_coder | 1 | 1/1 | 6.0/10 | 5.0/5 | 1.0/5 | 5.0/5 | 98603.0 | 3177.0 | 3673495.0 | 29.0 |
+| big_planner_small_coder | 1 | 0/1 | 4.0/10 | 3.0/5 | 0.0/5 | 5.0/5 | 99774.0 | 3357.0 | 1631376.0 | 26.0 |
+| big_planner_small_coder_big_reviewer | 1 | 0/1 | 3.0/10 | 1.0/5 | 2.0/5 | 4.0/5 | 85796.0 | 2199.0 | 1606098.0 | 22.0 |
+| big_planner_small_coder_small_reviewer | 1 | 0/1 | 5.0/10 | 3.0/5 | 2.0/5 | 5.0/5 | 45789.0 | 2082.0 | 1304249.0 | 18.0 |
+| small_coder_only | 1 | 0/1 | 0.0/10 | 0.0/5 | 0.0/5 | 4.0/5 | 115210.0 | 1933.0 | 1071684.0 | 17.0 |
+
+## Project Index
+
+| Project | Issues | Variants | Avg Quality | Avg Completion | Avg Efficiency | Avg In Tok | Avg Out Tok | Avg Rel Cost | Best Variant | Report |
+| --- | ---: | ---: | --- | --- | --- | ---: | ---: | ---: | --- | --- |
+| pydicom__pydicom | 1 | 7 | 3.4/10 | 2.4/5 | 1.0/5 | 114379.0 | 2771.3 | 3170615.3 | all_3_big | [pydicom__pydicom](./projects/pydicom__pydicom/README.md) |
 
 ## Files
 
-### small_coder_only
-- exit: `exit_format`
-- traj: `/Users/rafe/classes/eecs545/project/SWE-agent/latest_matrix_easy_results/small_coder_only/pydicom__pydicom-1458/pydicom__pydicom-1458.traj`
-- patch: `none`
-- info log: `none`
-- debug log: `none`
-- preds: `none`
-- exit yaml: `/Users/rafe/classes/eecs545/project/SWE-agent/latest_matrix_easy_results/small_coder_only/run_batch_exit_statuses.yaml`
-
-### big_coder_only
-- exit: `exit_format`
-- traj: `/Users/rafe/classes/eecs545/project/SWE-agent/latest_matrix_easy_results/big_coder_only/pydicom__pydicom-1458/pydicom__pydicom-1458.traj`
-- patch: `none`
-- info log: `none`
-- debug log: `none`
-- preds: `none`
-- exit yaml: `/Users/rafe/classes/eecs545/project/SWE-agent/latest_matrix_easy_results/big_coder_only/run_batch_exit_statuses.yaml`
-
-### big_planner_small_coder
-- exit: `Uncaught ValidationError`
-- traj: `/Users/rafe/classes/eecs545/project/SWE-agent/latest_matrix_easy_results/big_planner_small_coder/pydicom__pydicom-1458/pydicom__pydicom-1458.traj`
-- patch: `none`
-- info log: `none`
-- debug log: `none`
-- preds: `none`
-- exit yaml: `/Users/rafe/classes/eecs545/project/SWE-agent/latest_matrix_easy_results/big_planner_small_coder/run_batch_exit_statuses.yaml`
-
-### big_planner_big_coder
-- exit: `submitted`
-- traj: `/Users/rafe/classes/eecs545/project/SWE-agent/latest_matrix_easy_results/big_planner_big_coder/pydicom__pydicom-1458/pydicom__pydicom-1458.traj`
-- patch: `/Users/rafe/classes/eecs545/project/SWE-agent/latest_matrix_easy_results/big_planner_big_coder/pydicom__pydicom-1458/pydicom__pydicom-1458.patch`
-- info log: `none`
-- debug log: `none`
-- preds: `none`
-- exit yaml: `/Users/rafe/classes/eecs545/project/SWE-agent/latest_matrix_easy_results/big_planner_big_coder/run_batch_exit_statuses.yaml`
-
-### big_planner_small_coder_small_reviewer
-- exit: `submitted (exit_format)`
-- traj: `/Users/rafe/classes/eecs545/project/SWE-agent/latest_matrix_easy_results/big_planner_small_coder_small_reviewer/pydicom__pydicom-1458/pydicom__pydicom-1458.traj`
-- patch: `/Users/rafe/classes/eecs545/project/SWE-agent/latest_matrix_easy_results/big_planner_small_coder_small_reviewer/pydicom__pydicom-1458/pydicom__pydicom-1458.patch`
-- info log: `none`
-- debug log: `none`
-- preds: `none`
-- exit yaml: `/Users/rafe/classes/eecs545/project/SWE-agent/latest_matrix_easy_results/big_planner_small_coder_small_reviewer/run_batch_exit_statuses.yaml`
-
-### big_planner_small_coder_big_reviewer
-- exit: `submitted (exit_format)`
-- traj: `/Users/rafe/classes/eecs545/project/SWE-agent/latest_matrix_easy_results/big_planner_small_coder_big_reviewer/pydicom__pydicom-1458/pydicom__pydicom-1458.traj`
-- patch: `/Users/rafe/classes/eecs545/project/SWE-agent/latest_matrix_easy_results/big_planner_small_coder_big_reviewer/pydicom__pydicom-1458/pydicom__pydicom-1458.patch`
-- info log: `none`
-- debug log: `none`
-- preds: `none`
-- exit yaml: `/Users/rafe/classes/eecs545/project/SWE-agent/latest_matrix_easy_results/big_planner_small_coder_big_reviewer/run_batch_exit_statuses.yaml`
-
-### all_3_big
-- exit: `submitted`
-- traj: `/Users/rafe/classes/eecs545/project/SWE-agent/latest_matrix_easy_results/all_3_big/pydicom__pydicom-1458/pydicom__pydicom-1458.traj`
-- patch: `/Users/rafe/classes/eecs545/project/SWE-agent/latest_matrix_easy_results/all_3_big/pydicom__pydicom-1458/pydicom__pydicom-1458.patch`
-- info log: `none`
-- debug log: `none`
-- preds: `none`
-- exit yaml: `/Users/rafe/classes/eecs545/project/SWE-agent/latest_matrix_easy_results/all_3_big/run_batch_exit_statuses.yaml`
-
+- `summary.csv`: one row per `(variant, instance)` pair
+- `summary.json`: JSON version of the same table
+- `projects/<project>/README.md`: per-project comparisons across all variants

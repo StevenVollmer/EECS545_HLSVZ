@@ -252,6 +252,9 @@ class MultiAgentConfigThreeModels(BaseModel):
     planner: str
     coder: str
     reviewer: str
+    planner_model_config: ModelConfig | None = None
+    coder_model_config: ModelConfig | None = None
+    reviewer_model_config: ModelConfig | None = None
     enable_planner: bool = True
     enable_reviewer: bool = True
 

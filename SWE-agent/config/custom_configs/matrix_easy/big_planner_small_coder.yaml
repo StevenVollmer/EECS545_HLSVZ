@@ -2,15 +2,15 @@ output_dir: "trajectories/big_planner_small_coder/"
 
 instances:
   type: swe_bench
-  subset: full
+  subset: lite
   split: dev
-  shuffle: false
-  evaluate: false
+  shuffle: true
+  slice: ":10"
+  evaluate: true
   deployment:
     type: docker
     python_standalone_dir: ""
     pull: missing
-  filter: "pydicom__pydicom-1458"
 
 agent:
   type: multi_3_models
@@ -62,11 +62,10 @@ agent:
         - Do not include patch text, replacement code, diff hunks, or line-by-line edits.
         - Recommended planner handoff JSON keys: problem_summary, root_cause_hypothesis, files_likely_affected, target_symbols, allowed_change_types, forbidden_edits, required_validations, escalate_if.
         - Prefer to hand off once you have identified the target file, likely root cause, and concrete validation goals.
-        - `numpy_handler.py` is the most likely primary edit site for this bug; inspect supporting files only if they materially change the plan.
-        - Prefer targeted commands such as `grep -n "PixelRepresentation|required_elements|FloatPixelData|DoubleFloatPixelData" /testbed/pydicom/pixel_data_handlers/numpy_handler.py` or `str_replace_editor view /testbed/pydicom/pixel_data_handlers/numpy_handler.py --view_range 280 310` over full-file reads.
-        - Before inspecting a new file, prefer first extracting the relevant lines from the current file and ask whether the new file would change the handoff materially.
+        - Prefer targeted inspection commands against files or symbols named by the issue text over full-file reads.
+        - Before inspecting a new file, prefer extracting the relevant lines from the current file and ask whether the new file would materially change the handoff.
         - Example handoff command:
-          `handoff '{"problem_summary":"...","root_cause_hypothesis":"...","files_likely_affected":["pydicom/pixel_data_handlers/numpy_handler.py"],"target_symbols":["get_pixeldata","required_elements"],"allowed_change_types":["conditional requirement update"],"forbidden_edits":["unrelated refactors"],"required_validations":["repro for float pixel data without PixelRepresentation"],"escalate_if":"if util.py must change"}'`
+          `handoff '{"problem_summary":"...","root_cause_hypothesis":"...","files_likely_affected":["path/to/file.py"],"target_symbols":["symbol_name"],"allowed_change_types":["targeted fix"],"forbidden_edits":["unrelated refactors"],"required_validations":["targeted repro or test"],"escalate_if":"if the root cause requires broader changes"}'`
         {% else %}
         Planner is disabled.
         {% endif %}
@@ -89,7 +88,7 @@ agent:
         - Do not modify source files.
         - Keep the plan semantic. Do not write patch text or exact replacement code.
         - When finished, call handoff.
-        - Prefer inspecting `pydicom/pixel_data_handlers/numpy_handler.py` first.
+        - Prefer inspecting the file or module named most directly by the issue text first.
         - Use enough inspection to make the handoff precise, but favor a concise execution contract over exhaustive proof gathering.
         {% else %}
         Planner is disabled.
@@ -197,7 +196,7 @@ agent:
         - Use a short inspect -> edit -> validate cycle.
         - If the previous observation already showed the relevant code, move to `str_replace_editor` instead of re-reading.
         - Prefer line-range views around the target symbols instead of reading entire files.
-        - If you inspect a file, prefer `grep -n` or `str_replace_editor view` around `required_elements`, `PixelRepresentation`, `FloatPixelData`, and `DoubleFloatPixelData`.
+        - If you inspect a file, prefer `grep -n` or `str_replace_editor view` around the symbols or stack locations named by the issue text.
         {% if enable_reviewer %}
         - When the patch is ready, call handoff with a structured reviewer summary.
         {% else %}

@@ -1,44 +1,78 @@
 #!/usr/bin/env python3
-"""Build a compact index for latest_matrix_easy_results."""
+"""Build per-instance, per-project, and overall summaries for matrix batch results."""
 
 from __future__ import annotations
 
+import argparse
 import csv
 import json
+import re
+from collections import defaultdict
 from pathlib import Path
 
 from analyze_traj_quality import score_traj
 
 
-VARIANTS = [
-    "small_coder_only",
-    "big_coder_only",
-    "big_planner_small_coder",
-    "big_planner_big_coder",
-    "big_planner_small_coder_small_reviewer",
-    "big_planner_small_coder_big_reviewer",
-    "all_3_big",
-]
+SCORE_KEYS = ("quality_score", "completion_score", "efficiency_score", "grounding_score")
+BOOL_KEYS = ("submitted", "planner_phase_enabled")
+INT_KEYS = ("steps", "validation_runs", "successful_edit_steps", "failed_edit_steps")
 
 
 def repo_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
-def latest_root() -> Path:
+def default_results_root() -> Path:
     return repo_root() / "latest_matrix_easy_results"
 
 
-def read_exit_status(path: Path) -> str:
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--root",
+        type=Path,
+        default=default_results_root(),
+        help="Matrix results root containing one directory per variant.",
+    )
+    return parser.parse_args()
+
+
+def discover_variants(root: Path) -> list[Path]:
+    variants = []
+    for path in sorted(root.iterdir()):
+        if not path.is_dir() or path.name == "projects":
+            continue
+        if (path / "run_batch.config.yaml").exists() or (path / "run_batch_exit_statuses.yaml").exists():
+            variants.append(path)
+    return variants
+
+
+def project_id_from_instance(instance_id: str) -> str:
+    match = re.match(r"^(?P<project>.+)-(?P<issue>\d+)$", instance_id)
+    return match.group("project") if match else instance_id
+
+
+def read_exit_statuses(path: Path) -> dict[str, str]:
     if not path.exists():
-        return "missing"
-    text = path.read_text().splitlines()
-    current = None
-    for line in text:
+        return {}
+    statuses: dict[str, str] = {}
+    current: str | None = None
+    inside = False
+    for line in path.read_text().splitlines():
         stripped = line.strip()
-        if stripped.endswith(":") and stripped not in {"instances_by_exit_status:", "total_cost:"}:
+        if stripped == "instances_by_exit_status:":
+            inside = True
+            continue
+        if not inside:
+            continue
+        if stripped.startswith("total_cost:"):
+            break
+        if stripped.endswith(":") and not stripped.startswith("-"):
             current = stripped[:-1]
-    return current or "unknown"
+            continue
+        if stripped.startswith("- ") and current:
+            statuses[stripped[2:].strip()] = current
+    return statuses
 
 
 def read_traj_score(path: Path) -> dict[str, object]:
@@ -56,51 +90,80 @@ def read_traj_score(path: Path) -> dict[str, object]:
             "failed_edit_steps": "n/a",
             "submitted": "n/a",
             "planner_phase_enabled": "n/a",
+            "tokens_in": "n/a",
+            "tokens_out": "n/a",
+            "token_total": "n/a",
+            "tokens_per_step": "n/a",
+            "api_calls": "n/a",
+            "relative_cost_estimate": "n/a",
         }
     data = json.loads(path.read_text())
     return score_traj(data)
 
 
-def build_rows() -> list[dict[str, object]]:
+def list_variant_instances(variant_dir: Path) -> set[str]:
+    return {
+        child.name
+        for child in variant_dir.iterdir()
+        if child.is_dir() and any(child.glob("*.traj"))
+    }
+
+
+def build_rows(root: Path) -> list[dict[str, object]]:
+    variants = discover_variants(root)
+    instance_ids = sorted({instance for variant in variants for instance in list_variant_instances(variant)})
     rows: list[dict[str, object]] = []
-    root = latest_root()
-    for variant in VARIANTS:
-        variant_dir = root / variant
-        traj = variant_dir / "pydicom__pydicom-1458" / "pydicom__pydicom-1458.traj"
-        patch = variant_dir / "pydicom__pydicom-1458" / "pydicom__pydicom-1458.patch"
-        info_log = variant_dir / "pydicom__pydicom-1458" / "pydicom__pydicom-1458.info.log"
-        debug_log = variant_dir / "pydicom__pydicom-1458" / "pydicom__pydicom-1458.debug.log"
-        exit_yaml = variant_dir / "run_batch_exit_statuses.yaml"
+
+    for variant_dir in variants:
+        variant = variant_dir.name
+        exit_statuses = read_exit_statuses(variant_dir / "run_batch_exit_statuses.yaml")
         preds = variant_dir / "preds.json"
-        score = read_traj_score(traj)
-        rows.append(
-            {
-                "variant": variant,
-                "exit_status": read_exit_status(exit_yaml),
-                "quality_score": score["quality_score"],
-                "grounding_score": score["grounding_score"],
-                "completion_score": score["completion_score"],
-                "efficiency_score": score["efficiency_score"],
-                "progress_score": score["progress_score"],
-                "penalty_score": score["penalty_score"],
-                "steps": score["steps"],
-                "validation_runs": score["validation_runs"],
-                "successful_edit_steps": score["successful_edit_steps"],
-                "failed_edit_steps": score["failed_edit_steps"],
-                "submitted": score["submitted"],
-                "planner_phase_enabled": score["planner_phase_enabled"],
-                "traj": str(traj),
-                "patch": str(patch) if patch.exists() else "",
-                "info_log": str(info_log) if info_log.exists() else "",
-                "debug_log": str(debug_log) if debug_log.exists() else "",
-                "preds": str(preds) if preds.exists() else "",
-                "exit_yaml": str(exit_yaml) if exit_yaml.exists() else "",
-            }
-        )
+        for instance_id in instance_ids:
+            instance_dir = variant_dir / instance_id
+            traj = instance_dir / f"{instance_id}.traj"
+            patch = instance_dir / f"{instance_id}.patch"
+            info_log = instance_dir / f"{instance_id}.info.log"
+            debug_log = instance_dir / f"{instance_id}.debug.log"
+            exit_yaml = variant_dir / "run_batch_exit_statuses.yaml"
+            score = read_traj_score(traj)
+            rows.append(
+                {
+                    "project_id": project_id_from_instance(instance_id),
+                    "instance_id": instance_id,
+                    "variant": variant,
+                    "exit_status": exit_statuses.get(instance_id, "missing"),
+                    "quality_score": score["quality_score"],
+                    "grounding_score": score["grounding_score"],
+                    "completion_score": score["completion_score"],
+                    "efficiency_score": score["efficiency_score"],
+                    "progress_score": score["progress_score"],
+                    "penalty_score": score["penalty_score"],
+                    "steps": score["steps"],
+                    "validation_runs": score["validation_runs"],
+                    "successful_edit_steps": score["successful_edit_steps"],
+                    "failed_edit_steps": score["failed_edit_steps"],
+                    "submitted": score["submitted"],
+                    "planner_phase_enabled": score["planner_phase_enabled"],
+                    "tokens_in": score["tokens_in"],
+                    "tokens_out": score["tokens_out"],
+                    "token_total": score["token_total"],
+                    "tokens_per_step": score["tokens_per_step"],
+                    "api_calls": score["api_calls"],
+                    "relative_cost_estimate": score["relative_cost_estimate"],
+                    "traj": str(traj) if traj.exists() else "",
+                    "patch": str(patch) if patch.exists() else "",
+                    "info_log": str(info_log) if info_log.exists() else "",
+                    "debug_log": str(debug_log) if debug_log.exists() else "",
+                    "preds": str(preds) if preds.exists() else "",
+                    "exit_yaml": str(exit_yaml) if exit_yaml.exists() else "",
+                }
+            )
     return rows
 
 
 def write_csv(rows: list[dict[str, object]], path: Path) -> None:
+    if not rows:
+        return
     fieldnames = list(rows[0].keys())
     with path.open("w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -112,17 +175,140 @@ def write_json(rows: list[dict[str, object]], path: Path) -> None:
     path.write_text(json.dumps(rows, indent=2) + "\n")
 
 
-def write_md(rows: list[dict[str, object]], path: Path) -> None:
-    lines = [
-        "# Latest Matrix Easy Results",
-        "",
-        "| Variant | Exit | Quality | Completion | Efficiency | Grounding | Validations | Good Edits | Failed Edits | Submitted | Planner | Steps |",
-        "| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | --- | --- | ---: |",
-    ]
+def score_fraction(value: object) -> tuple[float, int] | None:
+    if not isinstance(value, str) or "/" not in value:
+        return None
+    numerator, denominator = value.split("/", 1)
+    try:
+        return float(numerator), int(denominator)
+    except ValueError:
+        return None
+
+
+def average_fraction(rows: list[dict[str, object]], key: str) -> str:
+    values = [score_fraction(row[key]) for row in rows]
+    parsed = [value for value in values if value is not None]
+    if not parsed:
+        return "n/a"
+    total = sum(value for value, _ in parsed)
+    scale = parsed[0][1]
+    return f"{total / len(parsed):.1f}/{scale}"
+
+
+def average_int(rows: list[dict[str, object]], key: str) -> str:
+    values = [row[key] for row in rows if isinstance(row[key], int)]
+    if not values:
+        return "n/a"
+    return f"{sum(values) / len(values):.1f}"
+
+
+def average_float(rows: list[dict[str, object]], key: str) -> str:
+    values = [float(row[key]) for row in rows if isinstance(row[key], (int, float))]
+    if not values:
+        return "n/a"
+    return f"{sum(values) / len(values):.1f}"
+
+
+def true_count(rows: list[dict[str, object]], key: str) -> str:
+    values = [row[key] for row in rows if isinstance(row[key], bool)]
+    if not values:
+        return "n/a"
+    return f"{sum(values)}/{len(values)}"
+
+
+def group_by(rows: list[dict[str, object]], key: str) -> dict[str, list[dict[str, object]]]:
+    grouped: dict[str, list[dict[str, object]]] = defaultdict(list)
     for row in rows:
+        grouped[str(row[key])].append(row)
+    return dict(sorted(grouped.items()))
+
+
+def build_variant_rollup(rows: list[dict[str, object]]) -> list[dict[str, object]]:
+    rollup = []
+    for variant, variant_rows in group_by(rows, "variant").items():
+        rollup.append(
+            {
+                "variant": variant,
+                "instances": len(variant_rows),
+                "submitted": true_count(variant_rows, "submitted"),
+                "avg_quality": average_fraction(variant_rows, "quality_score"),
+                "avg_completion": average_fraction(variant_rows, "completion_score"),
+                "avg_efficiency": average_fraction(variant_rows, "efficiency_score"),
+                "avg_grounding": average_fraction(variant_rows, "grounding_score"),
+                "avg_steps": average_int(variant_rows, "steps"),
+                "avg_tokens_in": average_int(variant_rows, "tokens_in"),
+                "avg_tokens_out": average_int(variant_rows, "tokens_out"),
+                "avg_rel_cost": average_float(variant_rows, "relative_cost_estimate"),
+            }
+        )
+    return rollup
+
+
+def build_project_rollup(rows: list[dict[str, object]]) -> list[dict[str, object]]:
+    rollup = []
+    for project_id, project_rows in group_by(rows, "project_id").items():
+        by_variant = group_by(project_rows, "variant")
+        best_variant = max(
+            by_variant.items(),
+            key=lambda item: (
+                sum(score_fraction(row["quality_score"])[0] for row in item[1] if score_fraction(row["quality_score"]) is not None)
+                / max(1, len([row for row in item[1] if score_fraction(row["quality_score"]) is not None]))
+            ),
+        )[0]
+        rollup.append(
+            {
+                "project_id": project_id,
+                "issues": len({str(row["instance_id"]) for row in project_rows}),
+                "variants": len(by_variant),
+                "avg_quality": average_fraction(project_rows, "quality_score"),
+                "avg_completion": average_fraction(project_rows, "completion_score"),
+                "avg_efficiency": average_fraction(project_rows, "efficiency_score"),
+                "avg_tokens_in": average_int(project_rows, "tokens_in"),
+                "avg_tokens_out": average_int(project_rows, "tokens_out"),
+                "avg_rel_cost": average_float(project_rows, "relative_cost_estimate"),
+                "best_variant": best_variant,
+            }
+        )
+    return rollup
+
+
+def write_root_readme(rows: list[dict[str, object]], path: Path) -> None:
+    variant_rollup = build_variant_rollup(rows)
+    project_rollup = build_project_rollup(rows)
+    lines = [
+        "# Matrix Batch Results",
+        "",
+        f"- variants: `{len({row['variant'] for row in rows})}`",
+        f"- projects: `{len({row['project_id'] for row in rows})}`",
+        f"- issues: `{len({row['instance_id'] for row in rows})}`",
+        "",
+        "## Variant Aggregate",
+        "",
+        "| Variant | Instances | Submitted | Avg Quality | Avg Completion | Avg Efficiency | Avg Grounding | Avg In Tok | Avg Out Tok | Avg Rel Cost | Avg Steps |",
+        "| --- | ---: | ---: | --- | --- | --- | --- | ---: | ---: | ---: | ---: |",
+    ]
+    for row in variant_rollup:
         lines.append(
-            "| {variant} | {exit_status} | {quality_score} | {completion_score} | {efficiency_score} | {grounding_score} | {validation_runs} | {successful_edit_steps} | {failed_edit_steps} | {submitted} | {planner_phase_enabled} | {steps} |".format(
+            "| {variant} | {instances} | {submitted} | {avg_quality} | {avg_completion} | {avg_efficiency} | {avg_grounding} | {avg_tokens_in} | {avg_tokens_out} | {avg_rel_cost} | {avg_steps} |".format(
                 **row
+            )
+        )
+
+    lines.extend(
+        [
+            "",
+            "## Project Index",
+            "",
+            "| Project | Issues | Variants | Avg Quality | Avg Completion | Avg Efficiency | Avg In Tok | Avg Out Tok | Avg Rel Cost | Best Variant | Report |",
+            "| --- | ---: | ---: | --- | --- | --- | ---: | ---: | ---: | --- | --- |",
+        ]
+    )
+    for row in project_rollup:
+        report_path = f"./projects/{row['project_id']}/README.md"
+        lines.append(
+            "| {project_id} | {issues} | {variants} | {avg_quality} | {avg_completion} | {avg_efficiency} | {avg_tokens_in} | {avg_tokens_out} | {avg_rel_cost} | {best_variant} | [{project_id}]({report_path}) |".format(
+                report_path=report_path,
+                **row,
             )
         )
 
@@ -131,32 +317,68 @@ def write_md(rows: list[dict[str, object]], path: Path) -> None:
             "",
             "## Files",
             "",
+            "- `summary.csv`: one row per `(variant, instance)` pair",
+            "- `summary.json`: JSON version of the same table",
+            "- `projects/<project>/README.md`: per-project comparisons across all variants",
         ]
     )
-    for row in rows:
-        lines.extend(
-            [
-                f"### {row['variant']}",
-                f"- exit: `{row['exit_status']}`",
-                f"- traj: `{row['traj']}`",
-                f"- patch: `{row['patch'] or 'none'}`",
-                f"- info log: `{row['info_log'] or 'none'}`",
-                f"- debug log: `{row['debug_log'] or 'none'}`",
-                f"- preds: `{row['preds'] or 'none'}`",
-                f"- exit yaml: `{row['exit_yaml'] or 'none'}`",
-                "",
-            ]
-        )
     path.write_text("\n".join(lines) + "\n")
 
 
+def write_project_reports(rows: list[dict[str, object]], root: Path) -> None:
+    projects_root = root / "projects"
+    projects_root.mkdir(parents=True, exist_ok=True)
+    for project_id, project_rows in group_by(rows, "project_id").items():
+        project_dir = projects_root / project_id
+        project_dir.mkdir(parents=True, exist_ok=True)
+        write_csv(project_rows, project_dir / "summary.csv")
+        write_json(project_rows, project_dir / "summary.json")
+        variant_rollup = build_variant_rollup(project_rows)
+        lines = [
+            f"# {project_id}",
+            "",
+            f"- issues: `{len({row['instance_id'] for row in project_rows})}`",
+            f"- variants: `{len({row['variant'] for row in project_rows})}`",
+            "",
+            "## Variant Aggregate",
+            "",
+            "| Variant | Instances | Submitted | Avg Quality | Avg Completion | Avg Efficiency | Avg Grounding | Avg In Tok | Avg Out Tok | Avg Rel Cost | Avg Steps |",
+            "| --- | ---: | ---: | --- | --- | --- | --- | ---: | ---: | ---: | ---: |",
+        ]
+        for row in variant_rollup:
+            lines.append(
+                "| {variant} | {instances} | {submitted} | {avg_quality} | {avg_completion} | {avg_efficiency} | {avg_grounding} | {avg_tokens_in} | {avg_tokens_out} | {avg_rel_cost} | {avg_steps} |".format(
+                    **row
+                )
+            )
+        lines.extend(
+            [
+                "",
+                "## Instance Details",
+                "",
+                "| Instance | Variant | Exit | Quality | Completion | Efficiency | Grounding | In Tok | Out Tok | Rel Cost | Validations | Good Edits | Failed Edits | Submitted | Steps |",
+                "| --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: |",
+            ]
+        )
+        for row in sorted(project_rows, key=lambda item: (str(item["instance_id"]), str(item["variant"]))):
+            lines.append(
+                "| {instance_id} | {variant} | {exit_status} | {quality_score} | {completion_score} | {efficiency_score} | {grounding_score} | {tokens_in} | {tokens_out} | {relative_cost_estimate} | {validation_runs} | {successful_edit_steps} | {failed_edit_steps} | {submitted} | {steps} |".format(
+                    **row
+                )
+            )
+        lines.append("")
+        (project_dir / "README.md").write_text("\n".join(lines))
+
+
 def main() -> int:
-    root = latest_root()
+    args = parse_args()
+    root = args.root.resolve()
     root.mkdir(parents=True, exist_ok=True)
-    rows = build_rows()
+    rows = build_rows(root)
     write_csv(rows, root / "summary.csv")
     write_json(rows, root / "summary.json")
-    write_md(rows, root / "README.md")
+    write_root_readme(rows, root / "README.md")
+    write_project_reports(rows, root)
     print(f"Wrote summary files to {root}")
     return 0
 

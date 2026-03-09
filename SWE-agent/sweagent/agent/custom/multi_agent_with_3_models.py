@@ -19,7 +19,7 @@ from jinja2 import Template
 from typing_extensions import Self
 
 from sweagent.agent.agents import DefaultAgent, MultiAgentConfigThreeModels, TemplateConfig
-from sweagent.agent.models import InstanceStats, get_model
+from sweagent.agent.models import InstanceStats, ModelConfig, get_model
 from sweagent.agent.problem_statement import ProblemStatement, ProblemStatementConfig
 from sweagent.environment.swe_env import SWEEnv
 from sweagent.tools.tools import ToolHandler
@@ -80,10 +80,14 @@ class MultiAgent(DefaultAgent):
     @classmethod
     def from_config(cls, config: MultiAgentConfigThreeModels) -> Self:
         config = config.model_copy(deep=True)
+        def build_role_model(role_name: str, role_model_name: str, override: ModelConfig | None):
+            model_config = override.model_copy(deep=True) if override is not None else config.model.model_copy(deep=True)
+            return get_model(model_config.model_copy(update={"name": role_model_name}), config.tools)
+
         models = {
-            "planner": get_model(config.model.model_copy(update={"name": config.planner}), config.tools),
-            "coder": get_model(config.model.model_copy(update={"name": config.coder}), config.tools),
-            "reviewer": get_model(config.model.model_copy(update={"name": config.reviewer}), config.tools),
+            "planner": build_role_model("planner", config.planner, config.planner_model_config),
+            "coder": build_role_model("coder", config.coder, config.coder_model_config),
+            "reviewer": build_role_model("reviewer", config.reviewer, config.reviewer_model_config),
         }
         role_templates = RoleTemplatesConfig(roles=config.roles)
 
