@@ -46,9 +46,16 @@ def read_traj_score(path: Path) -> dict[str, object]:
         return {
             "quality_score": "n/a",
             "grounding_score": "n/a",
+            "completion_score": "n/a",
+            "efficiency_score": "n/a",
             "progress_score": "n/a",
             "penalty_score": "n/a",
             "steps": "n/a",
+            "validation_runs": "n/a",
+            "successful_edit_steps": "n/a",
+            "failed_edit_steps": "n/a",
+            "submitted": "n/a",
+            "planner_phase_enabled": "n/a",
         }
     data = json.loads(path.read_text())
     return score_traj(data)
@@ -72,9 +79,16 @@ def build_rows() -> list[dict[str, object]]:
                 "exit_status": read_exit_status(exit_yaml),
                 "quality_score": score["quality_score"],
                 "grounding_score": score["grounding_score"],
+                "completion_score": score["completion_score"],
+                "efficiency_score": score["efficiency_score"],
                 "progress_score": score["progress_score"],
                 "penalty_score": score["penalty_score"],
                 "steps": score["steps"],
+                "validation_runs": score["validation_runs"],
+                "successful_edit_steps": score["successful_edit_steps"],
+                "failed_edit_steps": score["failed_edit_steps"],
+                "submitted": score["submitted"],
+                "planner_phase_enabled": score["planner_phase_enabled"],
                 "traj": str(traj),
                 "patch": str(patch) if patch.exists() else "",
                 "info_log": str(info_log) if info_log.exists() else "",
@@ -102,12 +116,12 @@ def write_md(rows: list[dict[str, object]], path: Path) -> None:
     lines = [
         "# Latest Matrix Easy Results",
         "",
-        "| Variant | Exit | Quality | Grounding | Progress | Penalty | Steps |",
-        "| --- | --- | --- | --- | ---: | ---: | ---: |",
+        "| Variant | Exit | Quality | Completion | Efficiency | Grounding | Validations | Good Edits | Failed Edits | Submitted | Planner | Steps |",
+        "| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | --- | --- | ---: |",
     ]
     for row in rows:
         lines.append(
-            "| {variant} | {exit_status} | {quality_score} | {grounding_score} | {progress_score} | {penalty_score} | {steps} |".format(
+            "| {variant} | {exit_status} | {quality_score} | {completion_score} | {efficiency_score} | {grounding_score} | {validation_runs} | {successful_edit_steps} | {failed_edit_steps} | {submitted} | {planner_phase_enabled} | {steps} |".format(
                 **row
             )
         )
