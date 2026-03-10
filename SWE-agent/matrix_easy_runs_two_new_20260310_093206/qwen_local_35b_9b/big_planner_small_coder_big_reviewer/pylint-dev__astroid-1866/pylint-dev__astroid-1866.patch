@@ -1,0 +1,20 @@
+diff --git a/astroid/brain/brain_builtin_inference.py b/astroid/brain/brain_builtin_inference.py
+index af1ddf4d..3ceca63c 100644
+--- a/astroid/brain/brain_builtin_inference.py
++++ b/astroid/brain/brain_builtin_inference.py
+@@ -954,7 +954,7 @@ def _infer_str_format_call(
+ 
+     try:
+         formatted_string = format_template.format(*pos_values, **keyword_values)
+-    except (IndexError, KeyError):
++    except (IndexError, KeyError, TypeError, ValueError):
+         # If there is an IndexError there are too few arguments to interpolate
+         return iter([util.Uninferable])
+ 
+diff --git a/handoff.txt b/handoff.txt
+new file mode 100644
+index 00000000..4f14d7b2
+--- /dev/null
++++ b/handoff.txt
+@@ -0,0 +1 @@
++{"problem_summary":"TypeError raised during string format call inference when values include None","root_cause_hypothesis":"The _infer_str_format_call function catches IndexError and KeyError but not TypeError which occurs when formatting None values","files_likely_affected":["astroid/brain/brain_builtin_inference.py"],"target_symbols":["_infer_str_format_call"],"allowed_change_types":["add exception handling for TypeError"],"forbidden_edits":["change logic beyond exception handling","modify function signature"],"required_validations":["verify format calls with None values no longer crash","ensure existing tests still pass"],"escalate_if":"if the fix requires broader changes to inference logic"}

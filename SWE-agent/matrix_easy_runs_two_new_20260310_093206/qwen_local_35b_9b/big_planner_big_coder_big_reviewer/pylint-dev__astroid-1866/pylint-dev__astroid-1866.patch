@@ -1,0 +1,22 @@
+diff --git a/astroid/brain/brain_builtin_inference.py b/astroid/brain/brain_builtin_inference.py
+index af1ddf4d..2ee0b97d 100644
+--- a/astroid/brain/brain_builtin_inference.py
++++ b/astroid/brain/brain_builtin_inference.py
+@@ -952,6 +952,10 @@ def _infer_str_format_call(
+         return iter([util.Uninferable])
+     keyword_values: dict[str, str] = {k: v.value for k, v in inferred_keyword.items()}
+ 
++    # Check for None values which would cause TypeError during format
++    if any(v is None for v in pos_values) or any(v is None for v in keyword_values.values()):
++        return iter([util.Uninferable])
++
+     try:
+         formatted_string = format_template.format(*pos_values, **keyword_values)
+     except (IndexError, KeyError):
+diff --git a/handoff.txt b/handoff.txt
+new file mode 100644
+index 00000000..2969ac41
+--- /dev/null
++++ b/handoff.txt
+@@ -0,0 +1 @@
++{"change_summary": "Added validation to check for None values in format arguments before calling str.format(), preventing TypeError: unsupported format string passed to NoneType.__format__", "files_changed": ["/testbed/astroid/brain/brain_builtin_inference.py"], "tests_run": ["tests/unittest_brain.py (187 passed, 18 skipped)", "tests/unittest_inference.py (398 passed, 7 skipped)"], "test_results": "All tests pass", "plan_followed": true, "scope_deviations": [], "open_risks": []}
