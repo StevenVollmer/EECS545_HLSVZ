@@ -13,11 +13,6 @@ from pathlib import Path
 from analyze_traj_quality import score_traj
 
 
-SCORE_KEYS = ("quality_score", "completion_score", "efficiency_score", "grounding_score")
-BOOL_KEYS = ("submitted", "planner_phase_enabled")
-INT_KEYS = ("steps", "validation_runs", "successful_edit_steps", "failed_edit_steps")
-
-
 def repo_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
@@ -45,6 +40,22 @@ def discover_variants(root: Path) -> list[Path]:
         if (path / "run_batch.config.yaml").exists() or (path / "run_batch_exit_statuses.yaml").exists():
             variants.append(path)
     return variants
+
+
+def discover_preset_roots(root: Path) -> list[Path]:
+    presets = []
+    for path in sorted(root.iterdir()):
+        if not path.is_dir() or path.name == "projects":
+            continue
+        if discover_variants(path):
+            presets.append(path)
+    return presets
+
+
+def display_config_name(row: dict[str, object]) -> str:
+    preset = str(row.get("preset", ""))
+    variant = str(row.get("variant", ""))
+    return f"{preset}/{variant}" if preset else variant
 
 
 def project_id_from_instance(instance_id: str) -> str:
@@ -109,14 +120,14 @@ def list_variant_instances(variant_dir: Path) -> set[str]:
     }
 
 
-def build_rows(root: Path) -> list[dict[str, object]]:
+def build_rows_for_preset(root: Path, preset_name: str) -> list[dict[str, object]]:
     variants = discover_variants(root)
-    instance_ids = sorted({instance for variant in variants for instance in list_variant_instances(variant)})
     rows: list[dict[str, object]] = []
 
     for variant_dir in variants:
         variant = variant_dir.name
         exit_statuses = read_exit_statuses(variant_dir / "run_batch_exit_statuses.yaml")
+        instance_ids = sorted(set(list_variant_instances(variant_dir)) | set(exit_statuses))
         preds = variant_dir / "preds.json"
         for instance_id in instance_ids:
             instance_dir = variant_dir / instance_id
@@ -128,6 +139,7 @@ def build_rows(root: Path) -> list[dict[str, object]]:
             score = read_traj_score(traj)
             rows.append(
                 {
+                    "preset": preset_name,
                     "project_id": project_id_from_instance(instance_id),
                     "instance_id": instance_id,
                     "variant": variant,
@@ -158,6 +170,17 @@ def build_rows(root: Path) -> list[dict[str, object]]:
                     "exit_yaml": str(exit_yaml) if exit_yaml.exists() else "",
                 }
             )
+    return rows
+
+
+def build_rows(root: Path) -> list[dict[str, object]]:
+    variants = discover_variants(root)
+    if variants:
+        return build_rows_for_preset(root, "")
+    preset_roots = discover_preset_roots(root)
+    rows: list[dict[str, object]] = []
+    for preset_root in preset_roots:
+        rows.extend(build_rows_for_preset(preset_root, preset_root.name))
     return rows
 
 
@@ -225,10 +248,13 @@ def group_by(rows: list[dict[str, object]], key: str) -> dict[str, list[dict[str
 
 def build_variant_rollup(rows: list[dict[str, object]]) -> list[dict[str, object]]:
     rollup = []
-    for variant, variant_rows in group_by(rows, "variant").items():
+    grouped: dict[str, list[dict[str, object]]] = defaultdict(list)
+    for row in rows:
+        grouped[display_config_name(row)].append(row)
+    for config_name, variant_rows in sorted(grouped.items()):
         rollup.append(
             {
-                "variant": variant,
+                "config": config_name,
                 "instances": len(variant_rows),
                 "submitted": true_count(variant_rows, "submitted"),
                 "avg_quality": average_fraction(variant_rows, "quality_score"),
@@ -247,9 +273,11 @@ def build_variant_rollup(rows: list[dict[str, object]]) -> list[dict[str, object
 def build_project_rollup(rows: list[dict[str, object]]) -> list[dict[str, object]]:
     rollup = []
     for project_id, project_rows in group_by(rows, "project_id").items():
-        by_variant = group_by(project_rows, "variant")
+        by_config: dict[str, list[dict[str, object]]] = defaultdict(list)
+        for row in project_rows:
+            by_config[display_config_name(row)].append(row)
         best_variant = max(
-            by_variant.items(),
+            by_config.items(),
             key=lambda item: (
                 sum(score_fraction(row["quality_score"])[0] for row in item[1] if score_fraction(row["quality_score"]) is not None)
                 / max(1, len([row for row in item[1] if score_fraction(row["quality_score"]) is not None]))
@@ -259,7 +287,7 @@ def build_project_rollup(rows: list[dict[str, object]]) -> list[dict[str, object
             {
                 "project_id": project_id,
                 "issues": len({str(row["instance_id"]) for row in project_rows}),
-                "variants": len(by_variant),
+                "configs": len({display_config_name(row) for row in project_rows}),
                 "avg_quality": average_fraction(project_rows, "quality_score"),
                 "avg_completion": average_fraction(project_rows, "completion_score"),
                 "avg_efficiency": average_fraction(project_rows, "efficiency_score"),
@@ -272,24 +300,84 @@ def build_project_rollup(rows: list[dict[str, object]]) -> list[dict[str, object
     return rollup
 
 
+def average_quality_value(rows: list[dict[str, object]]) -> float:
+    parsed = [score_fraction(row["quality_score"]) for row in rows]
+    usable = [value for value in parsed if value is not None]
+    if not usable:
+        return -1.0
+    return sum(value for value, _ in usable) / len(usable)
+
+
+def build_instance_rollup(rows: list[dict[str, object]]) -> list[dict[str, object]]:
+    rollup = []
+    for instance_id, instance_rows in group_by(rows, "instance_id").items():
+        by_config: dict[str, list[dict[str, object]]] = defaultdict(list)
+        for row in instance_rows:
+            by_config[display_config_name(row)].append(row)
+        best_variant = max(by_config.items(), key=lambda item: average_quality_value(item[1]))[0]
+        best_quality = average_fraction(by_config[best_variant], "quality_score")
+        exit_counts = defaultdict(int)
+        for row in instance_rows:
+            exit_counts[str(row["exit_status"])] += 1
+        exit_summary = ", ".join(f"{status}={count}" for status, count in sorted(exit_counts.items()))
+        rollup.append(
+            {
+                "project_id": str(instance_rows[0]["project_id"]),
+                "instance_id": instance_id,
+                "variants_run": len(instance_rows),
+                "submitted": true_count(instance_rows, "submitted"),
+                "avg_quality": average_fraction(instance_rows, "quality_score"),
+                "avg_completion": average_fraction(instance_rows, "completion_score"),
+                "avg_efficiency": average_fraction(instance_rows, "efficiency_score"),
+                "avg_tokens_in": average_int(instance_rows, "tokens_in"),
+                "avg_tokens_out": average_int(instance_rows, "tokens_out"),
+                "avg_rel_cost": average_float(instance_rows, "relative_cost_estimate"),
+                "best_variant": best_variant,
+                "best_quality": best_quality,
+                "exit_summary": exit_summary,
+            }
+        )
+    return sorted(rollup, key=lambda row: (str(row["project_id"]), str(row["instance_id"])))
+
+
 def write_root_readme(rows: list[dict[str, object]], path: Path) -> None:
     variant_rollup = build_variant_rollup(rows)
     project_rollup = build_project_rollup(rows)
+    instance_rollup = build_instance_rollup(rows)
     lines = [
         "# Matrix Batch Results",
         "",
+        f"- presets: `{len({row['preset'] for row in rows if row['preset']})}`",
         f"- variants: `{len({row['variant'] for row in rows})}`",
+        f"- configs: `{len({display_config_name(row) for row in rows})}`",
         f"- projects: `{len({row['project_id'] for row in rows})}`",
         f"- issues: `{len({row['instance_id'] for row in rows})}`",
+        f"- observed runs: `{len(rows)}`",
         "",
         "## Variant Aggregate",
         "",
-        "| Variant | Instances | Submitted | Avg Quality | Avg Completion | Avg Efficiency | Avg Grounding | Avg In Tok | Avg Out Tok | Avg Rel Cost | Avg Steps |",
+        "| Config | Instances | Submitted | Avg Quality | Avg Completion | Avg Efficiency | Avg Grounding | Avg In Tok | Avg Out Tok | Avg Rel Cost | Avg Steps |",
         "| --- | ---: | ---: | --- | --- | --- | --- | ---: | ---: | ---: | ---: |",
     ]
     for row in variant_rollup:
         lines.append(
-            "| {variant} | {instances} | {submitted} | {avg_quality} | {avg_completion} | {avg_efficiency} | {avg_grounding} | {avg_tokens_in} | {avg_tokens_out} | {avg_rel_cost} | {avg_steps} |".format(
+            "| {config} | {instances} | {submitted} | {avg_quality} | {avg_completion} | {avg_efficiency} | {avg_grounding} | {avg_tokens_in} | {avg_tokens_out} | {avg_rel_cost} | {avg_steps} |".format(
+                **row
+            )
+        )
+
+    lines.extend(
+        [
+            "",
+            "## Issue Index",
+            "",
+            "| Issue | Project | Configs Run | Submitted | Avg Quality | Avg Completion | Avg Efficiency | Avg In Tok | Avg Out Tok | Avg Rel Cost | Best Variant | Best Quality | Exit Mix |",
+            "| --- | --- | ---: | ---: | --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |",
+        ]
+    )
+    for row in instance_rollup:
+        lines.append(
+            "| {instance_id} | {project_id} | {variants_run} | {submitted} | {avg_quality} | {avg_completion} | {avg_efficiency} | {avg_tokens_in} | {avg_tokens_out} | {avg_rel_cost} | {best_variant} | {best_quality} | {exit_summary} |".format(
                 **row
             )
         )
@@ -299,14 +387,14 @@ def write_root_readme(rows: list[dict[str, object]], path: Path) -> None:
             "",
             "## Project Index",
             "",
-            "| Project | Issues | Variants | Avg Quality | Avg Completion | Avg Efficiency | Avg In Tok | Avg Out Tok | Avg Rel Cost | Best Variant | Report |",
+            "| Project | Issues | Configs | Avg Quality | Avg Completion | Avg Efficiency | Avg In Tok | Avg Out Tok | Avg Rel Cost | Best Variant | Report |",
             "| --- | ---: | ---: | --- | --- | --- | ---: | ---: | ---: | --- | --- |",
         ]
     )
     for row in project_rollup:
         report_path = f"./projects/{row['project_id']}/README.md"
         lines.append(
-            "| {project_id} | {issues} | {variants} | {avg_quality} | {avg_completion} | {avg_efficiency} | {avg_tokens_in} | {avg_tokens_out} | {avg_rel_cost} | {best_variant} | [{project_id}]({report_path}) |".format(
+            "| {project_id} | {issues} | {configs} | {avg_quality} | {avg_completion} | {avg_efficiency} | {avg_tokens_in} | {avg_tokens_out} | {avg_rel_cost} | {best_variant} | [{project_id}]({report_path}) |".format(
                 report_path=report_path,
                 **row,
             )
@@ -334,20 +422,39 @@ def write_project_reports(rows: list[dict[str, object]], root: Path) -> None:
         write_csv(project_rows, project_dir / "summary.csv")
         write_json(project_rows, project_dir / "summary.json")
         variant_rollup = build_variant_rollup(project_rows)
+        instance_rollup = build_instance_rollup(project_rows)
         lines = [
             f"# {project_id}",
             "",
             f"- issues: `{len({row['instance_id'] for row in project_rows})}`",
+            f"- presets: `{len({row['preset'] for row in project_rows if row['preset']})}`",
             f"- variants: `{len({row['variant'] for row in project_rows})}`",
+            f"- configs: `{len({display_config_name(row) for row in project_rows})}`",
+            f"- observed runs: `{len(project_rows)}`",
             "",
             "## Variant Aggregate",
             "",
-            "| Variant | Instances | Submitted | Avg Quality | Avg Completion | Avg Efficiency | Avg Grounding | Avg In Tok | Avg Out Tok | Avg Rel Cost | Avg Steps |",
+            "| Config | Instances | Submitted | Avg Quality | Avg Completion | Avg Efficiency | Avg Grounding | Avg In Tok | Avg Out Tok | Avg Rel Cost | Avg Steps |",
             "| --- | ---: | ---: | --- | --- | --- | --- | ---: | ---: | ---: | ---: |",
         ]
         for row in variant_rollup:
             lines.append(
-                "| {variant} | {instances} | {submitted} | {avg_quality} | {avg_completion} | {avg_efficiency} | {avg_grounding} | {avg_tokens_in} | {avg_tokens_out} | {avg_rel_cost} | {avg_steps} |".format(
+                "| {config} | {instances} | {submitted} | {avg_quality} | {avg_completion} | {avg_efficiency} | {avg_grounding} | {avg_tokens_in} | {avg_tokens_out} | {avg_rel_cost} | {avg_steps} |".format(
+                    **row
+                )
+            )
+        lines.extend(
+            [
+                "",
+                "## Issue Aggregate",
+                "",
+                "| Issue | Configs Run | Submitted | Avg Quality | Avg Completion | Avg Efficiency | Avg In Tok | Avg Out Tok | Avg Rel Cost | Best Variant | Best Quality | Exit Mix |",
+                "| --- | ---: | ---: | --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |",
+            ]
+        )
+        for row in instance_rollup:
+            lines.append(
+                "| {instance_id} | {variants_run} | {submitted} | {avg_quality} | {avg_completion} | {avg_efficiency} | {avg_tokens_in} | {avg_tokens_out} | {avg_rel_cost} | {best_variant} | {best_quality} | {exit_summary} |".format(
                     **row
                 )
             )
@@ -356,13 +463,13 @@ def write_project_reports(rows: list[dict[str, object]], root: Path) -> None:
                 "",
                 "## Instance Details",
                 "",
-                "| Instance | Variant | Exit | Quality | Completion | Efficiency | Grounding | In Tok | Out Tok | Rel Cost | Validations | Good Edits | Failed Edits | Submitted | Steps |",
-                "| --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: |",
+                "| Instance | Preset | Variant | Exit | Quality | Completion | Efficiency | Grounding | In Tok | Out Tok | Rel Cost | Validations | Good Edits | Failed Edits | Submitted | Steps |",
+                "| --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: |",
             ]
         )
         for row in sorted(project_rows, key=lambda item: (str(item["instance_id"]), str(item["variant"]))):
             lines.append(
-                "| {instance_id} | {variant} | {exit_status} | {quality_score} | {completion_score} | {efficiency_score} | {grounding_score} | {tokens_in} | {tokens_out} | {relative_cost_estimate} | {validation_runs} | {successful_edit_steps} | {failed_edit_steps} | {submitted} | {steps} |".format(
+                "| {instance_id} | {preset} | {variant} | {exit_status} | {quality_score} | {completion_score} | {efficiency_score} | {grounding_score} | {tokens_in} | {tokens_out} | {relative_cost_estimate} | {validation_runs} | {successful_edit_steps} | {failed_edit_steps} | {submitted} | {steps} |".format(
                     **row
                 )
             )
