@@ -10,7 +10,8 @@ import sys
 from pathlib import Path
 
 from matrix_easy_common import (
-    VARIANTS,
+    ALL_VARIANTS,
+    DEFAULT_VARIANTS,
     build_variant_config,
     default_results_root,
     default_sweagent_bin,
@@ -59,10 +60,17 @@ def run_variant(
     variant: str,
     preset: str,
     slot_overrides: dict[str, dict[str, object]],
+    instance_slice: str | None,
     dry_run: bool,
 ) -> int:
     generated_config = generated_config_path(results_root, run_label, variant)
-    config = build_variant_config(variant, preset, results_root / run_label, slot_overrides)
+    config = build_variant_config(
+        variant,
+        preset,
+        results_root / run_label,
+        slot_overrides,
+        instance_slice=instance_slice,
+    )
     write_yaml(generated_config, config)
 
     cmd = [str(sweagent_bin), "run-batch", "--config", str(generated_config)]
@@ -98,8 +106,8 @@ def main() -> int:
     parser.add_argument(
         "--variants",
         nargs="*",
-        default=VARIANTS,
-        help="Subset of variants to run. Defaults to the full matrix.",
+        default=DEFAULT_VARIANTS,
+        help="Subset of variants to run. Defaults to the reduced default matrix.",
     )
     parser.add_argument(
         "--preset",
@@ -110,6 +118,11 @@ def main() -> int:
         "--run-label",
         default=None,
         help="Output subdirectory label. Defaults to the preset name.",
+    )
+    parser.add_argument(
+        "--instance-slice",
+        default=None,
+        help="Override the instance slice in the generated config, e.g. ':1' or '5:6'.",
     )
     parser.add_argument(
         "--results-root",
@@ -150,8 +163,8 @@ def main() -> int:
     slot_overrides = slot_overrides_from_args(args)
     exit_code = 0
     for variant in args.variants:
-        if variant not in VARIANTS:
-            raise SystemExit(f"Unknown variant '{variant}'. Valid variants: {', '.join(VARIANTS)}")
+        if variant not in ALL_VARIANTS:
+            raise SystemExit(f"Unknown variant '{variant}'. Valid variants: {', '.join(ALL_VARIANTS)}")
         rc = run_variant(
             args.sweagent_bin,
             args.results_root.resolve(),
@@ -159,6 +172,7 @@ def main() -> int:
             variant,
             args.preset,
             slot_overrides,
+            args.instance_slice,
             args.dry_run,
         )
         if rc != 0:

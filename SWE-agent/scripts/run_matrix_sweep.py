@@ -30,6 +30,17 @@ def main() -> int:
         default=None,
         help="Optional subset of variants to run for every preset.",
     )
+    parser.add_argument(
+        "--instance-slice",
+        default=None,
+        help="Override the instance slice in every generated config, e.g. ':1' or '5:6'.",
+    )
+    parser.add_argument(
+        "--max-presets",
+        type=int,
+        default=None,
+        help="Optional cap on how many presets from the sweep to run, in listed order.",
+    )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--stop-on-error", action="store_true")
     parser.add_argument("--list-sweeps", action="store_true")
@@ -44,7 +55,13 @@ def main() -> int:
         raise SystemExit(f"Unknown sweep '{args.sweep}'. Valid sweeps: {', '.join(sweep_names())}")
 
     exit_code = 0
-    for preset in resolve_sweep(args.sweep):
+    presets = resolve_sweep(args.sweep)
+    if args.max_presets is not None:
+        if args.max_presets < 1:
+            raise SystemExit("--max-presets must be at least 1")
+        presets = presets[: args.max_presets]
+
+    for preset in presets:
         cmd = [
             sys.executable,
             str(repo_root() / "scripts" / "run_matrix_easy.py"),
@@ -57,6 +74,8 @@ def main() -> int:
         ]
         if args.variants:
             cmd.extend(["--variants", *args.variants])
+        if args.instance_slice is not None:
+            cmd.extend(["--instance-slice", args.instance_slice])
         if args.dry_run:
             cmd.append("--dry-run")
 

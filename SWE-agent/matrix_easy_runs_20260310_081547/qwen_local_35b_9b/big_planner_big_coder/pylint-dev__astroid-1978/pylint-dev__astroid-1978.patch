@@ -1,0 +1,33 @@
+diff --git a/astroid/raw_building.py b/astroid/raw_building.py
+index cc3aa015..9bcbc96f 100644
+--- a/astroid/raw_building.py
++++ b/astroid/raw_building.py
+@@ -470,12 +470,15 @@ class InspectBuilder:
+         if real_name != self._module.__name__:
+             # check if it sounds valid and then add an import node, else use a
+             # dummy node
+-            try:
+-                getattr(sys.modules[modname], name)
+-            except (KeyError, AttributeError):
+-                attach_dummy_node(node, name, member)
+-            else:
+-                attach_import_node(node, modname, name)
++            import warnings
++            with warnings.catch_warnings():
++                warnings.filterwarnings("ignore", category=FutureWarning)
++                try:
++                    getattr(sys.modules[modname], name)
++                except (KeyError, AttributeError):
++                    attach_dummy_node(node, name, member)
++                else:
++                    attach_import_node(node, modname, name)
+             return True
+         return False
+ 
+diff --git a/handoff.txt b/handoff.txt
+new file mode 100644
+index 00000000..d1c60a2a
+--- /dev/null
++++ b/handoff.txt
+@@ -0,0 +1 @@
++{"problem_summary":"FutureWarning from numpy np.long deprecation triggered when astroid inspects numpy module attributes","root_cause_hypothesis":"The getattr() call in imported_member() triggers numpy FutureWarnings for deprecated types like np.long; wrapping it with warnings.catch_warnings() will suppress these warnings","files_likely_affected":["astroid/raw_building.py"],"target_symbols":["imported_member"],"allowed_change_types":["wrap getattr call with warning suppression context manager"],"forbidden_edits":["modify function signature or logic flow","remove existing error handling"],"required_validations":["run pylint on test case with np.random.seed() to verify no FutureWarnings appear"],"escalate_if":"if numpy deprecation warnings persist after adding warning filter"}

@@ -23,7 +23,7 @@ class VariantSpec:
 
 
 def _build_variant_specs() -> list[VariantSpec]:
-    specs: list[VariantSpec] = [
+    specs = [
         VariantSpec(
             name="small_coder_only",
             enable_planner=False,
@@ -72,12 +72,27 @@ def _build_variant_specs() -> list[VariantSpec]:
                         template_variant="big_planner_small_coder_big_reviewer",
                     )
                 )
-
     return specs
 
 
+def _build_default_variants() -> list[str]:
+    # Keep the default sweep focused on the most decision-relevant comparisons:
+    # coder-only baseline, planner/coder with the planner on the big slot,
+    # and reviewer-enabled runs with the reviewer on the big slot.
+    return [
+        "small_coder_only",
+        "big_coder_only",
+        "big_planner_small_coder",
+        "big_planner_big_coder",
+        "big_planner_small_coder_big_reviewer",
+        "big_planner_big_coder_big_reviewer",
+    ]
+
+
 VARIANT_SPECS = _build_variant_specs()
-VARIANTS = [spec.name for spec in VARIANT_SPECS]
+ALL_VARIANTS = [spec.name for spec in VARIANT_SPECS]
+DEFAULT_VARIANTS = _build_default_variants()
+VARIANTS = DEFAULT_VARIANTS
 VARIANT_SPEC_BY_NAME = {spec.name: spec for spec in VARIANT_SPECS}
 
 
@@ -217,6 +232,7 @@ def build_variant_config(
     profile_name: str,
     output_root: Path,
     slot_overrides: dict[str, dict[str, Any]] | None = None,
+    instance_slice: str | None = None,
 ) -> dict[str, Any]:
     spec = VARIANT_SPEC_BY_NAME[variant]
     base = load_yaml(config_path(spec.template_variant))
@@ -239,6 +255,7 @@ def build_variant_config(
     shared_spec = profile["big"]
     agent["model"]["name"] = shared_spec.client_model_name
     agent["model"]["api_base"] = shared_spec.api_base
+    agent["model"]["per_instance_call_limit"] = 50
     if shared_spec.api_key is not None:
         agent["model"]["api_key"] = shared_spec.api_key
     if shared_spec.max_input_tokens is not None:
@@ -247,6 +264,9 @@ def build_variant_config(
         agent["model"]["max_output_tokens"] = shared_spec.max_output_tokens
     if shared_spec.litellm_model_registry is not None:
         agent["model"]["litellm_model_registry"] = shared_spec.litellm_model_registry
+
+    if instance_slice is not None:
+        base["instances"]["slice"] = instance_slice
 
     base["output_dir"] = str(output_root / variant)
     return base

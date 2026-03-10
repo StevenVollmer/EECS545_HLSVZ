@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 from matrix_easy_common import (
-    VARIANTS,
+    ALL_VARIANTS,
     build_variant_config,
     default_results_root,
     default_sweagent_bin,
@@ -73,6 +73,11 @@ def main() -> int:
         help="Output subdirectory label. Defaults to the preset name.",
     )
     parser.add_argument(
+        "--instance-slice",
+        default=None,
+        help="Override the instance slice in the generated config, e.g. ':1' or '5:6'.",
+    )
+    parser.add_argument(
         "--results-root",
         type=Path,
         default=default_results_root(),
@@ -90,7 +95,7 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.list:
-        for variant in VARIANTS:
+        for variant in ALL_VARIANTS:
             print(variant)
         return 0
 
@@ -101,14 +106,20 @@ def main() -> int:
 
     if not args.variant:
         raise SystemExit("Provide a variant name or use --list.")
-    if args.variant not in VARIANTS:
-        raise SystemExit(f"Unknown variant '{args.variant}'. Valid variants: {', '.join(VARIANTS)}")
+    if args.variant not in ALL_VARIANTS:
+        raise SystemExit(f"Unknown variant '{args.variant}'. Valid variants: {', '.join(ALL_VARIANTS)}")
     if args.preset not in preset_names():
         raise SystemExit(f"Unknown preset '{args.preset}'. Valid presets: {', '.join(preset_names())}")
 
     run_label = args.run_label or args.preset
     results_root = args.results_root.resolve()
-    config = build_variant_config(args.variant, args.preset, results_root / run_label, slot_overrides_from_args(args))
+    config = build_variant_config(
+        args.variant,
+        args.preset,
+        results_root / run_label,
+        slot_overrides_from_args(args),
+        instance_slice=args.instance_slice,
+    )
     generated_config = generated_config_path(results_root, run_label, args.variant)
     write_yaml(generated_config, config)
 
