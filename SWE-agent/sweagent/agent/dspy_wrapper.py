@@ -1,7 +1,7 @@
 import dspy
 import re
 from dspy.teleprompt import BootstrapFewShotWithRandomSearch
-
+import litellm
 
 # =========================
 # SIGNATURES (PLAIN TEXT ONLY)
@@ -65,33 +65,22 @@ class PlanActModule(dspy.Module):
 # =========================
 
 class LiteLLMAdapter(dspy.LM):
-    def __init__(self, model):
-        self.client = model
+    def __init__(self):
+        self.litellm = litellm
         self.model = "openai/gpt-4"
         self.kwargs = {}
 
-    def __call__(self, *args, **kwargs):
-        messages = kwargs.get("messages", None)
-
-        if messages is None and len(args) > 0:
-            messages = args[0]
-
+    def __call__(self, messages=None, **kwargs):
         if messages is None:
             return ""
 
-        result = self.client.query(messages)
+        response = self.litellm.completion(
+            model="gpt-4o",
+            messages=messages,
+            temperature=0
+        )
 
-        # normalize EVERYTHING to string
-        if isinstance(result, str):
-            text = result
-        elif hasattr(result, "choices"):
-            text = result.choices[0].message.content
-        elif isinstance(result, dict) and "choices" in result:
-            text = result["choices"][0]["message"]["content"]
-        else:
-            text = str(result)
-
-        return text.strip()
+        return response["choices"][0]["message"]["content"]
 
 
 # =========================
@@ -102,18 +91,15 @@ class DSPyPolicyWrapper:
     def __init__(self, model):
         print("🚀 DSPY WRAPPER INITIALIZING")
 
-        lm = LiteLLMAdapter(model)
+        lm = LiteLLMAdapter()
 
-        # 🔥 FORCE NON-JSON MODE
-        dspy.settings.configure(
-            lm=lm,
-            adapter=dspy.adapters.ChatAdapter()
-        )
+        dspy.settings.configure(lm=lm)
         dspy.settings.experimental = True
 
         # =========================
         # TRAINING DATA
         # =========================
+	# Fix these with better examples
         examples = [
 
             dspy.Example(
@@ -190,7 +176,7 @@ class DSPyPolicyWrapper:
         optimizer = BootstrapFewShotWithRandomSearch(
             metric=metric,
             max_bootstrapped_demos=4,
-            num_threads=1  # 🔥 prevents parallel crash
+            num_threads=1 
         )
 
         # =========================
