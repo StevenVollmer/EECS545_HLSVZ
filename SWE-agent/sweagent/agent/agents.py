@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from sweagent.agent.dspy_wrapper import DSPyPolicyWrapper
+
 import asyncio
 import copy
 import json
@@ -194,6 +196,7 @@ class MultiAgentConfig(BaseModel):
     history_processors: list[HistoryProcessor] = Field(default_factory=lambda: [DefaultHistoryProcessor()])
     model: ModelConfig = Field(description="Model options.")
     roles: dict[str, TemplateConfig]
+    use_dspy: bool = False
 
     max_requeries: int = 3
     """Maximum number of times to requery the model after an error, such as a
@@ -217,6 +220,7 @@ class MultiAgentConfigMultiModel(BaseModel):
     history_processors: list[HistoryProcessor] = Field(default_factory=lambda: [DefaultHistoryProcessor()])
     model: ModelConfig = Field(description="Model options.")
     roles: dict[str, TemplateConfig]
+    use_dspy: bool = True
 
     max_requeries: int = 3
     """Maximum number of times to requery the model after an error, such as a
@@ -243,7 +247,7 @@ class MultiAgentConfigThreeModels(BaseModel):
     history_processors: list[HistoryProcessor] = Field(default_factory=lambda: [DefaultHistoryProcessor()])
     model: ModelConfig = Field(description="Shared model options.")
     roles: dict[str, TemplateConfig]
-
+    use_dspy: bool = True
     max_requeries: int = 3
     action_sampler: ActionSamplerConfig | None = None
 
@@ -562,6 +566,10 @@ class DefaultAgent(AbstractAgent):
         self._always_require_zero_exit_code = _always_require_zero_exit_code
         self.name = name
         self.model = model
+        self.dspy_policy = None
+        if getattr(self.config, "use_dspy", False):
+            from sweagent.agent.dspy_wrapper import DSPyPolicyWrapper
+            self.dspy_policy = DSPyPolicyWrapper(self.model)
         self.templates = templates
         self.tools = tools
         if isinstance(self.model, HumanThoughtModel):
@@ -1139,7 +1147,10 @@ class DefaultAgent(AbstractAgent):
                 # todo: Handle history and trajectory
                 step.extra_info.update(best.extra_info)
             else:
-                output = self.model.query(history)  # type: ignore
+                if self.dspy_policy is not None:
+                   output = self.dspy_policy.run(history)
+                else:
+                   output = self.model.query(history)
             step.output = output["message"]
             # todo: Can't I override the parser in __init__?
             step.thought, step.action = self.tools.parse_actions(output)

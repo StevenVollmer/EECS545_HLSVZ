@@ -58,12 +58,14 @@ class MultiAgent(DefaultAgent):
     def __init__(
         self,
         *args,
+        config=None,
         role_templates: RoleTemplatesConfig | None = None,
         models: dict | None = None,
         enable_planner: bool = True,
         enable_reviewer: bool = True,
         **kwargs,
     ):
+        self.config = config
         super().__init__(*args, **kwargs)
         self.role_templates = role_templates
         self.models = models or {}
@@ -112,8 +114,7 @@ class MultiAgent(DefaultAgent):
             "reviewer": build_role_model(config.reviewer, config.reviewer_model_config),
         }
         role_templates = RoleTemplatesConfig(roles=config.roles)
-
-        return cls(
+        agent = cls(
             templates=config.templates,
             tools=ToolHandler(config.tools),
             history_processors=config.history_processors,
@@ -123,8 +124,8 @@ class MultiAgent(DefaultAgent):
             enable_reviewer=config.enable_reviewer,
             max_requeries=config.max_requeries,
             action_sampler_config=config.action_sampler,
-            role_templates=role_templates,
-        )
+            role_templates = role_templates, config=config,)
+        return agent
 
     def _init_roles(self) -> None:
         assert self.role_templates is not None
