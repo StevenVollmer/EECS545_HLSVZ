@@ -84,6 +84,12 @@ def main() -> int:
         help="Root directory where generated configs and run outputs are written.",
     )
     parser.add_argument(
+        "--num-workers",
+        type=int,
+        default=None,
+        help="Set run-batch num_workers in the generated config.",
+    )
+    parser.add_argument(
         "--sweagent-bin",
         type=Path,
         default=default_sweagent_bin(),
@@ -119,6 +125,7 @@ def main() -> int:
         results_root / run_label,
         slot_overrides_from_args(args),
         instance_slice=args.instance_slice,
+        num_workers=args.num_workers,
     )
     generated_config = generated_config_path(results_root, run_label, args.variant)
     write_yaml(generated_config, config)

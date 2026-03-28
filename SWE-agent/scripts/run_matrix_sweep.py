@@ -25,6 +25,12 @@ def main() -> int:
         help="Root directory where generated configs and run outputs are written.",
     )
     parser.add_argument(
+        "--num-workers",
+        type=int,
+        default=None,
+        help="Set run-batch num_workers for each preset run.",
+    )
+    parser.add_argument(
         "--variants",
         nargs="*",
         default=None,
@@ -76,6 +82,8 @@ def main() -> int:
             cmd.extend(["--variants", *args.variants])
         if args.instance_slice is not None:
             cmd.extend(["--instance-slice", args.instance_slice])
+        if args.num_workers is not None:
+            cmd.extend(["--num-workers", str(args.num_workers)])
         if args.dry_run:
             cmd.append("--dry-run")
 

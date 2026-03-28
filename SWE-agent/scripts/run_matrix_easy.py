@@ -61,6 +61,7 @@ def run_variant(
     preset: str,
     slot_overrides: dict[str, dict[str, object]],
     instance_slice: str | None,
+    num_workers: int | None,
     dry_run: bool,
 ) -> int:
     generated_config = generated_config_path(results_root, run_label, variant)
@@ -70,6 +71,7 @@ def run_variant(
         results_root / run_label,
         slot_overrides,
         instance_slice=instance_slice,
+        num_workers=num_workers,
     )
     write_yaml(generated_config, config)
 
@@ -131,6 +133,12 @@ def main() -> int:
         help="Root directory where generated configs and run outputs are written.",
     )
     parser.add_argument(
+        "--num-workers",
+        type=int,
+        default=None,
+        help="Set run-batch num_workers for each generated variant config.",
+    )
+    parser.add_argument(
         "--sweagent-bin",
         type=Path,
         default=default_sweagent_bin(),
@@ -173,6 +181,7 @@ def main() -> int:
             args.preset,
             slot_overrides,
             args.instance_slice,
+            args.num_workers,
             args.dry_run,
         )
         if rc != 0:

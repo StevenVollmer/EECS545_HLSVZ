@@ -233,6 +233,7 @@ def build_variant_config(
     output_root: Path,
     slot_overrides: dict[str, dict[str, Any]] | None = None,
     instance_slice: str | None = None,
+    num_workers: int | None = None,
 ) -> dict[str, Any]:
     spec = VARIANT_SPEC_BY_NAME[variant]
     base = load_yaml(config_path(spec.template_variant))
@@ -267,6 +268,9 @@ def build_variant_config(
 
     if instance_slice is not None:
         base["instances"]["slice"] = instance_slice
+
+    if num_workers is not None:
+        base["num_workers"] = num_workers
 
     base["output_dir"] = str(output_root / variant)
     return base
