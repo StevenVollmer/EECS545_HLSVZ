@@ -241,6 +241,58 @@ def role_model_config(spec: SlotModelSpec) -> dict[str, Any]:
     return config
 
 
+def _replace_bundle_paths(base: dict[str, Any]) -> None:
+    bundles = base.get("agent", {}).get("tools", {}).get("bundles", [])
+    if not isinstance(bundles, list):
+        return
+    new_bundles: list[dict[str, Any]] = []
+    replaced_edit_bundle = False
+    for bundle in bundles:
+        if not isinstance(bundle, dict):
+            new_bundles.append(bundle)
+            continue
+        path = str(bundle.get("path", ""))
+        if path.endswith("tools/edit_anthropic"):
+            replaced_edit_bundle = True
+            for replacement_path in ("tools/windowed", "tools/windowed_edit_linting"):
+                replacement = dict(bundle)
+                replacement["path"] = replacement_path
+                new_bundles.append(replacement)
+            continue
+        new_bundles.append(bundle)
+    if replaced_edit_bundle:
+        base["agent"]["tools"]["bundles"] = new_bundles
+
+
+def _rewrite_template_text(text: str) -> str:
+    replacements = {
+        "- For file changes, use the provided editing tool such as `str_replace_editor`, not an interactive editor.\n": "- For file changes, use the windowed editing tools: `open`, `goto`, and `edit`, not an interactive editor.\n",
+        "- When using `str_replace_editor`, the syntax is `str_replace_editor <command> <absolute_path> ...`.\n": "- Use `open <path> [line]` to open a file, `goto <line>` to move the window, and `edit <start_line>:<end_line>` followed by replacement text and `end_of_edit` to replace a line range.\n",
+        "- The second argument to `str_replace_editor` must be the file path.\n": "",
+        "- Before editing, prefer `grep -n` or `str_replace_editor view <path> --view_range start end` to inspect only the relevant lines.\n": "- Before editing, prefer `grep -n`, `open <path> <line>`, and `goto <line>` to inspect the exact target lines.\n",
+        "- Correct `str_replace_editor` example:\n  `str_replace_editor str_replace {{working_dir}}/path/to/file.py --old_str 'old text' --new_str 'new text'`\n": "- Correct edit flow example:\n  `open {{working_dir}}/path/to/file.py 280`\n  then\n  `edit 280:284`\n  `<replacement text>`\n  `end_of_edit`\n",
+        "- Correct targeted view example:\n  `str_replace_editor view {{working_dir}}/path/to/file.py --view_range 280 310`\n": "- Correct targeted view example:\n  `open {{working_dir}}/path/to/file.py 280`\n",
+        "- If the previous observation already showed the relevant code, move to `str_replace_editor` instead of re-reading.\n": "- If the previous observation already showed the relevant code, move to `edit` instead of re-reading.\n",
+        "- If you inspect a file, prefer `grep -n` or `str_replace_editor view` around the symbols or stack locations named by the issue text.\n": "- If you inspect a file, prefer `grep -n`, `open`, and `goto` around the symbols or stack locations named by the issue text.\n",
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+    return text
+
+
+def _modernize_matrix_templates(base: dict[str, Any]) -> None:
+    roles = base.get("agent", {}).get("roles", {})
+    if not isinstance(roles, dict):
+        return
+    for role_cfg in roles.values():
+        if not isinstance(role_cfg, dict):
+            continue
+        for template_key in ("system_template", "instance_template", "next_step_template", "next_step_no_output_template"):
+            value = role_cfg.get(template_key)
+            if isinstance(value, str):
+                role_cfg[template_key] = _rewrite_template_text(value)
+
+
 def build_variant_config(
     variant: str,
     profile_name: str,
@@ -251,6 +303,8 @@ def build_variant_config(
 ) -> dict[str, Any]:
     spec = VARIANT_SPEC_BY_NAME[variant]
     base = load_yaml(config_path(spec.template_variant))
+    _replace_bundle_paths(base)
+    _modernize_matrix_templates(base)
     profile = build_profile(profile_name, slot_overrides)
 
     agent = base["agent"]

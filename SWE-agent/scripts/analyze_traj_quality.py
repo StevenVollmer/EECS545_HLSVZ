@@ -237,11 +237,23 @@ def _path_matches_issue(path: str, issue_paths: list[str], issue_keywords: set[s
 
 
 def _is_edit_action(action: str) -> bool:
-    return action.startswith("str_replace_editor str_replace ")
+    stripped = action.strip()
+    return (
+        stripped.startswith("str_replace_editor str_replace ")
+        or stripped.startswith("edit ")
+        or stripped.startswith("insert ")
+    )
 
 
 def _is_inspection_action(action: str) -> bool:
-    return action.startswith(INSPECTION_PREFIXES)
+    stripped = action.strip()
+    return (
+        stripped.startswith(INSPECTION_PREFIXES)
+        or stripped.startswith("open ")
+        or stripped == "scroll_up"
+        or stripped == "scroll_down"
+        or stripped.startswith("goto ")
+    )
 
 
 def _is_validation_action(action: str) -> bool:
