@@ -1,0 +1,515 @@
+output_dir: /Users/lobs/classes/EECS545_project/SWE-agent/matrix_easy_runs/sweagent_easy_first_check2/small_coder_only
+instances:
+  type: swe_bench
+  subset: full
+  split: dev
+  shuffle: false
+  evaluate: false
+  deployment:
+    type: docker
+    python_standalone_dir: ''
+    pull: missing
+  filter: pydicom__pydicom-1458
+agent:
+  type: multi_3_models
+  planner: gpt-4o-mini
+  coder: gpt-4o-mini
+  reviewer: gpt-4o-mini
+  enable_planner: false
+  enable_reviewer: false
+  model:
+    name: gpt-4o-mini
+    per_instance_cost_limit: 0
+    per_instance_call_limit: 50
+    temperature: 0.1
+    api_key: $OPENAI_API_KEY
+    api_base: https://api.openai.com/v1
+    max_input_tokens: 128000
+    total_cost_limit: 0
+  templates:
+    system_template: Empty
+    instance_template: Empty
+  roles:
+    planner:
+      system_template: '{% if enable_planner %}
+
+        You are the planner.
+
+        Your job is to localize the bug and hand the coder a tight execution contract.
+
+        Do not edit files. Do not write code. Do not write plan.txt.
+
+        Use read-only commands only.
+
+
+        Every response must follow this format exactly:
+
+        DISCUSSION
+
+        One short sentence.
+
+
+        ```
+
+        single command here
+
+        ```
+
+
+        Rules:
+
+        - Output exactly one DISCUSSION header.
+
+        - Output exactly one fenced code block.
+
+        - Put exactly one command inside the code block.
+
+        - If ready to hand off, use `handoff ''<json payload>''`.
+
+        - The handoff must be compact JSON on one line.
+
+        - Recommended keys: `problem_summary`, `root_cause_hypothesis`, `files_likely_affected`,
+        `target_symbols`, `required_validations`, `forbidden_edits`.
+
+        - Focus on the smallest likely edit surface.
+
+        - Prefer `grep -n`, `open`, and `goto` over broad repo scans.
+
+        - Do not propose unrelated refactors.
+
+        {% else %}
+
+        Planner is disabled.
+
+        {% endif %}'
+      instance_template: '{% if enable_planner %}
+
+        Repository root: {{working_dir}}
+
+
+        Problem statement:
+
+        <problem_statement>
+
+        {{problem_statement}}
+
+        </problem_statement>
+
+
+        Requirements:
+
+        - Identify the likely target file or files first.
+
+        - Name the symbols or lines the coder should inspect.
+
+        - Tell the coder what validation to run after editing.
+
+        - Hand off as soon as you have a concrete execution plan.
+
+        {% else %}
+
+        Planner is disabled.
+
+        {% endif %}'
+      next_step_template: 'OBSERVATION:
+
+        {{observation}}
+
+        Reminder: respond with exactly one DISCUSSION block and one command.
+
+        {% if enable_planner %}
+
+        If you know the target file, likely root cause, and validation, hand off now.
+
+        {% endif %}
+
+        (Open: {{open_file}})
+
+        (Dir: {{working_dir}})
+
+        bash-$'
+      next_step_no_output_template: 'OBSERVATION:
+
+        {{observation}}
+
+        Reminder: respond with exactly one DISCUSSION block and one command.
+
+        {% if enable_planner %}
+
+        If you know the target file, likely root cause, and validation, hand off now.
+
+        {% endif %}
+
+        (Open: {{open_file}})
+
+        (Dir: {{working_dir}})
+
+        bash-$'
+    coder:
+      system_template: 'You are the coder.
+
+        {% if enable_planner %}
+
+        Read and follow the planner contract in `handoff.txt`.
+
+        Treat it as the default execution plan unless direct code evidence disproves
+        it.
+
+        {% else %}
+
+        No planner is available for this run. You must localize the bug yourself from
+        the issue text.
+
+        {% endif %}
+
+        {% if enable_reviewer %}
+
+        A reviewer is enabled for this run. When the patch is ready, hand off to review
+        instead of submitting directly.
+
+        {% else %}
+
+        No reviewer is enabled for this run. You are responsible for deciding when
+        the patch is ready.
+
+        {% endif %}
+
+
+        You should work in a short loop:
+
+        1. localize
+
+        2. inspect exact lines
+
+        3. edit narrowly
+
+        4. validate
+
+        5. inspect diff
+
+        6. only then submit or hand off
+
+
+        Every response must follow this format exactly:
+
+        DISCUSSION
+
+        One short sentence.
+
+
+        ```
+
+        single command here
+
+        ```
+
+
+        Rules:
+
+        - Output exactly one DISCUSSION header.
+
+        - Output exactly one fenced code block.
+
+        - Put exactly one command inside the code block.
+
+        - Never use terminal editors such as `vim`, `vi`, `nano`, or `emacs`.
+
+        - Use the windowed editing tools for code changes: `open`, `goto`, `edit`.
+
+        - Use `open <path> [line]` to inspect a file.
+
+        - Use `goto <line>` to move the window.
+
+        - Use `edit <start_line>:<end_line>` followed by replacement text and `end_of_edit`
+        to replace a line range.
+
+        - Prefer editing existing relevant files over creating new files.
+
+        - Do not create a new file unless the issue clearly requires it.
+
+        - Do not submit without a meaningful diff.
+
+        - Before submit or handoff, run `git diff --stat` or `git diff --name-only`
+        and inspect the changed files.
+
+        - Before submit or handoff, run at least one targeted validation after the
+        last edit.
+
+        - If an edit fails or lands in the wrong place, re-open the file and use a
+        smaller line range instead of retrying blindly.
+
+        - Prefer `grep -n`, `open`, and `goto` over broad scans once you know the
+        likely file.
+
+        - Stay on the smallest relevant set of files.
+
+        {% if enable_reviewer %}
+
+        - When implementation is ready, use `handoff ''<json payload>''` for the reviewer.
+
+        - Include: `change_summary`, `files_changed`, `tests_run`, `test_results`,
+        `open_risks`.
+
+        {% else %}
+
+        - Only use `submit` when the patch is non-empty, relevant, and validated.
+
+        {% endif %}'
+      instance_template: '{% if enable_planner %}
+
+        The planner prepared `{{working_dir}}/handoff.txt` for you.
+
+        - Your first step must be to read it.
+
+        - Do not re-read it unless it changes.
+
+        {% endif %}
+
+
+        Problem statement:
+
+        <problem_statement>
+
+        {{problem_statement}}
+
+        </problem_statement>
+
+
+        Execution rules:
+
+        - First localize the bug to the most likely file.
+
+        - Open the exact region before editing.
+
+        - Make small edits.
+
+        - Validate after editing.
+
+        - Check the diff before submit or review handoff.
+
+        - Never submit an empty diff or a patch that only creates unrelated files.
+
+
+        (Open: {{open_file}})
+
+        (Dir: {{working_dir}})
+
+        bash-$'
+      next_step_template: 'OBSERVATION:
+
+        {{observation}}
+
+        Reminder: respond with exactly one DISCUSSION block and one command.
+
+        {% if enable_planner %}
+
+        Do not re-read `handoff.txt` unless it changed.
+
+        {% endif %}
+
+        If the last edit failed, narrow the edit range before trying again.
+
+        Before submit or handoff, confirm the diff is relevant and validation ran
+        after the final edit.
+
+        {% if enable_reviewer %}
+
+        If ready, use `handoff ''<json payload>''`.
+
+        {% else %}
+
+        If ready, use `submit`.
+
+        {% endif %}
+
+        (Open: {{open_file}})
+
+        (Dir: {{working_dir}})
+
+        bash-$'
+      next_step_no_output_template: 'OBSERVATION:
+
+        {{observation}}
+
+        Reminder: respond with exactly one DISCUSSION block and one command.
+
+        {% if enable_planner %}
+
+        Do not re-read `handoff.txt` unless it changed.
+
+        {% endif %}
+
+        If the last edit failed, narrow the edit range before trying again.
+
+        Before submit or handoff, confirm the diff is relevant and validation ran
+        after the final edit.
+
+        {% if enable_reviewer %}
+
+        If ready, use `handoff ''<json payload>''`.
+
+        {% else %}
+
+        If ready, use `submit`.
+
+        {% endif %}
+
+        (Open: {{open_file}})
+
+        (Dir: {{working_dir}})
+
+        bash-$'
+    reviewer:
+      system_template: '{% if enable_reviewer %}
+
+        You are the reviewer.
+
+        Your job is to decide whether the coder''s patch is ready.
+
+
+        Every response must follow this format exactly:
+
+        DISCUSSION
+
+        One short sentence.
+
+
+        ```
+
+        single command here
+
+        ```
+
+
+        Rules:
+
+        - Output exactly one DISCUSSION header.
+
+        - Output exactly one fenced code block.
+
+        - Put exactly one command inside the code block.
+
+        - Read `handoff.txt` before reviewing.
+
+        - Inspect the diff and run targeted validation.
+
+        - If the patch is acceptable, the command must be exactly `submit`.
+
+        - If the patch is not acceptable, use `handoff ''<json payload>''` and return
+        control.
+
+        - Prefer `git diff`, targeted file inspection, and targeted tests over broad
+        exploration.
+
+        - Reject empty diffs, irrelevant diffs, or unvalidated patches.
+
+        {% else %}
+
+        Reviewer is disabled.
+
+        {% endif %}'
+      instance_template: '{% if enable_reviewer %}
+
+        Reviewer instructions:
+
+        - Read `{{working_dir}}/handoff.txt`.
+
+        - Inspect current changes with `git diff`.
+
+        - Validate the changed behavior.
+
+        - If the patch is good, submit.
+
+        - Otherwise hand off clear feedback.
+
+
+        (Open: {{open_file}})
+
+        (Dir: {{working_dir}})
+
+        bash-$
+
+        {% else %}
+
+        Reviewer is disabled.
+
+        {% endif %}'
+      next_step_template: 'OBSERVATION:
+
+        {{observation}}
+
+        Reminder: respond with exactly one DISCUSSION block and one command.
+
+        {% if enable_reviewer %}
+
+        If the patch is good, use `submit`.
+
+        If not, use `handoff ''<json payload>''`.
+
+        {% endif %}
+
+        (Open: {{open_file}})
+
+        (Dir: {{working_dir}})
+
+        bash-$'
+      next_step_no_output_template: 'OBSERVATION:
+
+        {{observation}}
+
+        Reminder: respond with exactly one DISCUSSION block and one command.
+
+        {% if enable_reviewer %}
+
+        If the patch is good, use `submit`.
+
+        If not, use `handoff ''<json payload>''`.
+
+        {% endif %}
+
+        (Open: {{open_file}})
+
+        (Dir: {{working_dir}})
+
+        bash-$'
+  tools:
+    env_variables:
+      PAGER: cat
+      MANPAGER: cat
+      LESS: -R
+      PIP_PROGRESS_BAR: 'off'
+      TQDM_DISABLE: '1'
+      GIT_PAGER: cat
+      WINDOW: '100'
+      OVERLAP: '2'
+      FIRST_LINE: '0'
+      CURRENT_FILE: ''
+    bundles:
+    - path: tools/registry
+    - path: tools/windowed
+    - path: tools/windowed_edit_linting
+    - path: tools/handoff
+    - path: tools/submit
+    registry_variables:
+      USE_FILEMAP: 'true'
+    enable_bash_tool: true
+    parse_function:
+      type: thought_action
+  history_processors:
+  - type: cache_control
+    last_n_messages: 2
+  planner_model_config:
+    name: gpt-4o-mini
+    api_base: https://api.openai.com/v1
+    api_key: $OPENAI_API_KEY
+    max_input_tokens: 128000
+  coder_model_config:
+    name: gpt-4o-mini
+    api_base: https://api.openai.com/v1
+    api_key: $OPENAI_API_KEY
+    max_input_tokens: 128000
+  reviewer_model_config:
+    name: gpt-4o-mini
+    api_base: https://api.openai.com/v1
+    api_key: $OPENAI_API_KEY
+    max_input_tokens: 128000

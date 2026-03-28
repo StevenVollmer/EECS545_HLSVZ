@@ -102,6 +102,9 @@ INSTANCE_SETS: dict[str, dict[str, Any]] = {
     },
     "sweagent_easy_first": {
         "description": "SWE-agent's in-repo easiest known SWE-bench dev fixture.",
+        "subset": "full",
+        "split": "dev",
+        "evaluate": False,
         "filter": "pydicom__pydicom-1458",
         "shuffle": False,
     },
@@ -560,6 +563,9 @@ def build_variant_config(
     if instance_set_name is not None:
         instance_set = resolve_instance_set(instance_set_name)
         instances_cfg = base["instances"]
+        for key in ("subset", "split", "evaluate"):
+            if key in instance_set:
+                instances_cfg[key] = instance_set[key]
         if "filter" in instance_set:
             instances_cfg["filter"] = instance_set["filter"]
             instances_cfg.pop("slice", None)
