@@ -15,6 +15,7 @@ from matrix_easy_common import (
     build_variant_config,
     default_results_root,
     default_sweagent_bin,
+    instance_set_names,
     preset_names,
     repo_root,
     write_yaml,
@@ -60,6 +61,8 @@ def run_variant(
     variant: str,
     preset: str,
     slot_overrides: dict[str, dict[str, object]],
+    instance_set: str | None,
+    instance_filter: str | None,
     instance_slice: str | None,
     num_workers: int | None,
     dry_run: bool,
@@ -70,6 +73,8 @@ def run_variant(
         preset,
         results_root / run_label,
         slot_overrides,
+        instance_set_name=instance_set,
+        instance_filter=instance_filter,
         instance_slice=instance_slice,
         num_workers=num_workers,
     )
@@ -122,6 +127,16 @@ def main() -> int:
         help="Output subdirectory label. Defaults to the preset name.",
     )
     parser.add_argument(
+        "--instance-set",
+        default=None,
+        help="Named instance set override. Use --list-instance-sets to see options.",
+    )
+    parser.add_argument(
+        "--instance-filter",
+        default=None,
+        help="Regex filter for explicit instance ids. Overrides the config slice when provided.",
+    )
+    parser.add_argument(
         "--instance-slice",
         default=None,
         help="Override the instance slice in the generated config, e.g. ':1' or '5:6'.",
@@ -156,6 +171,7 @@ def main() -> int:
         help="Do not run the matrix summary script after the batch completes.",
     )
     parser.add_argument("--list-presets", action="store_true", help="List valid model presets and exit.")
+    parser.add_argument("--list-instance-sets", action="store_true", help="List named instance sets and exit.")
     add_slot_args(parser, "small")
     add_slot_args(parser, "big")
     args = parser.parse_args()
@@ -164,8 +180,16 @@ def main() -> int:
         for preset in preset_names():
             print(preset)
         return 0
+    if args.list_instance_sets:
+        for instance_set in instance_set_names():
+            print(instance_set)
+        return 0
     if args.preset not in preset_names():
         raise SystemExit(f"Unknown preset '{args.preset}'. Valid presets: {', '.join(preset_names())}")
+    if args.instance_set is not None and args.instance_set not in instance_set_names():
+        raise SystemExit(
+            f"Unknown instance set '{args.instance_set}'. Valid sets: {', '.join(instance_set_names())}"
+        )
 
     run_label = args.run_label or args.preset
     slot_overrides = slot_overrides_from_args(args)
@@ -180,6 +204,8 @@ def main() -> int:
             variant,
             args.preset,
             slot_overrides,
+            args.instance_set,
+            args.instance_filter,
             args.instance_slice,
             args.num_workers,
             args.dry_run,

@@ -96,6 +96,32 @@ DEFAULT_VARIANTS = _build_default_variants()
 VARIANTS = DEFAULT_VARIANTS
 VARIANT_SPEC_BY_NAME = {spec.name: spec for spec in VARIANT_SPECS}
 
+INSTANCE_SETS: dict[str, dict[str, Any]] = {
+    "lite_default": {
+        "description": "Default SWE-bench Lite dev slice from the variant YAMLs.",
+    },
+    "sweagent_easy_first": {
+        "description": "SWE-agent's in-repo easiest known SWE-bench dev fixture.",
+        "filter": "pydicom__pydicom-1458",
+        "shuffle": False,
+    },
+    "4omini_smoke": {
+        "description": "Single historically reachable issue for weak/small-model smoke tests.",
+        "filter": "pylint-dev__astroid-1866",
+        "shuffle": False,
+    },
+    "4omini_easy_pair": {
+        "description": "Two historically most reachable Lite-dev issues in this repo's prior runs.",
+        "filter": "pylint-dev__astroid-1866|pvlib__pvlib-python-1072",
+        "shuffle": False,
+    },
+    "astroid_only": {
+        "description": "Restrict to the strongest historically reachable astroid issue.",
+        "filter": "pylint-dev__astroid-1866",
+        "shuffle": False,
+    },
+}
+
 
 @dataclass
 class SlotModelSpec:
@@ -165,6 +191,16 @@ def preset_names() -> list[str]:
 
 def sweep_names() -> list[str]:
     return sorted(load_presets().get("sweeps", {}).keys())
+
+
+def instance_set_names() -> list[str]:
+    return sorted(INSTANCE_SETS.keys())
+
+
+def resolve_instance_set(instance_set_name: str) -> dict[str, Any]:
+    if instance_set_name not in INSTANCE_SETS:
+        raise KeyError(f"Unknown instance set '{instance_set_name}'")
+    return copy.deepcopy(INSTANCE_SETS[instance_set_name])
 
 
 def resolve_profile(profile_name: str) -> dict[str, Any]:
@@ -269,33 +305,213 @@ def _replace_bundle_paths(base: dict[str, Any]) -> None:
         env_variables.setdefault("CURRENT_FILE", "")
 
 
-def _rewrite_template_text(text: str) -> str:
-    replacements = {
-        "- For file changes, use the provided editing tool such as `str_replace_editor`, not an interactive editor.\n": "- For file changes, use the windowed editing tools: `open`, `goto`, and `edit`, not an interactive editor.\n",
-        "- When using `str_replace_editor`, the syntax is `str_replace_editor <command> <absolute_path> ...`.\n": "- Use `open <path> [line]` to open a file, `goto <line>` to move the window, and `edit <start_line>:<end_line>` followed by replacement text and `end_of_edit` to replace a line range.\n",
-        "- The second argument to `str_replace_editor` must be the file path.\n": "",
-        "- Before editing, prefer `grep -n` or `str_replace_editor view <path> --view_range start end` to inspect only the relevant lines.\n": "- Before editing, prefer `grep -n`, `open <path> <line>`, and `goto <line>` to inspect the exact target lines.\n",
-        "- Correct `str_replace_editor` example:\n  `str_replace_editor str_replace {{working_dir}}/path/to/file.py --old_str 'old text' --new_str 'new text'`\n": "- Correct edit flow example:\n  `open {{working_dir}}/path/to/file.py 280`\n  then\n  `edit 280:284`\n  `<replacement text>`\n  `end_of_edit`\n",
-        "- Correct targeted view example:\n  `str_replace_editor view {{working_dir}}/path/to/file.py --view_range 280 310`\n": "- Correct targeted view example:\n  `open {{working_dir}}/path/to/file.py 280`\n",
-        "- If the previous observation already showed the relevant code, move to `str_replace_editor` instead of re-reading.\n": "- If the previous observation already showed the relevant code, move to `edit` instead of re-reading.\n",
-        "- If you inspect a file, prefer `grep -n` or `str_replace_editor view` around the symbols or stack locations named by the issue text.\n": "- If you inspect a file, prefer `grep -n`, `open`, and `goto` around the symbols or stack locations named by the issue text.\n",
-    }
-    for old, new in replacements.items():
-        text = text.replace(old, new)
-    return text
-
-
 def _modernize_matrix_templates(base: dict[str, Any]) -> None:
     roles = base.get("agent", {}).get("roles", {})
     if not isinstance(roles, dict):
         return
-    for role_cfg in roles.values():
-        if not isinstance(role_cfg, dict):
-            continue
-        for template_key in ("system_template", "instance_template", "next_step_template", "next_step_no_output_template"):
-            value = role_cfg.get(template_key)
-            if isinstance(value, str):
-                role_cfg[template_key] = _rewrite_template_text(value)
+    planner = roles.get("planner")
+    coder = roles.get("coder")
+    reviewer = roles.get("reviewer")
+
+    if isinstance(planner, dict):
+        planner["system_template"] = """{% if enable_planner %}
+You are the planner.
+Your job is to localize the bug and hand the coder a tight execution contract.
+Do not edit files. Do not write code. Do not write plan.txt.
+Use read-only commands only.
+
+Every response must follow this format exactly:
+DISCUSSION
+One short sentence.
+
+```
+single command here
+```
+
+Rules:
+- Output exactly one DISCUSSION header.
+- Output exactly one fenced code block.
+- Put exactly one command inside the code block.
+- If ready to hand off, use `handoff '<json payload>'`.
+- The handoff must be compact JSON on one line.
+- Recommended keys: `problem_summary`, `root_cause_hypothesis`, `files_likely_affected`, `target_symbols`, `required_validations`, `forbidden_edits`.
+- Focus on the smallest likely edit surface.
+- Prefer `grep -n`, `open`, and `goto` over broad repo scans.
+- Do not propose unrelated refactors.
+{% else %}
+Planner is disabled.
+{% endif %}"""
+        planner["instance_template"] = """{% if enable_planner %}
+Repository root: {{working_dir}}
+
+Problem statement:
+<problem_statement>
+{{problem_statement}}
+</problem_statement>
+
+Requirements:
+- Identify the likely target file or files first.
+- Name the symbols or lines the coder should inspect.
+- Tell the coder what validation to run after editing.
+- Hand off as soon as you have a concrete execution plan.
+{% else %}
+Planner is disabled.
+{% endif %}"""
+        planner["next_step_template"] = """OBSERVATION:
+{{observation}}
+Reminder: respond with exactly one DISCUSSION block and one command.
+{% if enable_planner %}
+If you know the target file, likely root cause, and validation, hand off now.
+{% endif %}
+(Open: {{open_file}})
+(Dir: {{working_dir}})
+bash-$"""
+        planner["next_step_no_output_template"] = planner["next_step_template"]
+
+    if isinstance(coder, dict):
+        coder["system_template"] = """You are the coder.
+{% if enable_planner %}
+Read and follow the planner contract in `handoff.txt`.
+Treat it as the default execution plan unless direct code evidence disproves it.
+{% else %}
+No planner is available for this run. You must localize the bug yourself from the issue text.
+{% endif %}
+{% if enable_reviewer %}
+A reviewer is enabled for this run. When the patch is ready, hand off to review instead of submitting directly.
+{% else %}
+No reviewer is enabled for this run. You are responsible for deciding when the patch is ready.
+{% endif %}
+
+You should work in a short loop:
+1. localize
+2. inspect exact lines
+3. edit narrowly
+4. validate
+5. inspect diff
+6. only then submit or hand off
+
+Every response must follow this format exactly:
+DISCUSSION
+One short sentence.
+
+```
+single command here
+```
+
+Rules:
+- Output exactly one DISCUSSION header.
+- Output exactly one fenced code block.
+- Put exactly one command inside the code block.
+- Never use terminal editors such as `vim`, `vi`, `nano`, or `emacs`.
+- Use the windowed editing tools for code changes: `open`, `goto`, `edit`.
+- Use `open <path> [line]` to inspect a file.
+- Use `goto <line>` to move the window.
+- Use `edit <start_line>:<end_line>` followed by replacement text and `end_of_edit` to replace a line range.
+- Prefer editing existing relevant files over creating new files.
+- Do not create a new file unless the issue clearly requires it.
+- Do not submit without a meaningful diff.
+- Before submit or handoff, run `git diff --stat` or `git diff --name-only` and inspect the changed files.
+- Before submit or handoff, run at least one targeted validation after the last edit.
+- If an edit fails or lands in the wrong place, re-open the file and use a smaller line range instead of retrying blindly.
+- Prefer `grep -n`, `open`, and `goto` over broad scans once you know the likely file.
+- Stay on the smallest relevant set of files.
+{% if enable_reviewer %}
+- When implementation is ready, use `handoff '<json payload>'` for the reviewer.
+- Include: `change_summary`, `files_changed`, `tests_run`, `test_results`, `open_risks`.
+{% else %}
+- Only use `submit` when the patch is non-empty, relevant, and validated.
+{% endif %}"""
+        coder["instance_template"] = """{% if enable_planner %}
+The planner prepared `{{working_dir}}/handoff.txt` for you.
+- Your first step must be to read it.
+- Do not re-read it unless it changes.
+{% endif %}
+
+Problem statement:
+<problem_statement>
+{{problem_statement}}
+</problem_statement>
+
+Execution rules:
+- First localize the bug to the most likely file.
+- Open the exact region before editing.
+- Make small edits.
+- Validate after editing.
+- Check the diff before submit or review handoff.
+- Never submit an empty diff or a patch that only creates unrelated files.
+
+(Open: {{open_file}})
+(Dir: {{working_dir}})
+bash-$"""
+        coder["next_step_template"] = """OBSERVATION:
+{{observation}}
+Reminder: respond with exactly one DISCUSSION block and one command.
+{% if enable_planner %}
+Do not re-read `handoff.txt` unless it changed.
+{% endif %}
+If the last edit failed, narrow the edit range before trying again.
+Before submit or handoff, confirm the diff is relevant and validation ran after the final edit.
+{% if enable_reviewer %}
+If ready, use `handoff '<json payload>'`.
+{% else %}
+If ready, use `submit`.
+{% endif %}
+(Open: {{open_file}})
+(Dir: {{working_dir}})
+bash-$"""
+        coder["next_step_no_output_template"] = coder["next_step_template"]
+
+    if isinstance(reviewer, dict):
+        reviewer["system_template"] = """{% if enable_reviewer %}
+You are the reviewer.
+Your job is to decide whether the coder's patch is ready.
+
+Every response must follow this format exactly:
+DISCUSSION
+One short sentence.
+
+```
+single command here
+```
+
+Rules:
+- Output exactly one DISCUSSION header.
+- Output exactly one fenced code block.
+- Put exactly one command inside the code block.
+- Read `handoff.txt` before reviewing.
+- Inspect the diff and run targeted validation.
+- If the patch is acceptable, the command must be exactly `submit`.
+- If the patch is not acceptable, use `handoff '<json payload>'` and return control.
+- Prefer `git diff`, targeted file inspection, and targeted tests over broad exploration.
+- Reject empty diffs, irrelevant diffs, or unvalidated patches.
+{% else %}
+Reviewer is disabled.
+{% endif %}"""
+        reviewer["instance_template"] = """{% if enable_reviewer %}
+Reviewer instructions:
+- Read `{{working_dir}}/handoff.txt`.
+- Inspect current changes with `git diff`.
+- Validate the changed behavior.
+- If the patch is good, submit.
+- Otherwise hand off clear feedback.
+
+(Open: {{open_file}})
+(Dir: {{working_dir}})
+bash-$
+{% else %}
+Reviewer is disabled.
+{% endif %}"""
+        reviewer["next_step_template"] = """OBSERVATION:
+{{observation}}
+Reminder: respond with exactly one DISCUSSION block and one command.
+{% if enable_reviewer %}
+If the patch is good, use `submit`.
+If not, use `handoff '<json payload>'`.
+{% endif %}
+(Open: {{open_file}})
+(Dir: {{working_dir}})
+bash-$"""
+        reviewer["next_step_no_output_template"] = reviewer["next_step_template"]
 
 
 def build_variant_config(
@@ -303,6 +519,8 @@ def build_variant_config(
     profile_name: str,
     output_root: Path,
     slot_overrides: dict[str, dict[str, Any]] | None = None,
+    instance_set_name: str | None = None,
+    instance_filter: str | None = None,
     instance_slice: str | None = None,
     num_workers: int | None = None,
 ) -> dict[str, Any]:
@@ -338,6 +556,19 @@ def build_variant_config(
         agent["model"]["max_output_tokens"] = shared_spec.max_output_tokens
     if shared_spec.litellm_model_registry is not None:
         agent["model"]["litellm_model_registry"] = shared_spec.litellm_model_registry
+
+    if instance_set_name is not None:
+        instance_set = resolve_instance_set(instance_set_name)
+        instances_cfg = base["instances"]
+        if "filter" in instance_set:
+            instances_cfg["filter"] = instance_set["filter"]
+            instances_cfg.pop("slice", None)
+        if "shuffle" in instance_set:
+            instances_cfg["shuffle"] = instance_set["shuffle"]
+
+    if instance_filter is not None:
+        base["instances"]["filter"] = instance_filter
+        base["instances"].pop("slice", None)
 
     if instance_slice is not None:
         base["instances"]["slice"] = instance_slice
