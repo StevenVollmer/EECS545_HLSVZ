@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build per-instance, per-project, and overall summaries for matrix batch results."""
+"""Build summaries for matrix batch results with issue-focused metrics."""
 
 from __future__ import annotations
 
@@ -100,6 +100,8 @@ def read_traj_score(path: Path) -> dict[str, object]:
             "successful_edit_steps": "n/a",
             "failed_edit_steps": "n/a",
             "submitted": "n/a",
+            "manual_submit": "n/a",
+            "clean_exit": "n/a",
             "planner_phase_enabled": "n/a",
             "tokens_in": "n/a",
             "tokens_out": "n/a",
@@ -107,6 +109,18 @@ def read_traj_score(path: Path) -> dict[str, object]:
             "tokens_per_step": "n/a",
             "api_calls": "n/a",
             "relative_cost_estimate": "n/a",
+            "issue_alignment_score": "n/a",
+            "solution_focus_score": "n/a",
+            "workflow_score": "n/a",
+            "stability_score": "n/a",
+            "analysis_score": "n/a",
+            "aligned_files_inspected": "n/a",
+            "aligned_files_edited": "n/a",
+            "validation_after_edit": "n/a",
+            "edited_file_alignment": "n/a",
+            "inspected_file_alignment": "n/a",
+            "edited_files": "",
+            "aligned_files": "",
         }
     data = json.loads(path.read_text())
     return score_traj(data)
@@ -144,6 +158,16 @@ def build_rows_for_preset(root: Path, preset_name: str) -> list[dict[str, object
                     "instance_id": instance_id,
                     "variant": variant,
                     "exit_status": exit_statuses.get(instance_id, "missing"),
+                    "analysis_score": score["analysis_score"],
+                    "issue_alignment_score": score["issue_alignment_score"],
+                    "solution_focus_score": score["solution_focus_score"],
+                    "workflow_score": score["workflow_score"],
+                    "stability_score": score["stability_score"],
+                    "aligned_files_inspected": score["aligned_files_inspected"],
+                    "aligned_files_edited": score["aligned_files_edited"],
+                    "validation_after_edit": score["validation_after_edit"],
+                    "edited_file_alignment": score["edited_file_alignment"],
+                    "inspected_file_alignment": score["inspected_file_alignment"],
                     "quality_score": score["quality_score"],
                     "grounding_score": score["grounding_score"],
                     "completion_score": score["completion_score"],
@@ -155,6 +179,8 @@ def build_rows_for_preset(root: Path, preset_name: str) -> list[dict[str, object
                     "successful_edit_steps": score["successful_edit_steps"],
                     "failed_edit_steps": score["failed_edit_steps"],
                     "submitted": score["submitted"],
+                    "manual_submit": score["manual_submit"],
+                    "clean_exit": score["clean_exit"],
                     "planner_phase_enabled": score["planner_phase_enabled"],
                     "tokens_in": score["tokens_in"],
                     "tokens_out": score["tokens_out"],
@@ -162,6 +188,8 @@ def build_rows_for_preset(root: Path, preset_name: str) -> list[dict[str, object
                     "tokens_per_step": score["tokens_per_step"],
                     "api_calls": score["api_calls"],
                     "relative_cost_estimate": score["relative_cost_estimate"],
+                    "edited_files": score["edited_files"],
+                    "aligned_files": score["aligned_files"],
                     "traj": str(traj) if traj.exists() else "",
                     "patch": str(patch) if patch.exists() else "",
                     "info_log": str(info_log) if info_log.exists() else "",
@@ -219,17 +247,17 @@ def average_fraction(rows: list[dict[str, object]], key: str) -> str:
 
 
 def average_int(rows: list[dict[str, object]], key: str) -> str:
-    values = [row[key] for row in rows if isinstance(row[key], int)]
+    values = [row[key] for row in rows if isinstance(row[key], int) and not isinstance(row[key], bool)]
     if not values:
         return "n/a"
     return f"{sum(values) / len(values):.1f}"
 
 
 def average_float(rows: list[dict[str, object]], key: str) -> str:
-    values = [float(row[key]) for row in rows if isinstance(row[key], (int, float))]
+    values = [float(row[key]) for row in rows if isinstance(row[key], (int, float)) and not isinstance(row[key], bool)]
     if not values:
         return "n/a"
-    return f"{sum(values) / len(values):.1f}"
+    return f"{sum(values) / len(values):.2f}"
 
 
 def true_count(rows: list[dict[str, object]], key: str) -> str:
@@ -239,11 +267,27 @@ def true_count(rows: list[dict[str, object]], key: str) -> str:
     return f"{sum(values)}/{len(values)}"
 
 
+def positive_count(rows: list[dict[str, object]], key: str) -> str:
+    values = [row[key] for row in rows if isinstance(row[key], int) and not isinstance(row[key], bool)]
+    if not values:
+        return "n/a"
+    positives = sum(1 for value in values if value > 0)
+    return f"{positives}/{len(values)}"
+
+
 def group_by(rows: list[dict[str, object]], key: str) -> dict[str, list[dict[str, object]]]:
     grouped: dict[str, list[dict[str, object]]] = defaultdict(list)
     for row in rows:
         grouped[str(row[key])].append(row)
     return dict(sorted(grouped.items()))
+
+
+def average_score_value(rows: list[dict[str, object]], key: str) -> float:
+    parsed = [score_fraction(row[key]) for row in rows]
+    usable = [value for value in parsed if value is not None]
+    if not usable:
+        return -1.0
+    return sum(value for value, _ in usable) / len(usable)
 
 
 def build_variant_rollup(rows: list[dict[str, object]]) -> list[dict[str, object]]:
@@ -257,14 +301,19 @@ def build_variant_rollup(rows: list[dict[str, object]]) -> list[dict[str, object
                 "config": config_name,
                 "instances": len(variant_rows),
                 "submitted": true_count(variant_rows, "submitted"),
-                "avg_quality": average_fraction(variant_rows, "quality_score"),
-                "avg_completion": average_fraction(variant_rows, "completion_score"),
-                "avg_efficiency": average_fraction(variant_rows, "efficiency_score"),
-                "avg_grounding": average_fraction(variant_rows, "grounding_score"),
+                "manual_submit": true_count(variant_rows, "manual_submit"),
+                "validated_after_edit": true_count(variant_rows, "validation_after_edit"),
+                "aligned_edits": positive_count(variant_rows, "aligned_files_edited"),
+                "avg_analysis": average_fraction(variant_rows, "analysis_score"),
+                "avg_issue_alignment": average_fraction(variant_rows, "issue_alignment_score"),
+                "avg_focus": average_fraction(variant_rows, "solution_focus_score"),
+                "avg_workflow": average_fraction(variant_rows, "workflow_score"),
+                "avg_stability": average_fraction(variant_rows, "stability_score"),
                 "avg_steps": average_int(variant_rows, "steps"),
                 "avg_tokens_in": average_int(variant_rows, "tokens_in"),
                 "avg_tokens_out": average_int(variant_rows, "tokens_out"),
                 "avg_rel_cost": average_float(variant_rows, "relative_cost_estimate"),
+                "avg_legacy_quality": average_fraction(variant_rows, "quality_score"),
             }
         )
     return rollup
@@ -276,21 +325,17 @@ def build_project_rollup(rows: list[dict[str, object]]) -> list[dict[str, object
         by_config: dict[str, list[dict[str, object]]] = defaultdict(list)
         for row in project_rows:
             by_config[display_config_name(row)].append(row)
-        best_variant = max(
-            by_config.items(),
-            key=lambda item: (
-                sum(score_fraction(row["quality_score"])[0] for row in item[1] if score_fraction(row["quality_score"]) is not None)
-                / max(1, len([row for row in item[1] if score_fraction(row["quality_score"]) is not None]))
-            ),
-        )[0]
+        best_variant = max(by_config.items(), key=lambda item: average_score_value(item[1], "analysis_score"))[0]
         rollup.append(
             {
                 "project_id": project_id,
-                "issues": len({str(row["instance_id"]) for row in project_rows}),
+                "issues": len({str(row['instance_id']) for row in project_rows}),
                 "configs": len({display_config_name(row) for row in project_rows}),
-                "avg_quality": average_fraction(project_rows, "quality_score"),
-                "avg_completion": average_fraction(project_rows, "completion_score"),
-                "avg_efficiency": average_fraction(project_rows, "efficiency_score"),
+                "avg_analysis": average_fraction(project_rows, "analysis_score"),
+                "avg_issue_alignment": average_fraction(project_rows, "issue_alignment_score"),
+                "avg_focus": average_fraction(project_rows, "solution_focus_score"),
+                "avg_workflow": average_fraction(project_rows, "workflow_score"),
+                "avg_stability": average_fraction(project_rows, "stability_score"),
                 "avg_tokens_in": average_int(project_rows, "tokens_in"),
                 "avg_tokens_out": average_int(project_rows, "tokens_out"),
                 "avg_rel_cost": average_float(project_rows, "relative_cost_estimate"),
@@ -300,22 +345,14 @@ def build_project_rollup(rows: list[dict[str, object]]) -> list[dict[str, object
     return rollup
 
 
-def average_quality_value(rows: list[dict[str, object]]) -> float:
-    parsed = [score_fraction(row["quality_score"]) for row in rows]
-    usable = [value for value in parsed if value is not None]
-    if not usable:
-        return -1.0
-    return sum(value for value, _ in usable) / len(usable)
-
-
 def build_instance_rollup(rows: list[dict[str, object]]) -> list[dict[str, object]]:
     rollup = []
     for instance_id, instance_rows in group_by(rows, "instance_id").items():
         by_config: dict[str, list[dict[str, object]]] = defaultdict(list)
         for row in instance_rows:
             by_config[display_config_name(row)].append(row)
-        best_variant = max(by_config.items(), key=lambda item: average_quality_value(item[1]))[0]
-        best_quality = average_fraction(by_config[best_variant], "quality_score")
+        best_variant = max(by_config.items(), key=lambda item: average_score_value(item[1], "analysis_score"))[0]
+        best_analysis = average_fraction(by_config[best_variant], "analysis_score")
         exit_counts = defaultdict(int)
         for row in instance_rows:
             exit_counts[str(row["exit_status"])] += 1
@@ -326,14 +363,18 @@ def build_instance_rollup(rows: list[dict[str, object]]) -> list[dict[str, objec
                 "instance_id": instance_id,
                 "variants_run": len(instance_rows),
                 "submitted": true_count(instance_rows, "submitted"),
-                "avg_quality": average_fraction(instance_rows, "quality_score"),
-                "avg_completion": average_fraction(instance_rows, "completion_score"),
-                "avg_efficiency": average_fraction(instance_rows, "efficiency_score"),
+                "validated_after_edit": true_count(instance_rows, "validation_after_edit"),
+                "aligned_edits": positive_count(instance_rows, "aligned_files_edited"),
+                "avg_analysis": average_fraction(instance_rows, "analysis_score"),
+                "avg_issue_alignment": average_fraction(instance_rows, "issue_alignment_score"),
+                "avg_focus": average_fraction(instance_rows, "solution_focus_score"),
+                "avg_workflow": average_fraction(instance_rows, "workflow_score"),
+                "avg_stability": average_fraction(instance_rows, "stability_score"),
                 "avg_tokens_in": average_int(instance_rows, "tokens_in"),
                 "avg_tokens_out": average_int(instance_rows, "tokens_out"),
                 "avg_rel_cost": average_float(instance_rows, "relative_cost_estimate"),
                 "best_variant": best_variant,
-                "best_quality": best_quality,
+                "best_analysis": best_analysis,
                 "exit_summary": exit_summary,
             }
         )
@@ -341,6 +382,10 @@ def build_instance_rollup(rows: list[dict[str, object]]) -> list[dict[str, objec
 
 
 def write_root_readme(rows: list[dict[str, object]], path: Path) -> None:
+    if not rows:
+        path.write_text("# Matrix Batch Results\n\nNo rows found.\n")
+        return
+
     variant_rollup = build_variant_rollup(rows)
     project_rollup = build_project_rollup(rows)
     instance_rollup = build_instance_rollup(rows)
@@ -354,14 +399,16 @@ def write_root_readme(rows: list[dict[str, object]], path: Path) -> None:
         f"- issues: `{len({row['instance_id'] for row in rows})}`",
         f"- observed runs: `{len(rows)}`",
         "",
-        "## Variant Aggregate",
+        "## Primary Aggregate",
         "",
-        "| Config | Instances | Submitted | Avg Quality | Avg Completion | Avg Efficiency | Avg Grounding | Avg In Tok | Avg Out Tok | Avg Rel Cost | Avg Steps |",
-        "| --- | ---: | ---: | --- | --- | --- | --- | ---: | ---: | ---: | ---: |",
+        "These metrics prioritize issue alignment, focused editing, validation after edits, and execution stability.",
+        "",
+        "| Config | Instances | Submitted | Manual Submit | Validated After Edit | Aligned Edits | Avg Analysis | Avg Issue Alignment | Avg Focus | Avg Workflow | Avg Stability | Avg In Tok | Avg Out Tok | Avg Rel Cost | Avg Steps |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: |",
     ]
     for row in variant_rollup:
         lines.append(
-            "| {config} | {instances} | {submitted} | {avg_quality} | {avg_completion} | {avg_efficiency} | {avg_grounding} | {avg_tokens_in} | {avg_tokens_out} | {avg_rel_cost} | {avg_steps} |".format(
+            "| {config} | {instances} | {submitted} | {manual_submit} | {validated_after_edit} | {aligned_edits} | {avg_analysis} | {avg_issue_alignment} | {avg_focus} | {avg_workflow} | {avg_stability} | {avg_tokens_in} | {avg_tokens_out} | {avg_rel_cost} | {avg_steps} |".format(
                 **row
             )
         )
@@ -371,13 +418,13 @@ def write_root_readme(rows: list[dict[str, object]], path: Path) -> None:
             "",
             "## Issue Index",
             "",
-            "| Issue | Project | Configs Run | Submitted | Avg Quality | Avg Completion | Avg Efficiency | Avg In Tok | Avg Out Tok | Avg Rel Cost | Best Variant | Best Quality | Exit Mix |",
-            "| --- | --- | ---: | ---: | --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |",
+            "| Issue | Project | Configs Run | Submitted | Validated After Edit | Aligned Edits | Avg Analysis | Avg Issue Alignment | Avg Focus | Avg Workflow | Avg Stability | Avg In Tok | Avg Out Tok | Avg Rel Cost | Best Variant | Best Analysis | Exit Mix |",
+            "| --- | --- | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |",
         ]
     )
     for row in instance_rollup:
         lines.append(
-            "| {instance_id} | {project_id} | {variants_run} | {submitted} | {avg_quality} | {avg_completion} | {avg_efficiency} | {avg_tokens_in} | {avg_tokens_out} | {avg_rel_cost} | {best_variant} | {best_quality} | {exit_summary} |".format(
+            "| {instance_id} | {project_id} | {variants_run} | {submitted} | {validated_after_edit} | {aligned_edits} | {avg_analysis} | {avg_issue_alignment} | {avg_focus} | {avg_workflow} | {avg_stability} | {avg_tokens_in} | {avg_tokens_out} | {avg_rel_cost} | {best_variant} | {best_analysis} | {exit_summary} |".format(
                 **row
             )
         )
@@ -387,14 +434,14 @@ def write_root_readme(rows: list[dict[str, object]], path: Path) -> None:
             "",
             "## Project Index",
             "",
-            "| Project | Issues | Configs | Avg Quality | Avg Completion | Avg Efficiency | Avg In Tok | Avg Out Tok | Avg Rel Cost | Best Variant | Report |",
-            "| --- | ---: | ---: | --- | --- | --- | ---: | ---: | ---: | --- | --- |",
+            "| Project | Issues | Configs | Avg Analysis | Avg Issue Alignment | Avg Focus | Avg Workflow | Avg Stability | Avg In Tok | Avg Out Tok | Avg Rel Cost | Best Variant | Report |",
+            "| --- | ---: | ---: | --- | --- | --- | --- | --- | ---: | ---: | ---: | --- | --- |",
         ]
     )
     for row in project_rollup:
         report_path = f"./projects/{row['project_id']}/README.md"
         lines.append(
-            "| {project_id} | {issues} | {configs} | {avg_quality} | {avg_completion} | {avg_efficiency} | {avg_tokens_in} | {avg_tokens_out} | {avg_rel_cost} | {best_variant} | [{project_id}]({report_path}) |".format(
+            "| {project_id} | {issues} | {configs} | {avg_analysis} | {avg_issue_alignment} | {avg_focus} | {avg_workflow} | {avg_stability} | {avg_tokens_in} | {avg_tokens_out} | {avg_rel_cost} | {best_variant} | [{project_id}]({report_path}) |".format(
                 report_path=report_path,
                 **row,
             )
@@ -434,12 +481,12 @@ def write_project_reports(rows: list[dict[str, object]], root: Path) -> None:
             "",
             "## Variant Aggregate",
             "",
-            "| Config | Instances | Submitted | Avg Quality | Avg Completion | Avg Efficiency | Avg Grounding | Avg In Tok | Avg Out Tok | Avg Rel Cost | Avg Steps |",
-            "| --- | ---: | ---: | --- | --- | --- | --- | ---: | ---: | ---: | ---: |",
+            "| Config | Instances | Submitted | Manual Submit | Validated After Edit | Aligned Edits | Avg Analysis | Avg Issue Alignment | Avg Focus | Avg Workflow | Avg Stability | Avg In Tok | Avg Out Tok | Avg Rel Cost | Avg Steps | Legacy Quality |",
+            "| --- | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- |",
         ]
         for row in variant_rollup:
             lines.append(
-                "| {config} | {instances} | {submitted} | {avg_quality} | {avg_completion} | {avg_efficiency} | {avg_grounding} | {avg_tokens_in} | {avg_tokens_out} | {avg_rel_cost} | {avg_steps} |".format(
+                "| {config} | {instances} | {submitted} | {manual_submit} | {validated_after_edit} | {aligned_edits} | {avg_analysis} | {avg_issue_alignment} | {avg_focus} | {avg_workflow} | {avg_stability} | {avg_tokens_in} | {avg_tokens_out} | {avg_rel_cost} | {avg_steps} | {avg_legacy_quality} |".format(
                     **row
                 )
             )
@@ -448,13 +495,13 @@ def write_project_reports(rows: list[dict[str, object]], root: Path) -> None:
                 "",
                 "## Issue Aggregate",
                 "",
-                "| Issue | Configs Run | Submitted | Avg Quality | Avg Completion | Avg Efficiency | Avg In Tok | Avg Out Tok | Avg Rel Cost | Best Variant | Best Quality | Exit Mix |",
-                "| --- | ---: | ---: | --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |",
+                "| Issue | Configs Run | Submitted | Validated After Edit | Aligned Edits | Avg Analysis | Avg Issue Alignment | Avg Focus | Avg Workflow | Avg Stability | Avg In Tok | Avg Out Tok | Avg Rel Cost | Best Variant | Best Analysis | Exit Mix |",
+                "| --- | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |",
             ]
         )
         for row in instance_rollup:
             lines.append(
-                "| {instance_id} | {variants_run} | {submitted} | {avg_quality} | {avg_completion} | {avg_efficiency} | {avg_tokens_in} | {avg_tokens_out} | {avg_rel_cost} | {best_variant} | {best_quality} | {exit_summary} |".format(
+                "| {instance_id} | {variants_run} | {submitted} | {validated_after_edit} | {aligned_edits} | {avg_analysis} | {avg_issue_alignment} | {avg_focus} | {avg_workflow} | {avg_stability} | {avg_tokens_in} | {avg_tokens_out} | {avg_rel_cost} | {best_variant} | {best_analysis} | {exit_summary} |".format(
                     **row
                 )
             )
@@ -463,13 +510,13 @@ def write_project_reports(rows: list[dict[str, object]], root: Path) -> None:
                 "",
                 "## Instance Details",
                 "",
-                "| Instance | Preset | Variant | Exit | Quality | Completion | Efficiency | Grounding | In Tok | Out Tok | Rel Cost | Validations | Good Edits | Failed Edits | Submitted | Steps |",
-                "| --- | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: |",
+                "| Instance | Preset | Variant | Exit | Analysis | Issue Align | Focus | Workflow | Stability | Validated After Edit | Aligned Files Edited | Edited Files | Legacy Quality | Completion | Grounding | In Tok | Out Tok | Rel Cost | Steps |",
+                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | --- | --- | --- | --- | ---: | ---: | ---: | ---: |",
             ]
         )
         for row in sorted(project_rows, key=lambda item: (str(item["instance_id"]), str(item["variant"]))):
             lines.append(
-                "| {instance_id} | {preset} | {variant} | {exit_status} | {quality_score} | {completion_score} | {efficiency_score} | {grounding_score} | {tokens_in} | {tokens_out} | {relative_cost_estimate} | {validation_runs} | {successful_edit_steps} | {failed_edit_steps} | {submitted} | {steps} |".format(
+                "| {instance_id} | {preset} | {variant} | {exit_status} | {analysis_score} | {issue_alignment_score} | {solution_focus_score} | {workflow_score} | {stability_score} | {validation_after_edit} | {aligned_files_edited} | {edited_files} | {quality_score} | {completion_score} | {grounding_score} | {tokens_in} | {tokens_out} | {relative_cost_estimate} | {steps} |".format(
                     **row
                 )
             )
