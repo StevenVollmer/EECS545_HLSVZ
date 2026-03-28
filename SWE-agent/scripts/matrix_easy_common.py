@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import copy
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -180,11 +181,24 @@ def resolve_sweep(sweep_name: str) -> list[str]:
     return list(sweeps[sweep_name])
 
 
+def _resolve_nonsecret_env(value: Any) -> Any:
+    if not isinstance(value, str) or not value.startswith("$"):
+        return value
+    env_var_name = value[1:]
+    resolved = os.getenv(env_var_name)
+    if not resolved:
+        raise KeyError(f"Environment variable '{env_var_name}' is not set")
+    return resolved
+
+
 def build_slot_spec(raw: dict[str, Any]) -> SlotModelSpec:
+    role_model_name = str(_resolve_nonsecret_env(raw["role_model_name"]))
+    client_model_name = str(_resolve_nonsecret_env(raw.get("client_model_name", role_model_name)))
+    api_base = str(_resolve_nonsecret_env(raw.get("api_base", "https://api.openai.com/v1")))
     return SlotModelSpec(
-        role_model_name=str(raw["role_model_name"]),
-        client_model_name=str(raw.get("client_model_name", "openai/local-model")),
-        api_base=str(raw["api_base"]),
+        role_model_name=role_model_name,
+        client_model_name=client_model_name,
+        api_base=api_base,
         api_key=raw.get("api_key"),
         max_input_tokens=raw.get("max_input_tokens", 300000),
         max_output_tokens=raw.get("max_output_tokens"),
