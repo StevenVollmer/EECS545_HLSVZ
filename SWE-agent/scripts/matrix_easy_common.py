@@ -262,6 +262,11 @@ def _replace_bundle_paths(base: dict[str, Any]) -> None:
         new_bundles.append(bundle)
     if replaced_edit_bundle:
         base["agent"]["tools"]["bundles"] = new_bundles
+        env_variables = base["agent"]["tools"].setdefault("env_variables", {})
+        env_variables.setdefault("WINDOW", "100")
+        env_variables.setdefault("OVERLAP", "2")
+        env_variables.setdefault("FIRST_LINE", "0")
+        env_variables.setdefault("CURRENT_FILE", "")
 
 
 def _rewrite_template_text(text: str) -> str:
