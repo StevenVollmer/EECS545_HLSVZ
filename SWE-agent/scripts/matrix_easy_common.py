@@ -337,10 +337,12 @@ Rules:
 - Put exactly one command inside the code block.
 - If ready to hand off, use `handoff '<json payload>'`.
 - The handoff must be compact JSON on one line.
-- Recommended keys: `problem_summary`, `root_cause_hypothesis`, `files_likely_affected`, `target_symbols`, `required_validations`, `forbidden_edits`.
+- Recommended keys: `problem_summary`, `root_cause_hypothesis`, `files_likely_affected`, `target_symbols`, `required_repro`, `required_validations`, `forbidden_edits`.
 - Focus on the smallest likely edit surface.
 - Prefer `grep -n`, `open`, and `goto` over broad repo scans.
 - Do not propose unrelated refactors.
+- Prefer executable code paths over comments, docstrings, or markdown text.
+- For behavior bugs, point the coder to runtime logic, not only descriptive text.
 {% else %}
 Planner is disabled.
 {% endif %}"""
@@ -355,6 +357,7 @@ Problem statement:
 Requirements:
 - Identify the likely target file or files first.
 - Name the symbols or lines the coder should inspect.
+- Name one concrete repro or failing-behavior command the coder should run before editing.
 - Tell the coder what validation to run after editing.
 - Hand off as soon as you have a concrete execution plan.
 {% else %}
@@ -378,6 +381,9 @@ Read and follow the planner contract in `handoff.txt`.
 Treat it as the default execution plan unless direct code evidence disproves it.
 {% else %}
 No planner is available for this run. You must localize the bug yourself from the issue text.
+The full issue report will appear in the next user message.
+That next user message is the authoritative task specification for this run.
+Read the issue report before taking any action.
 {% endif %}
 {% if enable_reviewer %}
 A reviewer is enabled for this run. When the patch is ready, hand off to review instead of submitting directly.
@@ -387,11 +393,12 @@ No reviewer is enabled for this run. You are responsible for deciding when the p
 
 You should work in a short loop:
 1. localize
-2. inspect exact lines
-3. edit narrowly
-4. validate
-5. inspect diff
-6. only then submit or hand off
+2. reproduce the failing behavior
+3. inspect exact lines
+4. edit narrowly
+5. rerun the repro or targeted validation
+6. inspect diff
+7. only then submit or hand off
 
 Every response must follow this format exactly:
 DISCUSSION
@@ -441,17 +448,22 @@ edit 46:46 | (0028,0103) | PixelRepresentation | 1 | 0, 1 | Optional | end_of_ed
 ```bash
 edit 285:290 && pytest
 ```
+- For behavior bugs, a real fix changes executable logic, not just comments, docstrings, examples, or tables.
+- Do not submit a patch that only changes documentation or comments unless the issue is explicitly documentation-only.
+- Before the first edit, run one targeted repro, failing test, or direct behavior check whenever the issue gives enough information.
+- After the final edit, rerun that same repro or targeted validation before submit.
 - Prefer editing existing relevant files over creating new files.
 - Do not create a new file unless the issue clearly requires it.
 - Do not submit without a meaningful diff.
 - Before submit or handoff, run `git diff --stat` or `git diff --name-only` and inspect the changed files.
 - Before submit or handoff, run at least one targeted validation after the last edit.
+- If your diff only touches docs/comments or if validation has not run after the last edit, you are not ready to submit.
 - If an edit fails or lands in the wrong place, re-open the file and use a smaller line range instead of retrying blindly.
 - Prefer `grep -n`, `open`, and `goto` over broad scans once you know the likely file.
 - Stay on the smallest relevant set of files.
 {% if enable_reviewer %}
 - When implementation is ready, use `handoff '<json payload>'` for the reviewer.
-- Include: `change_summary`, `files_changed`, `tests_run`, `test_results`, `open_risks`.
+- Include: `change_summary`, `files_changed`, `repro_command`, `tests_run`, `test_results`, `open_risks`.
 {% else %}
 - Only use `submit` when the patch is non-empty, relevant, and validated.
 {% endif %}"""
@@ -461,6 +473,9 @@ The planner prepared `{{working_dir}}/handoff.txt` for you.
 - Do not re-read it unless it changes.
 {% endif %}
 
+This issue report is your task specification.
+Read it carefully before running your first command.
+
 Problem statement:
 <problem_statement>
 {{problem_statement}}
@@ -468,15 +483,18 @@ Problem statement:
 
 Execution rules:
 - First localize the bug to the most likely file.
+- Before the first edit, run one targeted repro, failing test, or direct behavior check if the issue gives enough information.
 - Open the exact region before editing.
 - Make small edits.
 - When using `edit`, write it as a multiline command:
   first line `edit start:end`
   then replacement text
   then `end_of_edit` on its own line
-- Validate after editing.
+- After the final edit, rerun the same repro or a targeted validation command.
 - Check the diff before submit or review handoff.
+- Prefer changing executable logic over comments, docstrings, markdown, or examples.
 - Never submit an empty diff or a patch that only creates unrelated files.
+- Never submit a doc-only patch for a behavior bug.
 
 (Open: {{open_file}})
 (Dir: {{working_dir}})
@@ -495,6 +513,8 @@ replacement text here
 end_of_edit
 ```
 Do not place replacement text on the same line as `edit`.
+If you have not yet run a repro or targeted failing-behavior check, do that before editing further.
+If your current changes only affect comments or docstrings, you have not fixed a behavior bug yet.
 Before submit or handoff, confirm the diff is relevant and validation ran after the final edit.
 {% if enable_reviewer %}
 If ready, use `handoff '<json payload>'`.
@@ -529,6 +549,8 @@ Rules:
 - If the patch is not acceptable, use `handoff '<json payload>'` and return control.
 - Prefer `git diff`, targeted file inspection, and targeted tests over broad exploration.
 - Reject empty diffs, irrelevant diffs, or unvalidated patches.
+- Reject doc-only or comment-only patches for behavior bugs.
+- Reject patches that did not rerun a relevant repro or validation command after the last edit.
 {% else %}
 Reviewer is disabled.
 {% endif %}"""
