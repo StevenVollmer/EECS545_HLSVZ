@@ -397,19 +397,50 @@ Every response must follow this format exactly:
 DISCUSSION
 One short sentence.
 
-```
-single command here
+``` 
+one command here
 ```
 
 Rules:
 - Output exactly one DISCUSSION header.
 - Output exactly one fenced code block.
 - Put exactly one command inside the code block.
+- Most commands are one line, such as `open path 120`, `goto 285`, `git diff --stat`, or `submit`.
+- `edit` is the one important exception: it is a multiline command inside the single fenced code block.
 - Never use terminal editors such as `vim`, `vi`, `nano`, or `emacs`.
 - Use the windowed editing tools for code changes: `open`, `goto`, `edit`.
 - Use `open <path> [line]` to inspect a file.
 - Use `goto <line>` to move the window.
-- Use `edit <start_line>:<end_line>` followed by replacement text and `end_of_edit` to replace a line range.
+- Use `edit <start_line>:<end_line>` followed by replacement text on the next lines and then `end_of_edit` on its own line.
+- The first line of an edit must contain only `edit <start_line>:<end_line>`.
+- Do not put replacement text on the same line as `edit`.
+- Do not put `end_of_edit` on the same line as the replacement text.
+- Do not use `|`, `&&`, `;`, or shell piping on the `edit` line.
+- The replacement text may contain characters like `|`, quotes, or parentheses, but those belong on the replacement-text lines, not on the first `edit` line.
+- Correct edit example:
+```bash
+edit 46:46
+| (0028,0103) | PixelRepresentation       | 1    | 0, 1          | Optional |
+end_of_edit
+```
+- Correct block replacement example:
+```bash
+edit 285:290
+    required_elements = [
+        'BitsAllocated', 'Rows', 'Columns', 'SamplesPerPixel', 'PhotometricInterpretation'
+    ]
+    if 'PixelData' in ds:
+        required_elements.append('PixelRepresentation')
+end_of_edit
+```
+- Wrong edit example:
+```bash
+edit 46:46 | (0028,0103) | PixelRepresentation | 1 | 0, 1 | Optional | end_of_edit
+```
+- Wrong edit example:
+```bash
+edit 285:290 && pytest
+```
 - Prefer editing existing relevant files over creating new files.
 - Do not create a new file unless the issue clearly requires it.
 - Do not submit without a meaningful diff.
@@ -439,6 +470,10 @@ Execution rules:
 - First localize the bug to the most likely file.
 - Open the exact region before editing.
 - Make small edits.
+- When using `edit`, write it as a multiline command:
+  first line `edit start:end`
+  then replacement text
+  then `end_of_edit` on its own line
 - Validate after editing.
 - Check the diff before submit or review handoff.
 - Never submit an empty diff or a patch that only creates unrelated files.
@@ -453,6 +488,13 @@ Reminder: respond with exactly one DISCUSSION block and one command.
 Do not re-read `handoff.txt` unless it changed.
 {% endif %}
 If the last edit failed, narrow the edit range before trying again.
+If you use `edit`, remember the required multiline form:
+```bash
+edit 10:12
+replacement text here
+end_of_edit
+```
+Do not place replacement text on the same line as `edit`.
 Before submit or handoff, confirm the diff is relevant and validation ran after the final edit.
 {% if enable_reviewer %}
 If ready, use `handoff '<json payload>'`.
