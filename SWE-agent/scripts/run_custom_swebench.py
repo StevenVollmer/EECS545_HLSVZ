@@ -220,6 +220,8 @@ Rules:
 - Reproduce the bug before the first source edit when feasible.
 - Fix executable runtime logic before touching tests, docs, comments, or examples.
 - Prefer targeted inspection and one deliberate block replacement over many tiny edits.
+- If you are not sure about an exact file path, use `bash` with `find`, `rg --files`, or `ls` before calling `view` or editing tools.
+- If a file tool reports that a path does not exist, stop guessing filenames and discover the real path first.
 - For multi-line replacements, pass actual multi-line strings in tool arguments. Do not insert literal backslash-n text unless you truly want `\\n` in the file.
 - Never replace a bare identifier when it can appear in multiple places. Replace the smallest unique surrounding block.
 - After the first successful semantic code edit, validate immediately before making more edits.
@@ -350,6 +352,24 @@ class ToolRuntime:
     def _read(self, path: str) -> str:
         return self.env.read_file(path)
 
+    def _path_exists(self, path: str) -> bool:
+        quoted = shlex.quote(path)
+        output = self.env.communicate(
+            input=f"if [ -e {quoted} ]; then printf 'exists'; else printf 'missing'; fi",
+            timeout=10,
+            check="ignore",
+        )
+        return output.strip() == "exists"
+
+    def _path_is_file(self, path: str) -> bool:
+        quoted = shlex.quote(path)
+        output = self.env.communicate(
+            input=f"if [ -f {quoted} ]; then printf 'file'; else printf 'not-file'; fi",
+            timeout=10,
+            check="ignore",
+        )
+        return output.strip() == "file"
+
     def _write(self, path: str, content: str) -> None:
         self.edit_history[path].append(self._read(path))
         self.env.write_file(path, content)
@@ -364,6 +384,16 @@ class ToolRuntime:
 
     def view(self, path: str, start_line: int | None = None, end_line: int | None = None) -> str:
         path = self._validate_path(path)
+        if not self._path_exists(path):
+            return (
+                f"Path `{path}` does not exist. "
+                "Use `bash` with `find`, `rg --files`, or `ls` to discover the correct path before trying `view` again."
+            )
+        if not self._path_is_file(path):
+            return (
+                f"Path `{path}` is not a regular file. "
+                "Use `bash` to inspect the directory contents and then call `view` on a specific file."
+            )
         text = self._read(path)
         lines = text.splitlines()
         start = 1 if start_line is None else start_line

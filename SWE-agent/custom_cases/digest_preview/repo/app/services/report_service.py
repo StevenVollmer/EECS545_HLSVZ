@@ -1,7 +1,7 @@
 from app.config import DEFAULT_GREETING
 from app.models.report import DigestMetrics, DigestRequest, DigestViewModel
 from app.services.summary_service import build_summary_line
-from app.utils.text import normalize_display_name
+from app.utils.text import build_initials, classify_name_shape, normalize_display_name
 
 
 def build_metrics(total_value: float, alert_count: int) -> DigestMetrics:
@@ -21,9 +21,12 @@ def build_digest(request: DigestRequest) -> DigestViewModel:
     owner_name = normalize_display_name(request.owner_name)
     summary_line = build_summary_line(request.total_value, request.alert_count)
     metrics = build_metrics(request.total_value, request.alert_count)
+    name_shape = classify_name_shape(request.owner_name)
     notes = [
         "Generated for dashboard preview",
         f"Movement status: {metrics.movement_label}",
+        f"Owner initials: {build_initials(owner_name)}",
+        f"Name shape: {name_shape}",
     ]
     return DigestViewModel(
         greeting=DEFAULT_GREETING,
