@@ -5,10 +5,9 @@ from __future__ import annotations
 
 import argparse
 import subprocess
-import sys
 from pathlib import Path
 
-from matrix_easy_common import default_results_root, preset_names, repo_root, sweep_names, resolve_sweep
+from matrix_easy_common import default_python_bin, default_results_root, preset_names, repo_root, sweep_names, resolve_sweep
 
 
 def main() -> int:
@@ -69,7 +68,7 @@ def main() -> int:
 
     for preset in presets:
         cmd = [
-            sys.executable,
+            str(default_python_bin()),
             str(repo_root() / "scripts" / "run_matrix_easy.py"),
             "--preset",
             preset,

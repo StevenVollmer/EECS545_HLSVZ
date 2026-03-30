@@ -6,13 +6,13 @@ from __future__ import annotations
 import argparse
 import os
 import subprocess
-import sys
 from pathlib import Path
 
 from matrix_easy_common import (
     ALL_VARIANTS,
     DEFAULT_VARIANTS,
     build_variant_config,
+    default_python_bin,
     default_results_root,
     default_sweagent_bin,
     instance_set_names,
@@ -95,7 +95,7 @@ def run_variant(
 
 def summarize_results(results_root: Path, run_label: str, dry_run: bool) -> int:
     cmd = [
-        sys.executable,
+        str(default_python_bin()),
         str(repo_root() / "scripts" / "summarize_latest_matrix_results.py"),
         "--root",
         str((results_root / run_label).resolve()),
