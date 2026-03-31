@@ -26,6 +26,17 @@ class CommandResult:
     passed: bool
     failures: list[str]
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "command": self.command,
+            "exit_code": self.exit_code,
+            "passed": self.passed,
+            "failures": self.failures,
+            "stdout": self.stdout,
+            "stderr": self.stderr,
+        }
+
 
 def _resolve_case_file(path: Path) -> Path:
     candidate = path.resolve()
@@ -134,6 +145,62 @@ def _run_commands(commands: list[str], cwd: Path) -> list[CommandResult]:
     return results
 
 
+def evaluate_case(
+    *,
+    case_path: Path,
+    mode: str,
+    patch_file: Path | None = None,
+    run_install: bool = False,
+) -> dict[str, Any]:
+    case_item, repo_path = _load_case(case_path)
+    evaluation = case_item.get("evaluation", {})
+    if not isinstance(evaluation, dict):
+        raise ValueError("evaluation must be an object")
+
+    if mode == "baseline":
+        checks = evaluation.get("baseline_checks", [])
+        work_repo = repo_path
+    elif mode in {"success", "patch"}:
+        checks = evaluation.get("success_checks", [])
+        work_repo = repo_path
+    else:
+        raise ValueError(f"Unsupported mode: {mode}")
+
+    cleanup_path: Path | None = None
+    if mode == "patch":
+        if patch_file is None:
+            raise ValueError("patch_file is required for mode='patch'")
+        cleanup_path = _copy_repo_to_temp(repo_path).parent
+        work_repo = cleanup_path / "repo"
+        _apply_patch(work_repo, patch_file)
+
+    if not isinstance(checks, list):
+        raise ValueError("Checks must be a list")
+
+    setup_results: list[CommandResult] = []
+    if run_install:
+        install_commands = [str(x) for x in case_item.get("install_commands", [])]
+        setup_commands = [str(x) for x in case_item.get("setup_commands", [])]
+        setup_results.extend(_run_commands(install_commands + setup_commands, work_repo))
+
+    check_results = [_run_check(check, work_repo) for check in checks]
+    all_results = setup_results + check_results
+    passed = all(result.passed for result in all_results)
+
+    output = {
+        "case": str(_resolve_case_file(case_path)),
+        "repo_path": str(work_repo),
+        "mode": mode,
+        "passed": passed,
+        "results": [result.to_dict() for result in all_results],
+    }
+
+    if cleanup_path is not None:
+        shutil.rmtree(cleanup_path, ignore_errors=True)
+
+    return output
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--case", dest="case_path", type=Path, required=True)
@@ -146,57 +213,14 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    case_item, repo_path = _load_case(args.case_path)
-    evaluation = case_item.get("evaluation", {})
-    if not isinstance(evaluation, dict):
-        raise ValueError("evaluation must be an object")
-
-    if args.mode == "baseline":
-        checks = evaluation.get("baseline_checks", [])
-        work_repo = repo_path
-    else:
-        checks = evaluation.get("success_checks", [])
-        work_repo = repo_path
-
-    cleanup_path: Path | None = None
-    if args.mode == "patch":
-        if args.patch_file is None:
-            raise ValueError("--patch-file is required for --mode patch")
-        cleanup_path = _copy_repo_to_temp(repo_path).parent
-        work_repo = cleanup_path / "repo"
-        _apply_patch(work_repo, args.patch_file)
-
-    if not isinstance(checks, list):
-        raise ValueError("Checks must be a list")
-
-    setup_results: list[CommandResult] = []
-    if args.run_install:
-        install_commands = [str(x) for x in case_item.get("install_commands", [])]
-        setup_commands = [str(x) for x in case_item.get("setup_commands", [])]
-        setup_results.extend(_run_commands(install_commands + setup_commands, work_repo))
-
-    check_results = [_run_check(check, work_repo) for check in checks]
-    all_results = setup_results + check_results
-    passed = all(result.passed for result in all_results)
-
-    output = {
-        "case": str(_resolve_case_file(args.case_path)),
-        "repo_path": str(work_repo),
-        "mode": args.mode,
-        "passed": passed,
-        "results": [
-            {
-                "name": result.name,
-                "command": result.command,
-                "exit_code": result.exit_code,
-                "passed": result.passed,
-                "failures": result.failures,
-                "stdout": result.stdout,
-                "stderr": result.stderr,
-            }
-            for result in all_results
-        ],
-    }
+    output = evaluate_case(
+        case_path=args.case_path,
+        mode=args.mode,
+        patch_file=args.patch_file,
+        run_install=args.run_install,
+    )
+    all_results = output["results"]
+    passed = bool(output["passed"])
 
     if args.json:
         print(json.dumps(output, indent=2))
@@ -205,22 +229,19 @@ def main() -> None:
         print(f"mode: {args.mode}")
         print(f"passed: {passed}")
         for result in all_results:
-            status = "PASS" if result.passed else "FAIL"
-            print(f"\n[{status}] {result.name}")
-            print(f"command: {result.command}")
-            print(f"exit_code: {result.exit_code}")
-            if result.failures:
-                for failure in result.failures:
+            status = "PASS" if result["passed"] else "FAIL"
+            print(f"\n[{status}] {result['name']}")
+            print(f"command: {result['command']}")
+            print(f"exit_code: {result['exit_code']}")
+            if result["failures"]:
+                for failure in result["failures"]:
                     print(f"failure: {failure}")
-            if result.stdout.strip():
+            if result["stdout"].strip():
                 print("stdout:")
-                print(result.stdout.rstrip())
-            if result.stderr.strip():
+                print(result["stdout"].rstrip())
+            if result["stderr"].strip():
                 print("stderr:")
-                print(result.stderr.rstrip())
-
-    if cleanup_path is not None:
-        shutil.rmtree(cleanup_path, ignore_errors=True)
+                print(result["stderr"].rstrip())
 
     raise SystemExit(0 if passed else 1)
 

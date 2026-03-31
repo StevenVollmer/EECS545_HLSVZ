@@ -22,6 +22,7 @@ import ast
 import asyncio
 import json
 import os
+import re
 import shlex
 import time
 from collections import defaultdict
@@ -217,6 +218,7 @@ def _build_system_prompt(repo_root: str) -> str:
 You are working inside a repository mounted at `{repo_root}`.
 
 Rules:
+- Do not think out loud or reveal reasoning. Take actions with tools instead.
 - Reproduce the bug before the first source edit when feasible.
 - Fix executable runtime logic before touching tests, docs, comments, or examples.
 - Prefer targeted inspection and one deliberate block replacement over many tiny edits.
@@ -233,15 +235,30 @@ Rules:
 
 
 def _build_react_json_prompt() -> str:
-    return """If native tool calling is unavailable, respond with JSON only and no surrounding prose.
+    return """If native tool calling is unavailable, do not think out loud. Respond with JSON only and no surrounding prose.
 
 Schema:
 {"tool":"bash|view|str_replace|insert|undo_edit|submit","arguments":{...}}
 
-You must return exactly one action object per response.
-Do not return an array.
-Do not return multiple newline-separated objects.
-You may use a single ```json fenced block, but it must contain exactly one JSON object.
+Hard output contract:
+- Do not reveal reasoning.
+- Return exactly one action object per response.
+- Do not return an array.
+- Do not return multiple newline-separated objects.
+- Do not include `<think>`, `</think>`, `<tool_call>`, XML tags, markdown commentary, bullet points, explanations, or any plain English outside the one JSON object.
+- Do not ask what help is needed. You already have the task.
+- Do not describe a plan. Pick exactly one next action and return only that action.
+- On early turns, prefer one discovery action such as `bash` with `find`, `rg --files`, `ls`, or one targeted `view`.
+
+Everything below is invalid and must never appear:
+- Multiple JSON objects in one response
+- Any text before the JSON object
+- Any text after the JSON object
+- `</think>` or similar wrapper tags
+- Questions to the user
+- Summaries of what you saw
+
+If you violate the contract, the runner will ignore your response and ask again.
 
 Use these exact argument names:
 - str_replace: `path`, `old_str`, `new_str`
@@ -256,15 +273,38 @@ Do not use markdown unless it is a single ```json fence containing only the JSON
 Make sure every `{` and `[` is closed. A missing closing `}` will make the action unreadable.
 Before responding, mentally check that the JSON parses and that arrays/objects are balanced.
 
-Examples:
-{"tool":"bash","arguments":{"command":"python3 -m pytest test_calculator.py"}}
-{"tool":"view","arguments":{"path":"calculator.py","start_line":1,"end_line":20}}
+Valid responses:
+{"tool":"bash","arguments":{"command":"find /repo -type f -name '*.py' | head -30"}}
+{"tool":"view","arguments":{"path":"README.md","start_line":1,"end_line":50}}
+```json
 {"tool":"submit","arguments":{"summary":"Fixed the denominator bug"}}
+```
+
+Invalid responses:
+Here is my next step: {"tool":"bash","arguments":{"command":"ls"}}
+{"tool":"bash","arguments":{"command":"ls"}} {"tool":"view","arguments":{"path":"README.md"}}
+{"tool":"bash","arguments":{"command":"ls"}}
+</think>
+What would you like me to help you with?
+
+When in doubt, output one simple discovery action only.
+"""
+
+
+def _build_openai_tools_prompt() -> str:
+    return """Use native tool calling for every action.
+
+Do not put tool arguments in normal assistant text.
+Do not return raw JSON in message content.
+Do not describe a plan instead of calling a tool.
+If you want to inspect, edit, validate, or submit, do it via a native tool call.
 """
 
 
 def _build_task_prompt(problem_statement: str, repo_root: str) -> str:
     return f"""Solve this SWE-bench issue inside `{repo_root}`.
+
+Do not think out loud. Do not reveal reasoning. Do not explain a plan. Return only one concrete next action at a time.
 
 Problem statement:
 <problem_statement>
@@ -293,6 +333,199 @@ Startup observations:
 {runtime_context}
 </runtime_context>
 """
+
+
+def _build_planner_system_prompt(repo_root: str) -> str:
+    return f"""You are the planner for a software repair task.
+
+You do not edit files. You produce a concrete repair contract for the coder.
+
+Rules:
+- Do not think out loud.
+- Output JSON only.
+- Do not include markdown fences.
+- Do not include patch text or exact replacement strings.
+- Keep the plan focused on likely runtime files under `{repo_root}`.
+
+Return a JSON object with these keys:
+- problem_summary: short string
+- root_cause_hypothesis: short string
+- files_likely_affected: array of file paths
+- target_symbols: array of functions/classes/modules
+- required_validations: array of commands or checks
+- allowed_change_types: array of strings
+- forbidden_edits: array of strings
+- escalation_conditions: array of strings
+"""
+
+
+def _build_planner_task_prompt(problem_statement: str, repo_root: str, runtime_context: str) -> str:
+    return f"""Create a repair plan for this issue in `{repo_root}`.
+
+Problem statement:
+<problem_statement>
+{problem_statement}
+</problem_statement>
+
+Runtime context:
+<runtime_context>
+{runtime_context}
+</runtime_context>
+
+Constraints:
+- Do not guess exact file paths unless the runtime context already supports them.
+- Prefer module-level areas and symbols over invented filenames.
+- If the code location is uncertain, say so in `root_cause_hypothesis` and keep `files_likely_affected` conservative.
+"""
+
+
+def _build_reviewer_system_prompt(repo_root: str) -> str:
+    return f"""You are the reviewer for a software repair task.
+
+You do not edit files directly. You review the planner contract, the coder's patch, and the observed validations.
+
+Rules:
+- Do not think out loud.
+- Output JSON only.
+- Do not include markdown fences.
+- Decide whether the current patch is ready or should go back to the coder.
+
+Return a JSON object with these keys:
+- decision: `accept` or `revise`
+- summary: short string
+- required_changes: array of strings
+- files_to_revisit: array of file paths
+- validations_to_rerun: array of commands or checks
+- plan_adherence: short string
+- risk_assessment: short string
+
+The repository root is `{repo_root}`.
+"""
+
+
+def _build_reviewer_task_prompt(
+    *,
+    planner_handoff: dict[str, Any] | None,
+    coder_result: dict[str, Any],
+    patch_text: str,
+) -> str:
+    condensed_turns = [
+        {
+            "turn": turn.get("turn"),
+            "parse_error": turn.get("parse_error"),
+            "tool_calls": [call.get("name") for call in turn.get("tool_calls", []) if isinstance(call, dict)],
+        }
+        for turn in coder_result.get("turns", [])[:20]
+    ]
+    return json.dumps(
+        {
+            "planner_handoff": planner_handoff or {},
+            "coder_summary": {
+                "submitted": coder_result.get("submitted", False),
+                "submission_summary": coder_result.get("submission_summary", ""),
+                "stopped_reason": coder_result.get("stopped_reason", ""),
+                "stats": coder_result.get("stats", {}),
+                "condensed_turns": condensed_turns,
+            },
+            "patch": patch_text,
+        },
+        indent=2,
+    )
+
+
+def _extract_first_json_dict(text: str) -> dict[str, Any]:
+    text = text.strip()
+    if not text:
+        raise ValueError("empty model response")
+    if text.startswith("```"):
+        parts = text.split("```")
+        for idx, part in enumerate(parts):
+            if idx % 2 == 1:
+                stripped = part.strip()
+                if stripped.startswith("json"):
+                    stripped = stripped[4:].strip()
+                if stripped:
+                    text = stripped
+                    break
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, dict):
+            return parsed
+    except json.JSONDecodeError:
+        pass
+
+    start = text.find("{")
+    if start == -1:
+        raise ValueError("no JSON object found")
+
+    depth = 0
+    in_string = False
+    escape = False
+    for index in range(start, len(text)):
+        char = text[index]
+        if in_string:
+            if escape:
+                escape = False
+            elif char == "\\":
+                escape = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                snippet = text[start : index + 1]
+                parsed = json.loads(snippet)
+                if not isinstance(parsed, dict):
+                    raise ValueError("response JSON was not an object")
+                return parsed
+    raise ValueError("unterminated JSON object")
+
+
+def _call_json_role(
+    *,
+    model: str,
+    api_base: str | None,
+    api_key: str | None,
+    temperature: float,
+    max_tokens: int,
+    num_ctx: int | None,
+    system_prompt: str,
+    user_prompt: str,
+) -> tuple[dict[str, Any], dict[str, int], str]:
+    import litellm
+
+    litellm.suppress_debug_info = True
+    completion_kwargs: dict[str, Any] = {
+        "model": model,
+        "api_base": api_base,
+        "api_key": api_key,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "temperature": temperature,
+        "max_tokens": min(max_tokens, 1400),
+    }
+    if model.startswith("ollama/"):
+        completion_kwargs["reasoning_effort"] = "none"
+        if num_ctx is not None:
+            completion_kwargs["num_ctx"] = num_ctx
+    response = litellm.completion(**completion_kwargs)
+    usage = getattr(response, "usage", None)
+    stats = {
+        "tokens_in": int(getattr(usage, "prompt_tokens", 0) or 0),
+        "tokens_out": int(getattr(usage, "completion_tokens", 0) or 0),
+        "api_calls": 1,
+    }
+    message = response.choices[0].message
+    content = message.content or ""
+    parsed = _extract_first_json_dict(content if isinstance(content, str) else json.dumps(content))
+    return parsed, stats, str(content)
 
 
 @dataclass
@@ -474,12 +707,15 @@ class CustomAgentLoop:
         temperature: float,
         max_turns: int,
         max_tokens: int,
+        num_ctx: int | None,
         env: SWEEnv,
         repo_root: str,
         problem_statement: str,
         runtime_context: str,
         max_identical_tool_failures: int,
         tool_call_mode: str,
+        role_name: str = "coder",
+        extra_user_prompts: list[str] | None = None,
         log_fn: Callable[[str], None] | None = None,
     ):
         self.model = model
@@ -488,18 +724,22 @@ class CustomAgentLoop:
         self.temperature = temperature
         self.max_turns = max_turns
         self.max_tokens = max_tokens
+        self.num_ctx = num_ctx
         self.env = env
         self.repo_root = repo_root
         self.problem_statement = problem_statement
         self.runtime_context = runtime_context
         self.max_identical_tool_failures = max_identical_tool_failures
         self.tool_call_mode = tool_call_mode
+        self.role_name = role_name
+        self.extra_user_prompts = extra_user_prompts or []
         self.tools = ToolRuntime(env, repo_root)
         self.turns: list[TurnRecord] = []
         self.stats = RunStats()
         self.repeat_hashes: list[str] = []
         self.log_fn = log_fn or (lambda _line: None)
         self.consecutive_failure_counts: dict[str, int] = defaultdict(int)
+        self.consecutive_success_counts: dict[str, int] = defaultdict(int)
         self.state = LoopState()
 
     def _log(self, message: str) -> None:
@@ -518,8 +758,12 @@ class CustomAgentLoop:
             {"role": "user", "content": _build_task_prompt(self.problem_statement, self.repo_root)},
             {"role": "user", "content": _build_runtime_context_prompt(self.repo_root, self.runtime_context)},
         ]
+        for prompt in self.extra_user_prompts:
+            messages.append({"role": "user", "content": prompt})
         if self.tool_call_mode == "react_json":
             messages.append({"role": "user", "content": _build_react_json_prompt()})
+        elif self.tool_call_mode == "openai_tools":
+            messages.append({"role": "user", "content": _build_openai_tools_prompt()})
         return messages
 
     @staticmethod
@@ -539,6 +783,10 @@ class CustomAgentLoop:
                 normalized["start_line"] = normalized.pop("start")
             if "end" in normalized and "end_line" not in normalized:
                 normalized["end_line"] = normalized.pop("end")
+            if "line_start" in normalized and "start_line" not in normalized:
+                normalized["start_line"] = normalized.pop("line_start")
+            if "line_end" in normalized and "end_line" not in normalized:
+                normalized["end_line"] = normalized.pop("line_end")
         if name == "bash":
             if "cmd" in normalized and "command" not in normalized:
                 normalized["command"] = normalized.pop("cmd")
@@ -550,8 +798,58 @@ class CustomAgentLoop:
         return normalized
 
     @classmethod
+    def _infer_tool_name(cls, payload: dict[str, Any], arguments: dict[str, Any]) -> str | None:
+        explicit = payload.get("tool") or payload.get("action") or payload.get("name") or payload.get("tool_name")
+        if isinstance(explicit, str) and explicit.strip():
+            return explicit.strip()
+        if "command" in arguments or "cmd" in arguments:
+            return "bash"
+        if "summary" in arguments:
+            return "submit"
+        if "path" in arguments:
+            if "old_str" in arguments or "old_text" in arguments or "replace" in arguments:
+                return "str_replace"
+            if "line" in arguments or "insert_line" in arguments:
+                return "insert"
+            return "view"
+        return None
+
+    @classmethod
+    def _sanitize_react_json_text(cls, content: str) -> str:
+        text = content.strip()
+        if not text:
+            return text
+        text = re.sub(r"<think\b[^>]*>.*?</think>", "\n", text, flags=re.IGNORECASE | re.DOTALL)
+        text = re.sub(r"</?think\b[^>]*>", "\n", text, flags=re.IGNORECASE)
+        text = re.sub(r"<tool_call\b[^>]*>", "\n", text, flags=re.IGNORECASE)
+        text = re.sub(r"</tool_call>", "\n", text, flags=re.IGNORECASE)
+        text = re.sub(r"<analysis\b[^>]*>.*?</analysis>", "\n", text, flags=re.IGNORECASE | re.DOTALL)
+        text = re.sub(r"</?analysis\b[^>]*>", "\n", text, flags=re.IGNORECASE)
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        return text.strip()
+
+    @classmethod
+    def _payload_to_tool_call(cls, payload: dict[str, Any]) -> dict[str, Any] | None:
+        arguments = payload.get("arguments")
+        if arguments is None:
+            arguments = {
+                k: v
+                for k, v in payload.items()
+                if k not in {"tool", "action", "name", "tool_name", "type"}
+            }
+        tool = cls._infer_tool_name(payload, arguments if isinstance(arguments, dict) else {})
+        if not isinstance(tool, str) or not isinstance(arguments, dict):
+            return None
+        tool = tool.strip()
+        return {
+            "id": f"react-1-{tool}",
+            "name": tool,
+            "arguments": cls._normalize_tool_arguments(tool, arguments),
+        }
+
+    @classmethod
     def _parse_react_json(cls, content: str) -> ParseOutcome:
-        text = content.replace("</think>", "\n").replace("<think>", "\n").strip()
+        text = cls._sanitize_react_json_text(content)
         if not text:
             return ParseOutcome(tool_calls=[], error="Empty response; expected JSON action object or array.")
         candidate_payloads: list[Any] = []
@@ -638,30 +936,28 @@ class CustomAgentLoop:
         tool_calls: list[dict[str, Any]] = []
         for payload in candidate_payloads:
             if isinstance(payload, list):
+                parsed_calls = [call for item in payload if isinstance(item, dict) for call in [cls._payload_to_tool_call(item)] if call]
+                if parsed_calls:
+                    first_call = parsed_calls[0]
+                    if all(
+                        cls._hash_tool_call(call["name"], call["arguments"])
+                        == cls._hash_tool_call(first_call["name"], first_call["arguments"])
+                        for call in parsed_calls
+                    ):
+                        return ParseOutcome(
+                            tool_calls=[first_call],
+                            error="Returned the same action multiple times in one response; recovered the first action only.",
+                        )
                 return ParseOutcome(
                     tool_calls=[],
                     error="Returned multiple actions, but react_json mode requires exactly one JSON object per response.",
                 )
             if not isinstance(payload, dict):
                 continue
-            tool = payload.get("tool") or payload.get("action") or payload.get("name") or payload.get("tool_name")
-            arguments = payload.get("arguments")
-            if arguments is None:
-                arguments = {
-                    k: v
-                    for k, v in payload.items()
-                    if k not in {"tool", "action", "name", "tool_name", "type"}
-                }
-            if not isinstance(tool, str) or not isinstance(arguments, dict):
+            parsed_call = cls._payload_to_tool_call(payload)
+            if parsed_call is None:
                 continue
-            tool = tool.strip()
-            tool_calls.append(
-                {
-                    "id": f"react-1-{tool}",
-                    "name": tool,
-                    "arguments": cls._normalize_tool_arguments(tool, arguments),
-                }
-            )
+            tool_calls.append(parsed_call)
             return ParseOutcome(tool_calls=tool_calls, error=None)
 
         error = "Could not parse model action JSON."
@@ -714,7 +1010,7 @@ class CustomAgentLoop:
         litellm.suppress_debug_info = True
         messages = self._messages()
         stopped_reason = "max_turns"
-        self._log(f"[run] starting model={self.model} repo_root={self.repo_root}")
+        self._log(f"[run] starting role={self.role_name} model={self.model} repo_root={self.repo_root}")
 
         for turn in range(1, self.max_turns + 1):
             self.stats.turns = turn
@@ -730,6 +1026,13 @@ class CustomAgentLoop:
             if self.tool_call_mode == "openai_tools":
                 completion_kwargs["tools"] = TOOL_SCHEMAS
                 completion_kwargs["tool_choice"] = "auto"
+            elif self.tool_call_mode == "react_json":
+                completion_kwargs["max_tokens"] = min(self.max_tokens, 512)
+                completion_kwargs["stop"] = ["</think>", "<tool_call>", "```"]
+                if self.model.startswith("ollama/"):
+                    completion_kwargs["reasoning_effort"] = "none"
+                    if self.num_ctx is not None:
+                        completion_kwargs["num_ctx"] = self.num_ctx
             response = litellm.completion(**completion_kwargs)
             usage = getattr(response, "usage", None)
             if usage is not None:
@@ -753,7 +1056,7 @@ class CustomAgentLoop:
                             "arguments": arguments,
                         }
                     )
-            elif self.tool_call_mode == "react_json":
+            else:
                 parse_outcome = self._parse_react_json(content if isinstance(content, str) else json.dumps(content))
                 tool_calls = parse_outcome.tool_calls
                 parse_error = parse_outcome.error
@@ -791,11 +1094,26 @@ class CustomAgentLoop:
 
             if not tool_calls:
                 self._log(f"[turn {turn}] no tool call returned")
-                corrective_hint = (
-                    "Use a tool call to inspect, edit, validate, or submit. "
-                    "If native tool calling is unavailable, respond with valid JSON only and exactly one action object per response. "
-                    + (f"Your last action payload was invalid: {parse_error}" if parse_error else "")
-                ).strip()
+                if self.tool_call_mode == "react_json":
+                    corrective_hint = (
+                        "Your previous response was unusable. "
+                        "Respond with exactly one JSON action object and nothing else. "
+                        "No `</think>`, no extra JSON objects, no tool-call tags, no explanations, no questions, and no conversational text. "
+                        + (f"Your last action payload was invalid: {parse_error}" if parse_error else "")
+                    ).strip()
+                else:
+                    corrective_hint = (
+                        "Your previous response did not contain a native tool call. "
+                        "Use native tool calling only. "
+                        "Do not return raw JSON in assistant text, and do not describe a plan in plain English. "
+                        + (f"Your last response was: {parse_error}" if parse_error else "")
+                    ).strip()
+                if turn <= 3:
+                    corrective_hint += (
+                        " On early turns, choose exactly one discovery action such as "
+                        "`bash` with `find /repo -type f -name '*.py' | head -30`, "
+                        "`bash` with `ls -la /repo`, or one targeted `view`."
+                    )
                 if self.state.validation_passed and not self.state.diff_checked:
                     corrective_hint += " Tests already passed. Your next best step is usually `bash` with `git diff`."
                 elif self.state.validation_passed and self.state.diff_checked:
@@ -817,6 +1135,7 @@ class CustomAgentLoop:
                 self._update_state_from_tool_result(result)
                 level = "tool-error" if result.is_error else "tool-output"
                 self._log(f"[turn {turn}] {level} {result.name}: {self._clip(result.output)}")
+                repeated_success_warning = False
                 failure_key = json.dumps(
                     {
                         "tool": result.name,
@@ -828,6 +1147,7 @@ class CustomAgentLoop:
                 )
                 if result.is_error:
                     self.consecutive_failure_counts[failure_key] += 1
+                    self.consecutive_success_counts.clear()
                     messages.append(
                         {
                             "role": "user",
@@ -846,6 +1166,24 @@ class CustomAgentLoop:
                         break
                 else:
                     self.consecutive_failure_counts.clear()
+                    self.consecutive_success_counts[failure_key] += 1
+                    repeated_success_warning = False
+                    if self.consecutive_success_counts[failure_key] >= self.max_identical_tool_failures:
+                        self._log(
+                            f"[run] repeated successful tool call threshold={self.max_identical_tool_failures} "
+                            f"tool={result.name}"
+                        )
+                        messages.append(
+                            {
+                                "role": "user",
+                                "content": (
+                                    "You already ran that exact tool call and got the same result multiple times. "
+                                    "Do not run it again. Use the observed output to take a different next step: "
+                                    "inspect a different file, edit code, run a broader validation, inspect `git diff`, or `submit`."
+                                ),
+                            }
+                        )
+                        repeated_success_warning = True
                 messages.append(
                     {
                         "role": "tool",
@@ -1103,12 +1441,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--preset", choices=preset_names)
     parser.add_argument("--backend", choices=sorted(BACKEND_DEFAULTS.keys()))
     parser.add_argument("--model")
+    parser.add_argument("--agent-architecture", choices=["single", "planner_coder", "planner_coder_reviewer"], default="single")
+    parser.add_argument("--planner-model")
+    parser.add_argument("--reviewer-model")
     parser.add_argument("--api-base", dest="api_base")
     parser.add_argument("--api-key")
+    parser.add_argument("--planner-api-base")
+    parser.add_argument("--planner-api-key")
+    parser.add_argument("--reviewer-api-base")
+    parser.add_argument("--reviewer-api-key")
     parser.add_argument("--tool-call-mode", choices=["openai_tools", "react_json"])
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--max-turns", type=int, default=60)
     parser.add_argument("--max-tokens", type=int, default=4096)
+    parser.add_argument("--num-ctx", type=int)
+    parser.add_argument("--reviewer-rounds", type=int, default=1)
     parser.add_argument("--max-identical-tool-failures", type=int, default=3)
     parser.add_argument("--post-startup-command", action="append", default=[])
     parser.add_argument("--instances-type", choices=["swe_bench", "file"], default="swe_bench")
@@ -1128,12 +1475,30 @@ def parse_args() -> argparse.Namespace:
             args.backend = preset.get("backend")
         if args.model is None:
             args.model = preset.get("model")
+        if args.planner_model is None and preset.get("planner_model") is not None:
+            args.planner_model = preset.get("planner_model")
+        if args.reviewer_model is None and preset.get("reviewer_model") is not None:
+            args.reviewer_model = preset.get("reviewer_model")
         if args.api_base is None:
             args.api_base = preset.get("api_base")
         if args.api_key is None and preset.get("api_key") is not None:
             args.api_key = preset.get("api_key")
+        if args.planner_api_base is None and preset.get("planner_api_base") is not None:
+            args.planner_api_base = preset.get("planner_api_base")
+        if args.planner_api_key is None and preset.get("planner_api_key") is not None:
+            args.planner_api_key = preset.get("planner_api_key")
+        if args.reviewer_api_base is None and preset.get("reviewer_api_base") is not None:
+            args.reviewer_api_base = preset.get("reviewer_api_base")
+        if args.reviewer_api_key is None and preset.get("reviewer_api_key") is not None:
+            args.reviewer_api_key = preset.get("reviewer_api_key")
         if args.tool_call_mode is None and preset.get("tool_call_mode") is not None:
             args.tool_call_mode = preset.get("tool_call_mode")
+        if args.max_tokens == 4096 and preset.get("max_tokens") is not None:
+            args.max_tokens = int(preset.get("max_tokens"))
+        if args.num_ctx is None and preset.get("num_ctx") is not None:
+            args.num_ctx = int(preset.get("num_ctx"))
+        if args.temperature == 0.0 and preset.get("temperature") is not None:
+            args.temperature = float(preset.get("temperature"))
         if args.run_name == "custom_runner":
             args.run_name = args.preset
 
@@ -1143,6 +1508,8 @@ def parse_args() -> argparse.Namespace:
         parser.error("--model is required unless provided by --preset")
     if args.tool_call_mode is None:
         args.tool_call_mode = "openai_tools"
+    if args.agent_architecture == "planner_coder_reviewer" and args.reviewer_rounds < 1:
+        parser.error("--reviewer-rounds must be at least 1")
 
     return args
 
@@ -1155,16 +1522,29 @@ def main() -> None:
     api_base = args.api_base or BACKEND_DEFAULTS[args.backend].get("api_base")
     api_key = _resolve_api_key(args.backend, args.api_key)
     model = _normalize_model_name(args.backend, args.model)
+    planner_api_base = args.planner_api_base or api_base
+    planner_api_key = _resolve_api_key(args.backend, args.planner_api_key) if args.planner_api_key else api_key
+    reviewer_api_base = args.reviewer_api_base or api_base
+    reviewer_api_key = _resolve_api_key(args.backend, args.reviewer_api_key) if args.reviewer_api_key else api_key
+    planner_model = _normalize_model_name(args.backend, args.planner_model) if args.planner_model else model
+    reviewer_model = _normalize_model_name(args.backend, args.reviewer_model) if args.reviewer_model else model
 
     run_config = {
         "backend": args.backend,
         "model": model,
+        "planner_model": planner_model if args.agent_architecture != "single" else "",
+        "reviewer_model": reviewer_model if args.agent_architecture == "planner_coder_reviewer" else "",
         "api_base": api_base,
         "api_key_source": "explicit" if args.api_key else BACKEND_DEFAULTS[args.backend].get("api_key_env", ""),
+        "planner_api_base": planner_api_base,
+        "reviewer_api_base": reviewer_api_base,
         "tool_call_mode": args.tool_call_mode,
+        "agent_architecture": args.agent_architecture,
         "temperature": args.temperature,
         "max_turns": args.max_turns,
         "max_tokens": args.max_tokens,
+        "num_ctx": args.num_ctx,
+        "reviewer_rounds": args.reviewer_rounds,
         "max_identical_tool_failures": args.max_identical_tool_failures,
         "post_startup_commands": list(args.post_startup_command),
         "subset": args.subset,
@@ -1243,6 +1623,8 @@ def main() -> None:
                     "printf 'PWD: '; pwd\n"
                     "printf '\\nFILES:\\n'\n"
                     "ls\n"
+                    "printf '\\nPYTHON FILES (depth<=3):\\n'\n"
+                    "find . -maxdepth 3 -type f -name '*.py' | sort\n"
                     "printf '\\nGIT STATUS:\\n'\n"
                     "git status --short || true\n"
                 ),
@@ -1250,23 +1632,116 @@ def main() -> None:
                 timeout=20,
             )
             log_line(f"[env] startup_context {runtime_context.strip().replace(chr(10), ' | ')}")
+            role_model_stats: dict[str, dict[str, Any]] = {}
+            planner_handoff: dict[str, Any] | None = None
+            review_feedback: dict[str, Any] | None = None
 
-            loop = CustomAgentLoop(
-                model=model,
-                api_base=api_base,
-                api_key=api_key,
-                temperature=args.temperature,
-                max_turns=args.max_turns,
-                max_tokens=args.max_tokens,
-                env=env,
-                repo_root=repo_root,
-                problem_statement=instance.problem_statement.text,
-                runtime_context=runtime_context,
-                max_identical_tool_failures=args.max_identical_tool_failures,
-                tool_call_mode=args.tool_call_mode,
-                log_fn=log_line,
-            )
-            result = loop.run()
+            if args.agent_architecture in {"planner_coder", "planner_coder_reviewer"}:
+                log_line(f"[planner] calling model={planner_model}")
+                planner_handoff, planner_stats, planner_raw = _call_json_role(
+                    model=planner_model,
+                    api_base=planner_api_base,
+                    api_key=planner_api_key,
+                    temperature=args.temperature,
+                    max_tokens=args.max_tokens,
+                    num_ctx=args.num_ctx,
+                    system_prompt=_build_planner_system_prompt(repo_root),
+                    user_prompt=_build_planner_task_prompt(instance.problem_statement.text, repo_root, runtime_context),
+                )
+                role_model_stats["planner"] = {"model": planner_model, **planner_stats}
+                log_line(f"[planner] handoff {json.dumps(planner_handoff, sort_keys=True)}")
+                if planner_raw.strip() and planner_raw.strip() != json.dumps(planner_handoff):
+                    log_line(f"[planner] raw {planner_raw.strip()[:500]}")
+
+            coder_result: dict[str, Any] | None = None
+            coder_accumulated_stats = {"tokens_in": 0, "tokens_out": 0, "api_calls": 0, "turns": 0, "tool_calls": 0}
+
+            for reviewer_round in range(max(1, args.reviewer_rounds if args.agent_architecture == "planner_coder_reviewer" else 1)):
+                extra_prompts: list[str] = []
+                if planner_handoff:
+                    extra_prompts.append(
+                        "Planner handoff JSON:\n"
+                        + json.dumps(planner_handoff, indent=2)
+                        + "\nTreat this as the preferred repair contract unless the inspected code proves it wrong."
+                    )
+                if review_feedback:
+                    extra_prompts.append(
+                        "Reviewer feedback JSON:\n"
+                        + json.dumps(review_feedback, indent=2)
+                        + "\nAddress this feedback before final submission."
+                    )
+
+                loop = CustomAgentLoop(
+                    model=model,
+                    api_base=api_base,
+                    api_key=api_key,
+                    temperature=args.temperature,
+                    max_turns=args.max_turns,
+                    max_tokens=args.max_tokens,
+                    num_ctx=args.num_ctx,
+                    env=env,
+                    repo_root=repo_root,
+                    problem_statement=instance.problem_statement.text,
+                    runtime_context=runtime_context,
+                    max_identical_tool_failures=args.max_identical_tool_failures,
+                    tool_call_mode=args.tool_call_mode,
+                    role_name="coder",
+                    extra_user_prompts=extra_prompts,
+                    log_fn=log_line,
+                )
+                coder_result = loop.run()
+                coder_stats = coder_result.get("stats", {}) if isinstance(coder_result.get("stats"), dict) else {}
+                for key in coder_accumulated_stats:
+                    coder_accumulated_stats[key] += int(coder_stats.get(key, 0) or 0)
+
+                if args.agent_architecture != "planner_coder_reviewer":
+                    break
+
+                assert coder_result is not None
+                patch_text = str(coder_result.get("patch", ""))
+                log_line(f"[reviewer] calling model={reviewer_model} round={reviewer_round + 1}")
+                review_feedback, reviewer_stats, reviewer_raw = _call_json_role(
+                    model=reviewer_model,
+                    api_base=reviewer_api_base,
+                    api_key=reviewer_api_key,
+                    temperature=args.temperature,
+                    max_tokens=args.max_tokens,
+                    num_ctx=args.num_ctx,
+                    system_prompt=_build_reviewer_system_prompt(repo_root),
+                    user_prompt=_build_reviewer_task_prompt(
+                        planner_handoff=planner_handoff,
+                        coder_result=coder_result,
+                        patch_text=patch_text,
+                    ),
+                )
+                prior = role_model_stats.get("reviewer", {"model": reviewer_model, "tokens_in": 0, "tokens_out": 0, "api_calls": 0})
+                role_model_stats["reviewer"] = {
+                    "model": reviewer_model,
+                    "tokens_in": int(prior.get("tokens_in", 0)) + int(reviewer_stats["tokens_in"]),
+                    "tokens_out": int(prior.get("tokens_out", 0)) + int(reviewer_stats["tokens_out"]),
+                    "api_calls": int(prior.get("api_calls", 0)) + int(reviewer_stats["api_calls"]),
+                }
+                log_line(f"[reviewer] decision {json.dumps(review_feedback, sort_keys=True)}")
+                if reviewer_raw.strip() and reviewer_raw.strip() != json.dumps(review_feedback):
+                    log_line(f"[reviewer] raw {reviewer_raw.strip()[:500]}")
+
+                if str(review_feedback.get("decision", "")).lower() == "accept":
+                    break
+                log_line("[reviewer] patch rejected; returning control to coder")
+
+            assert coder_result is not None
+            result = coder_result
+            role_model_stats["coder"] = {"model": model, **coder_accumulated_stats}
+            result["agent_architecture"] = args.agent_architecture
+            result["role_model_stats"] = role_model_stats
+            result["planner_handoff"] = planner_handoff or {}
+            result["review_feedback"] = review_feedback or {}
+            total_tokens_in = sum(int(stats.get("tokens_in", 0) or 0) for stats in role_model_stats.values())
+            total_tokens_out = sum(int(stats.get("tokens_out", 0) or 0) for stats in role_model_stats.values())
+            total_api_calls = sum(int(stats.get("api_calls", 0) or 0) for stats in role_model_stats.values())
+            result["stats"]["input_tokens"] = total_tokens_in
+            result["stats"]["output_tokens"] = total_tokens_out
+            result["stats"]["api_calls"] = total_api_calls
             result["instance_id"] = instance_id
             result["duration_seconds"] = round(time.time() - start, 2)
             _dump_json(instance_dir / f"{instance_id}.traj", result)

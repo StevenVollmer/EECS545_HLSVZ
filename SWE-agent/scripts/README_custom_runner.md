@@ -7,7 +7,12 @@ It reuses:
 - SWE-ReX Docker environments
 - repository reset/setup through `SWEEnv`
 
-It does not reuse the existing SWE-agent planner/coder/reviewer loop.
+It now supports:
+- a single-agent custom coder loop
+- a planner -> coder loop
+- a planner -> coder -> reviewer loop
+
+The planner and reviewer are lightweight JSON handoff stages around the same coder loop, so you can compare architectures without going back to the full SWE-agent orchestration.
 
 ## Simple local smoke test
 
@@ -41,11 +46,13 @@ That case should be easy:
 
 ## Additional custom cases
 
-There are three harder local fixtures as well:
+There are five harder local fixtures as well:
 
 - [label_formatter](/Users/rafe/classes/eecs545/project/SWE-agent/custom_cases/label_formatter)
 - [nested_app](/Users/rafe/classes/eecs545/project/SWE-agent/custom_cases/nested_app)
 - [digest_preview](/Users/rafe/classes/eecs545/project/SWE-agent/custom_cases/digest_preview)
+- [board_rollup](/Users/rafe/classes/eecs545/project/SWE-agent/custom_cases/board_rollup)
+- [budget_snapshot](/Users/rafe/classes/eecs545/project/SWE-agent/custom_cases/budget_snapshot)
 
 `label_formatter_001` is still small, but the problem statement is less explicit.
 The repo is:
@@ -101,6 +108,28 @@ Run it with:
   --output-dir SWE-agent/custom_runs/digest_preview_openai
 ```
 
+`board_rollup_001` is a medium-sized nested fixture with a cleaner failing test and a bug in the service/presenter pipeline.
+
+```bash
+./env/bin/python SWE-agent/scripts/run_custom_swebench.py \
+  --preset openai_gpt4o_mini \
+  --instances-type file \
+  --instances-path SWE-agent/custom_cases/board_rollup \
+  --filter board_rollup_001 \
+  --output-dir SWE-agent/custom_runs/board_rollup_openai
+```
+
+`budget_snapshot_001` is a larger manual-repro fixture where the exact threshold bug is not covered by the existing tests.
+
+```bash
+./env/bin/python SWE-agent/scripts/run_custom_swebench.py \
+  --preset openai_gpt4o_mini \
+  --instances-type file \
+  --instances-path SWE-agent/custom_cases/budget_snapshot \
+  --filter budget_snapshot_001 \
+  --output-dir SWE-agent/custom_runs/budget_snapshot_openai
+```
+
 ## What it does
 
 - uses a direct OpenAI-compatible tool-calling loop through `litellm`
@@ -138,6 +167,39 @@ If the case needs package bootstrap, add `--run-install`.
 Each case defines:
 - `evaluation.baseline_checks` for proving the bug exists
 - `evaluation.success_checks` for proving the fix is correct
+
+Use [analyze_custom_runs.py](/Users/rafe/classes/eecs545/project/SWE-agent/scripts/analyze_custom_runs.py) for run-level scoring and reporting:
+
+```bash
+./env/bin/python SWE-agent/scripts/analyze_custom_runs.py \
+  SWE-agent/custom_runs/digest_preview_umich_qwen \
+  --json
+```
+
+The analyzer combines:
+- deterministic case evaluation from `case.json`
+- patch precision and grounding heuristics
+- protocol/tool stability signals from the custom trajectory
+- relative cost estimates normalized to `gpt-4o-mini`
+
+Use [run_custom_experiment_matrix.py](/Users/rafe/classes/eecs545/project/SWE-agent/scripts/run_custom_experiment_matrix.py) to run a preset x architecture x case sweep and analyze every run automatically:
+
+```bash
+./env/bin/python SWE-agent/scripts/run_custom_experiment_matrix.py \
+  --presets openai_gpt4o_mini,umich_qwen,ollama_qwen35_9b \
+  --architectures single,planner_coder,planner_coder_reviewer \
+  --cases simple_mean_bug,label_formatter,nested_app,digest_preview,board_rollup,budget_snapshot \
+  --parallel 3 \
+  --output-root SWE-agent/custom_matrix_runs/benchmark_round_1
+```
+
+That script writes:
+- per-run outputs in nested directories by preset / architecture / case
+- per-run `analysis.json`
+- root-level `matrix_manifest.json`
+- root-level `matrix_jobs.json`
+- root-level `analysis.summary.json`
+- per-job `runner.stdout.log`, `runner.stderr.log`, `analyzer.stdout.log`, and `analyzer.stderr.log`
 
 ## Backends
 
@@ -226,6 +288,9 @@ UMich endpoint:
 - `--api-base` overrides the backend default.
 - `--api-key` overrides environment lookup. If it starts with `$`, the remainder is treated as an environment variable name.
 - `--preset <name>` loads a model/backend preset, and explicit CLI flags still override the preset values.
+- `--agent-architecture` chooses `single`, `planner_coder`, or `planner_coder_reviewer`.
+- `--planner-model` and `--reviewer-model` let you override role models while keeping the coder model separate.
+- `--reviewer-rounds` controls how many coder/reviewer revision cycles are allowed.
 - `--post-startup-command` can be repeated to bootstrap dependencies before the model starts.
 - `--instances-type file --instances-path <case-folder>` lets you run custom local cases instead of SWE-bench.
 - The runner accepts a case folder and looks for `case.json`, `case.yaml`, or `case.yml` inside it.

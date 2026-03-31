@@ -1,16 +1,16 @@
 [
   {
     "image_name": "python:3.11",
-    "instance_id": "digest_preview_001",
-    "problem_statement": "A client-facing digest preview still renders certain owner names incorrectly. The regression is in the preview/display path and the current automated tests may not cover the exact case. Investigate the codebase, reproduce the bug directly, fix the behavior, add targeted validation only if you need it, inspect the diff, and submit.",
+    "instance_id": "budget_snapshot_001",
+    "problem_statement": "A budget snapshot preview jumps to an awkward abbreviated money label around the upper end of the thousands range. Existing automated tests still pass, so reproduce the bug directly from the preview path, fix the behavior in the correct layer, run relevant validation, inspect the diff, and submit.",
     "repo_path": "repo",
     "install_commands": [
       "pip install pytest"
     ],
     "analysis": {
       "likely_fix_paths": [
-        "app/presenters/report_presenter.py",
-        "app/utils/text.py"
+        "app/utils/currency.py",
+        "app/presenters/snapshot_presenter.py"
       ]
     },
     "evaluation": {
@@ -24,14 +24,14 @@
           ]
         },
         {
-          "name": "manual_repro_shows_bad_capitalization",
-          "command": "python scripts/demo_preview.py",
+          "name": "manual_preview_shows_bad_threshold_label",
+          "command": "python scripts/demo_snapshot.py",
           "expect_exit_code": 0,
           "stdout_contains": [
-            "Good morning, O'connor-smith"
+            "Total planned spend: $1000.0K"
           ],
           "stdout_not_contains": [
-            "Good morning, O'Connor-Smith"
+            "Total planned spend: $999.9K"
           ]
         }
       ],
@@ -45,14 +45,14 @@
           ]
         },
         {
-          "name": "manual_repro_is_fixed",
-          "command": "python scripts/demo_preview.py",
+          "name": "manual_preview_is_fixed",
+          "command": "python scripts/demo_snapshot.py",
           "expect_exit_code": 0,
           "stdout_contains": [
-            "Good morning, O'Connor-Smith"
+            "Total planned spend: $999.9K"
           ],
           "stdout_not_contains": [
-            "Good morning, O'connor-smith"
+            "Total planned spend: $1000.0K"
           ]
         }
       ]
