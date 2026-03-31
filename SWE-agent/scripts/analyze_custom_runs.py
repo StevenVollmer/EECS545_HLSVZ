@@ -263,6 +263,8 @@ def analyze_artifact(artifact: RunArtifact, case_entry: dict[str, Any], run_inst
     case_file = case_entry["case_file"]
     analysis_meta = _case_analysis_metadata(case_item)
     likely_fix_paths = {_normalize_path(path) for path in analysis_meta.get("likely_fix_paths", [])}
+    showcase = str(analysis_meta.get("showcase", "") or "")
+    difficulty = str(analysis_meta.get("difficulty", "") or "")
 
     patch_text = artifact.patch_path.read_text() if artifact.patch_path.exists() else ""
     changed_files = _extract_changed_files(patch_text)
@@ -498,6 +500,8 @@ def analyze_artifact(artifact: RunArtifact, case_entry: dict[str, Any], run_inst
         "instance_dir": str(artifact.instance_dir),
         "instance_id": artifact.instance_id,
         "case_file": str(case_file),
+        "case_showcase": showcase,
+        "case_difficulty": difficulty,
         "architecture": run_config.get("agent_architecture", "single"),
         "model": model_name,
         "tool_call_mode": run_config.get("tool_call_mode", ""),

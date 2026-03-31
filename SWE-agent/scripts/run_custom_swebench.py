@@ -346,12 +346,18 @@ Rules:
 - Do not include markdown fences.
 - Do not include patch text or exact replacement strings.
 - Keep the plan focused on likely runtime files under `{repo_root}`.
+- Prefer a conservative, high-signal handoff over a broad speculative dump.
+- Do not invent exact file paths unless the runtime context strongly supports them.
+- If uncertain, name modules/directories/functions and one discovery command instead of hallucinating filenames.
+- Keep `files_likely_affected` to at most 4 entries, ordered from most likely to least likely.
 
 Return a JSON object with these keys:
 - problem_summary: short string
 - root_cause_hypothesis: short string
 - files_likely_affected: array of file paths
 - target_symbols: array of functions/classes/modules
+- first_actions: array of 1-3 concrete next steps for the coder
+- reproduction_steps: array of commands or checks
 - required_validations: array of commands or checks
 - allowed_change_types: array of strings
 - forbidden_edits: array of strings
@@ -376,6 +382,8 @@ Constraints:
 - Do not guess exact file paths unless the runtime context already supports them.
 - Prefer module-level areas and symbols over invented filenames.
 - If the code location is uncertain, say so in `root_cause_hypothesis` and keep `files_likely_affected` conservative.
+- Use `first_actions` to tell the coder exactly how to start: discovery, repro, inspect.
+- Use `reproduction_steps` and `required_validations` to name the highest-signal checks only.
 """
 
 
@@ -389,6 +397,10 @@ Rules:
 - Output JSON only.
 - Do not include markdown fences.
 - Decide whether the current patch is ready or should go back to the coder.
+- Be conservative about rejection. Do not reject for style, naming preference, or hypothetical cleanup.
+- Accept if the observed fix is behaviorally correct, validations are sufficient for the case, and the patch is reasonably focused.
+- Reject only when there is concrete evidence of a remaining bug, missing required validation, wrong-file fix, or regression risk.
+- When rejecting, give at most 3 required changes and at most 3 files to revisit.
 
 Return a JSON object with these keys:
 - decision: `accept` or `revise`
@@ -409,6 +421,21 @@ def _build_reviewer_task_prompt(
     coder_result: dict[str, Any],
     patch_text: str,
 ) -> str:
+    stats = coder_result.get("stats", {}) if isinstance(coder_result.get("stats"), dict) else {}
+    validations_run = []
+    for turn in coder_result.get("turns", []):
+        if not isinstance(turn, dict):
+            continue
+        for result in turn.get("tool_results", []):
+            if not isinstance(result, dict):
+                continue
+            if result.get("name") == "bash":
+                command = ""
+                arguments = result.get("arguments")
+                if isinstance(arguments, dict):
+                    command = str(arguments.get("command", ""))
+                output = str(result.get("output", ""))[:600]
+                validations_run.append({"command": command, "output": output, "is_error": bool(result.get("is_error"))})
     condensed_turns = [
         {
             "turn": turn.get("turn"),
@@ -424,12 +451,32 @@ def _build_reviewer_task_prompt(
                 "submitted": coder_result.get("submitted", False),
                 "submission_summary": coder_result.get("submission_summary", ""),
                 "stopped_reason": coder_result.get("stopped_reason", ""),
-                "stats": coder_result.get("stats", {}),
+                "stats": stats,
                 "condensed_turns": condensed_turns,
+                "validations_run": validations_run[-8:],
             },
             "patch": patch_text,
         },
         indent=2,
+    )
+
+
+def _build_planner_handoff_prompt(planner_handoff: dict[str, Any]) -> str:
+    return (
+        "Planner handoff JSON:\n"
+        + json.dumps(planner_handoff, indent=2)
+        + "\nFollow this contract unless repository evidence disproves it. "
+        "Start with the listed first_actions or reproduction_steps, verify the likely files quickly, then edit the most probable runtime location."
+    )
+
+
+def _build_reviewer_feedback_prompt(review_feedback: dict[str, Any]) -> str:
+    return (
+        "Reviewer feedback JSON:\n"
+        + json.dumps(review_feedback, indent=2)
+        + "\nAddress the required_changes first. "
+        "Revisit only the listed files unless new evidence forces a broader search. "
+        "Run the requested validations before submit."
     )
 
 
@@ -1028,11 +1075,12 @@ class CustomAgentLoop:
                 completion_kwargs["tool_choice"] = "auto"
             elif self.tool_call_mode == "react_json":
                 completion_kwargs["max_tokens"] = min(self.max_tokens, 512)
-                completion_kwargs["stop"] = ["</think>", "<tool_call>", "```"]
                 if self.model.startswith("ollama/"):
                     completion_kwargs["reasoning_effort"] = "none"
                     if self.num_ctx is not None:
                         completion_kwargs["num_ctx"] = self.num_ctx
+                else:
+                    completion_kwargs["stop"] = ["</think>", "<tool_call>", "```"]
             response = litellm.completion(**completion_kwargs)
             usage = getattr(response, "usage", None)
             if usage is not None:
@@ -1452,10 +1500,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--reviewer-api-key")
     parser.add_argument("--tool-call-mode", choices=["openai_tools", "react_json"])
     parser.add_argument("--temperature", type=float, default=0.0)
+    parser.add_argument("--planner-temperature", type=float)
+    parser.add_argument("--reviewer-temperature", type=float)
     parser.add_argument("--max-turns", type=int, default=60)
     parser.add_argument("--max-tokens", type=int, default=4096)
     parser.add_argument("--num-ctx", type=int)
-    parser.add_argument("--reviewer-rounds", type=int, default=1)
+    parser.add_argument("--reviewer-rounds", type=int)
     parser.add_argument("--max-identical-tool-failures", type=int, default=3)
     parser.add_argument("--post-startup-command", action="append", default=[])
     parser.add_argument("--instances-type", choices=["swe_bench", "file"], default="swe_bench")
@@ -1499,6 +1549,10 @@ def parse_args() -> argparse.Namespace:
             args.num_ctx = int(preset.get("num_ctx"))
         if args.temperature == 0.0 and preset.get("temperature") is not None:
             args.temperature = float(preset.get("temperature"))
+        if args.planner_temperature is None and preset.get("planner_temperature") is not None:
+            args.planner_temperature = float(preset.get("planner_temperature"))
+        if args.reviewer_temperature is None and preset.get("reviewer_temperature") is not None:
+            args.reviewer_temperature = float(preset.get("reviewer_temperature"))
         if args.run_name == "custom_runner":
             args.run_name = args.preset
 
@@ -1508,6 +1562,12 @@ def parse_args() -> argparse.Namespace:
         parser.error("--model is required unless provided by --preset")
     if args.tool_call_mode is None:
         args.tool_call_mode = "openai_tools"
+    if args.planner_temperature is None:
+        args.planner_temperature = 0.0 if args.agent_architecture != "single" else args.temperature
+    if args.reviewer_temperature is None:
+        args.reviewer_temperature = 0.0
+    if args.reviewer_rounds is None:
+        args.reviewer_rounds = 2 if args.agent_architecture == "planner_coder_reviewer" else 1
     if args.agent_architecture == "planner_coder_reviewer" and args.reviewer_rounds < 1:
         parser.error("--reviewer-rounds must be at least 1")
 
@@ -1541,6 +1601,8 @@ def main() -> None:
         "tool_call_mode": args.tool_call_mode,
         "agent_architecture": args.agent_architecture,
         "temperature": args.temperature,
+        "planner_temperature": args.planner_temperature,
+        "reviewer_temperature": args.reviewer_temperature,
         "max_turns": args.max_turns,
         "max_tokens": args.max_tokens,
         "num_ctx": args.num_ctx,
@@ -1625,6 +1687,8 @@ def main() -> None:
                     "ls\n"
                     "printf '\\nPYTHON FILES (depth<=3):\\n'\n"
                     "find . -maxdepth 3 -type f -name '*.py' | sort\n"
+                    "printf '\\nREADME HEAD:\\n'\n"
+                    "if [ -f README.md ]; then sed -n '1,120p' README.md; fi\n"
                     "printf '\\nGIT STATUS:\\n'\n"
                     "git status --short || true\n"
                 ),
@@ -1642,7 +1706,7 @@ def main() -> None:
                     model=planner_model,
                     api_base=planner_api_base,
                     api_key=planner_api_key,
-                    temperature=args.temperature,
+                    temperature=args.planner_temperature,
                     max_tokens=args.max_tokens,
                     num_ctx=args.num_ctx,
                     system_prompt=_build_planner_system_prompt(repo_root),
@@ -1659,17 +1723,9 @@ def main() -> None:
             for reviewer_round in range(max(1, args.reviewer_rounds if args.agent_architecture == "planner_coder_reviewer" else 1)):
                 extra_prompts: list[str] = []
                 if planner_handoff:
-                    extra_prompts.append(
-                        "Planner handoff JSON:\n"
-                        + json.dumps(planner_handoff, indent=2)
-                        + "\nTreat this as the preferred repair contract unless the inspected code proves it wrong."
-                    )
+                    extra_prompts.append(_build_planner_handoff_prompt(planner_handoff))
                 if review_feedback:
-                    extra_prompts.append(
-                        "Reviewer feedback JSON:\n"
-                        + json.dumps(review_feedback, indent=2)
-                        + "\nAddress this feedback before final submission."
-                    )
+                    extra_prompts.append(_build_reviewer_feedback_prompt(review_feedback))
 
                 loop = CustomAgentLoop(
                     model=model,
@@ -1699,12 +1755,32 @@ def main() -> None:
 
                 assert coder_result is not None
                 patch_text = str(coder_result.get("patch", ""))
+                has_patch = bool(patch_text.strip())
+                has_progress = has_patch or bool(coder_result.get("submitted")) or any(
+                    isinstance(turn, dict) and turn.get("tool_results") for turn in coder_result.get("turns", [])
+                )
+                if not has_progress:
+                    review_feedback = {
+                        "decision": "revise",
+                        "summary": "No concrete progress yet. Re-center on reproduction, localization, and one focused code edit.",
+                        "required_changes": [
+                            "Run one high-signal reproduction or targeted validation command.",
+                            "Inspect the most likely runtime files from the planner handoff or search results.",
+                            "Make one focused code edit before asking for another review.",
+                        ],
+                        "files_to_revisit": list((planner_handoff or {}).get("files_likely_affected", []))[:3],
+                        "validations_to_rerun": list((planner_handoff or {}).get("required_validations", []))[:2],
+                        "plan_adherence": "Insufficient progress to review patch quality.",
+                        "risk_assessment": "Continuing without a concrete edit will waste turns.",
+                    }
+                    log_line("[reviewer] skipped model call because coder made no concrete progress")
+                    continue
                 log_line(f"[reviewer] calling model={reviewer_model} round={reviewer_round + 1}")
                 review_feedback, reviewer_stats, reviewer_raw = _call_json_role(
                     model=reviewer_model,
                     api_base=reviewer_api_base,
                     api_key=reviewer_api_key,
-                    temperature=args.temperature,
+                    temperature=args.reviewer_temperature,
                     max_tokens=args.max_tokens,
                     num_ctx=args.num_ctx,
                     system_prompt=_build_reviewer_system_prompt(repo_root),
@@ -1725,7 +1801,8 @@ def main() -> None:
                 if reviewer_raw.strip() and reviewer_raw.strip() != json.dumps(review_feedback):
                     log_line(f"[reviewer] raw {reviewer_raw.strip()[:500]}")
 
-                if str(review_feedback.get("decision", "")).lower() == "accept":
+                decision = str(review_feedback.get("decision", "")).lower()
+                if decision == "accept":
                     break
                 log_line("[reviewer] patch rejected; returning control to coder")
 

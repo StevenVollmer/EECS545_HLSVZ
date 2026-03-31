@@ -46,13 +46,15 @@ That case should be easy:
 
 ## Additional custom cases
 
-There are five harder local fixtures as well:
+There are seven harder local fixtures as well:
 
 - [label_formatter](/Users/rafe/classes/eecs545/project/SWE-agent/custom_cases/label_formatter)
 - [nested_app](/Users/rafe/classes/eecs545/project/SWE-agent/custom_cases/nested_app)
 - [digest_preview](/Users/rafe/classes/eecs545/project/SWE-agent/custom_cases/digest_preview)
 - [board_rollup](/Users/rafe/classes/eecs545/project/SWE-agent/custom_cases/board_rollup)
 - [budget_snapshot](/Users/rafe/classes/eecs545/project/SWE-agent/custom_cases/budget_snapshot)
+- [workspace_digest](/Users/rafe/classes/eecs545/project/SWE-agent/custom_cases/workspace_digest)
+- [owner_recap](/Users/rafe/classes/eecs545/project/SWE-agent/custom_cases/owner_recap)
 
 `label_formatter_001` is still small, but the problem statement is less explicit.
 The repo is:
@@ -130,6 +132,35 @@ Run it with:
   --output-dir SWE-agent/custom_runs/budget_snapshot_openai
 ```
 
+`workspace_digest_001` is designed to favor good planning:
+- the issue text is vague
+- the bug sits in a service/filter/presenter pipeline
+- the likely fix is not at the entrypoint
+
+```bash
+./env/bin/python SWE-agent/scripts/run_custom_swebench.py \
+  --preset openai_gpt4o_mini \
+  --instances-type file \
+  --instances-path SWE-agent/custom_cases/workspace_digest \
+  --filter workspace_digest_001 \
+  --output-dir SWE-agent/custom_runs/workspace_digest_openai
+```
+
+`owner_recap_001` is designed to reward good review/regression checking:
+- the preview is wrong
+- existing tests still pass
+- a naive shared-helper fix can regress the export path
+
+```bash
+./env/bin/python SWE-agent/scripts/run_custom_swebench.py \
+  --preset openai_gpt4o_mini \
+  --agent-architecture planner_coder_reviewer \
+  --instances-type file \
+  --instances-path SWE-agent/custom_cases/owner_recap \
+  --filter owner_recap_001 \
+  --output-dir SWE-agent/custom_runs/owner_recap_openai
+```
+
 ## What it does
 
 - uses a direct OpenAI-compatible tool-calling loop through `litellm`
@@ -188,7 +219,7 @@ Use [run_custom_experiment_matrix.py](/Users/rafe/classes/eecs545/project/SWE-ag
 ./env/bin/python SWE-agent/scripts/run_custom_experiment_matrix.py \
   --presets openai_gpt4o_mini,umich_qwen,ollama_qwen35_9b \
   --architectures single,planner_coder,planner_coder_reviewer \
-  --cases simple_mean_bug,label_formatter,nested_app,digest_preview,board_rollup,budget_snapshot \
+  --cases simple_mean_bug,label_formatter,nested_app,digest_preview,board_rollup,budget_snapshot,workspace_digest,owner_recap \
   --parallel 3 \
   --output-root SWE-agent/custom_matrix_runs/benchmark_round_1
 ```
