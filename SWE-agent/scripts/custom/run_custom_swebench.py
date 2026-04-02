@@ -461,15 +461,20 @@ Rules:
 - If uncertain, name modules/directories/functions and one discovery command instead of hallucinating filenames.
 - Keep `files_likely_affected` to at most 4 entries, ordered from most likely to least likely.
 - Prefer runtime code over tests. Do not list test files as likely fix locations unless the case explicitly allows test edits or the issue is clearly about missing coverage.
+- Prefer robust reproduction and validation commands that already appear in the runtime context, README excerpt, or case metadata.
+- Avoid brittle shell one-liners that require tricky quoting or escaping. Prefer stable commands like `pytest ...`, `python scripts/...`, `rg`, `find`, and `view`.
+- If a repro requires a tricky quoted literal, describe the safer equivalent in `reproduction_notes` and keep the command itself simple.
 
 Return a JSON object with these keys:
 - problem_summary: short string
 - root_cause_hypothesis: short string
 - files_likely_affected: array of file paths
 - target_symbols: array of functions/classes/modules
+- discovery_priority: array of 1-4 files or modules to inspect first
 - first_actions: array of 1-3 concrete next steps for the coder
-- reproduction_steps: array of commands or checks
-- required_validations: array of commands or checks
+- safe_reproduction_steps: array of safe commands or checks
+- reproduction_notes: array of short strings about edge cases or quoting hazards
+- required_validations: array of safe commands or checks
 - allowed_change_types: array of strings
 - forbidden_edits: array of strings
 - escalation_conditions: array of strings
@@ -494,10 +499,12 @@ Constraints:
 - Prefer module-level areas and symbols over invented filenames.
 - If the code location is uncertain, say so in `root_cause_hypothesis` and keep `files_likely_affected` conservative.
 - Use `first_actions` to tell the coder exactly how to start: discovery, repro, inspect.
-- Use `reproduction_steps` and `required_validations` to name the highest-signal checks only.
+- Use `safe_reproduction_steps` and `required_validations` to name the highest-signal checks only.
 - Only name exact test commands or script paths if they already appear in the runtime context or the problem statement.
 - If existing tests pass at baseline but the problem statement still describes a user-visible bug, do not treat the baseline tests as proof of correctness.
 - Prefer a runtime fix plan over a test-adjustment plan. Existing tests may be lagging indicators of the intended behavior.
+- Avoid fragile commands with nested quotes or apostrophe-heavy literals when a safer script/test command exists.
+- Rank the most likely files and symbols so the coder can inspect quickly instead of re-searching the whole repo.
 """
 
 
@@ -599,7 +606,9 @@ def _build_planner_handoff_prompt(planner_handoff: dict[str, Any]) -> str:
         "Planner handoff JSON:\n"
         + json.dumps(planner_handoff, indent=2)
         + "\nFollow this contract unless repository evidence disproves it. "
-        "Start with the listed first_actions or reproduction_steps, verify the likely files quickly, then edit the most probable runtime location."
+        "Start with the listed first_actions or safe_reproduction_steps. "
+        "Inspect discovery_priority and files_likely_affected before broad searching. "
+        "If a planner repro command looks brittle or quote-heavy, use the safer equivalent implied by reproduction_notes or the runtime context instead of retrying broken quoting variants."
     )
 
 
@@ -674,11 +683,13 @@ def _default_planner_handoff() -> dict[str, Any]:
         "root_cause_hypothesis": "Planner output could not be parsed cleanly. Reproduce first and inspect the most likely runtime files from the repository context.",
         "files_likely_affected": [],
         "target_symbols": [],
+        "discovery_priority": [],
         "first_actions": [
             "Run one high-signal reproduction or targeted validation command.",
             "Inspect the most likely runtime files from the startup context before editing.",
         ],
-        "reproduction_steps": [],
+        "safe_reproduction_steps": [],
+        "reproduction_notes": [],
         "required_validations": [],
         "allowed_change_types": ["targeted runtime code fixes"],
         "forbidden_edits": ["broad refactors without evidence"],
