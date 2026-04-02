@@ -113,13 +113,36 @@ def _copy_repo_to_temp(repo_path: Path) -> Path:
     return target
 
 
+def _filtered_patch_text(patch_text: str) -> str:
+    if not patch_text.strip():
+        return patch_text
+
+    keep_blocks: list[str] = []
+    for block in patch_text.split("diff --git "):
+        if not block:
+            continue
+        full_block = "diff --git " + block
+        header = full_block.splitlines()[0] if full_block.splitlines() else ""
+        lowered = header.lower()
+        if "__pycache__" in lowered or lowered.endswith(".pyc") or ".pyc " in lowered:
+            continue
+        keep_blocks.append(full_block)
+    return "".join(keep_blocks)
+
+
 def _apply_patch(repo_path: Path, patch_path: Path) -> None:
+    filtered_patch = _filtered_patch_text(patch_path.read_text())
+    if not filtered_patch.strip():
+        return
+    temp_patch = repo_path / ".judge_filtered.patch"
+    temp_patch.write_text(filtered_patch)
     result = subprocess.run(
-        ["git", "apply", str(patch_path.resolve())],
+        ["git", "apply", str(temp_patch.resolve())],
         cwd=str(repo_path),
         text=True,
         capture_output=True,
     )
+    temp_patch.unlink(missing_ok=True)
     if result.returncode != 0:
         raise RuntimeError(f"Failed to apply patch: {result.stderr.strip() or result.stdout.strip()}")
 
