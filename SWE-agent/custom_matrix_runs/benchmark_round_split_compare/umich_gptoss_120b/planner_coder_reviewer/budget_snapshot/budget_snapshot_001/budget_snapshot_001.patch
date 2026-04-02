@@ -1,0 +1,41 @@
+diff --git a/app/services/snapshot_service.py b/app/services/snapshot_service.py
+index 7d93368..4d41fd1 100644
+--- a/app/services/snapshot_service.py
++++ b/app/services/snapshot_service.py
+@@ -1,12 +1,12 @@
+ from app.models.snapshot import SnapshotMetrics, SnapshotRequest, SnapshotViewModel
+ from app.services.note_service import build_notes
+-from app.utils.currency import abbreviate_currency
++from app.utils.currency import format_full_currency
+ from app.utils.variance import variance_label
+ 
+ 
+ def build_snapshot(request: SnapshotRequest) -> SnapshotViewModel:
+     metrics = SnapshotMetrics(
+-        total_spend_label=abbreviate_currency(request.total_spend),
++        total_spend_label=format_full_currency(request.total_spend),
+         variance_label=variance_label(request.variance),
+         note_count=request.note_count,
+     )
+diff --git a/app/utils/currency.py b/app/utils/currency.py
+index 6c2af37..3cdb9b8 100644
+--- a/app/utils/currency.py
++++ b/app/utils/currency.py
+@@ -1,6 +1,15 @@
+ def abbreviate_currency(amount: float) -> str:
++    """Abbreviate currency values.
++    - >= 1_000_000 -> millions with 'M'
++    - >= 1_000 -> thousands with 'K'
++    - otherwise full currency with commas.
++    """
+     if amount >= 1_000_000:
+         return f"${amount / 1_000_000:.1f}M"
+     if amount >= 1_000:
+-        return f"${round(amount / 1_000, 1):.1f}K"
+-    return f"${amount:.0f}"
++        return f"${amount / 1_000:.1f}K"
++    return f"${amount:,.0f}"
++
++def format_full_currency(amount: float) -> str:
++    """Return full currency format with commas, no abbreviation."""
++    return f"${amount:,.0f}"

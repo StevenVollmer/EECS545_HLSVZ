@@ -1,0 +1,5 @@
+{
+  "model_name_or_path": "umich_qwen__planner_coder_reviewer__board_rollup",
+  "instance_id": "board_rollup_001",
+  "model_patch": "diff --git a/app/models/card.py b/app/models/card.py\nindex e79d4d6..cae2895 100644\n--- a/app/models/card.py\n+++ b/app/models/card.py\n@@ -7,3 +7,5 @@ class BoardCard:\n     owner: str\n     severity: str\n     archived: bool = False\n+    active: bool = True\n+    needs_attention: bool = True\ndiff --git a/app/services/board_service.py b/app/services/board_service.py\nindex a9c656f..27e2060 100644\n--- a/app/services/board_service.py\n+++ b/app/services/board_service.py\n@@ -5,7 +5,7 @@ from app.utils.owners import unique_owner_names\n \n def build_board_summary(cards: list[BoardCard]) -> BoardSummary:\n     active_cards = [card for card in cards if not card.archived]\n-    alert_cards = len(cards)\n+    alert_cards = len([card for card in cards if card.active and card.needs_attention and not card.archived])\n     owners = unique_owner_names(active_cards)\n     return BoardSummary(\n         active_cards=len(active_cards),\n"
+}

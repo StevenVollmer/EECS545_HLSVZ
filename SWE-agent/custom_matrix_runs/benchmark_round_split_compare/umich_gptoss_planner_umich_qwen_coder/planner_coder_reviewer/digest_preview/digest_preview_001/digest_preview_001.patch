@@ -1,0 +1,31 @@
+diff --git a/app/utils/text.py b/app/utils/text.py
+index 0addf0e..b1b0b0d 100644
+--- a/app/utils/text.py
++++ b/app/utils/text.py
+@@ -21,13 +21,25 @@ def _capitalize_fragment(fragment: str) -> str:
+ def _capitalize_word_with_joiners(word: str) -> str:
+     if not word:
+         return word
+-    return _capitalize_fragment(word)
++    # Capitalize first letter, preserve case of rest
++    # Handle punctuation-aware capitalization: capitalize after hyphens and apostrophes
++    result = word[0].upper() + word[1:].lower()
++    # Ensure capitalization after joiners
++    for i, char in enumerate(word):
++        if i > 0 and char in "'-" and i + 1 < len(word):
++            result = result[:i+1] + word[i+1].upper() + result[i+2:]
++    return result
+ 
+ 
+ def title_case_words(value: str) -> str:
+     words = value.split(" ")
+     return " ".join(_capitalize_word_with_joiners(word) for word in words)
+ 
++    # Ensure punctuation-aware capitalization by applying _capitalize_word_with_joiners to each word
++    # This ensures that after joiners like '-' and ''' the first letter of the next word is capitalized.
++    # The function is already correct; the issue is that the comment is misplaced and the function is not being called correctly.
++    # The function is being called correctly, but the capitalization logic is not handling the joiners properly.
++
+ 
+ def normalize_display_name(value: str) -> str:
+     cleaned = collapse_outer_whitespace(value)

@@ -1,0 +1,21 @@
+diff --git a/app/utils/text.py b/app/utils/text.py
+index 0addf0e..85ee678 100644
+--- a/app/utils/text.py
++++ b/app/utils/text.py
+@@ -21,7 +21,15 @@ def _capitalize_fragment(fragment: str) -> str:
+ def _capitalize_word_with_joiners(word: str) -> str:
+     if not word:
+         return word
+-    return _capitalize_fragment(word)
++    import re
++    # Split the word while keeping the delimiters (joiners) in the result
++    parts = re.split(r"([\-\'/])", word)
++    # Capitalize each non‑delimiter fragment
++    capitalized = [
++        _capitalize_fragment(part) if part not in NAME_JOINERS else part
++        for part in parts
++    ]
++    return "".join(capitalized)
+ 
+ 
+ def title_case_words(value: str) -> str:
