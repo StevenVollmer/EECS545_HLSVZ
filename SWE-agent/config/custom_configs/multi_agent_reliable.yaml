@@ -2,7 +2,7 @@
 # This template is heavily inspired by anthropic's computer use demo, but you can use it with any LM.
 # CUSTOM config for local ollama qwen model
 
-# sweagent run --config SWE-agent/config/custom_configs/multi_agent.yaml
+# sweagent run --config SWE-agent/config/custom_configs/multi_agent_reliable.yaml
 # sweagent traj-to-demo trajectories/multi_agent/multi_agent_test_1/multi_agent_test_1.traj --overwrite
 # sweagent run-replay --traj_path demos/multi_agent_test_1/multi_agent_planner.demo.yaml
 
@@ -11,7 +11,7 @@
 # ollama pull codellama:7b-instruct
 
 
-output_dir: "trajectories/multi_agent/"
+output_dir: "trajectories/multi_agent_qwen35_9b/"
 
 env: 
   repo:
@@ -27,16 +27,20 @@ problem_statement:
 agent:
   type: multi
   model:
-    name: ollama/qwen2.5-coder:7b-instruct
+    # name: ollama/qwen3.5:9b
+    name: openai/Qwen/Qwen3-VL-30B-A3B-Instruct # UMICH model
+    # name: ollama/qwen2.5-coder:7b-instruct
     # name: ollama/mistral:7b-instruct-v0.3-q4_K_M
     # name: ollama/granite-code:8b # thought_action only
     # name: ollama/codellama:7b-instruct # thought_action only
     # name: ollama/deepseek-r1:7b # thought_action only
     per_instance_cost_limit: 0
     per_instance_call_limit: 20
-    temperature: 0.2
-    api_key: ollama
-    api_base: http://localhost:11434
+    temperature: 0.0
+    # api_key: ollama
+    api_key: api_RPnuSxgxJQamqW04ma9uJW27vc4TyBdy # UMICH model
+    # api_base: http://localhost:11434
+    api_base: http://promaxgb10-d668.eecs.umich.edu:8000/v1 # UMICH model
     max_input_tokens: 100000
     total_cost_limit: 0
     # options:
@@ -178,7 +182,8 @@ agent:
       #     </diff>
     enable_bash_tool: true
     parse_function:
-      type: function_calling # thought_action
+      # type: function_calling
+      type: thought_action
   history_processors:
     - type: cache_control
       last_n_messages: 2
