@@ -24,7 +24,7 @@ OPENAI_COST_MULTIPLIERS = {
     "gpt-4o-mini": {"input": 1.0, "output": 4.0},
     "gpt-4o": {"input": 16.67, "output": 16.67},
 }
-PRESET_FILE = Path(__file__).resolve().parents[1] / "config" / "custom_configs" / "custom_runner_model_presets.yaml"
+PRESET_FILE = Path(__file__).resolve().parents[2] / "config" / "custom_configs" / "custom_runner_model_presets.yaml"
 
 
 @dataclass

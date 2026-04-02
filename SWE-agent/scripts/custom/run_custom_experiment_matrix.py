@@ -18,9 +18,9 @@ from typing import Any
 import yaml
 
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-RUNNER_SCRIPT = REPO_ROOT / "SWE-agent" / "scripts" / "run_custom_swebench.py"
-ANALYZER_SCRIPT = REPO_ROOT / "SWE-agent" / "scripts" / "analyze_custom_runs.py"
+REPO_ROOT = Path(__file__).resolve().parents[3]
+RUNNER_SCRIPT = REPO_ROOT / "SWE-agent" / "scripts" / "custom" / "run_custom_swebench.py"
+ANALYZER_SCRIPT = REPO_ROOT / "SWE-agent" / "scripts" / "custom" / "analyze_custom_runs.py"
 PRESET_FILE = REPO_ROOT / "SWE-agent" / "config" / "custom_configs" / "custom_runner_model_presets.yaml"
 CUSTOM_CASES_ROOT = REPO_ROOT / "SWE-agent" / "custom_cases"
 TRANSIENT_RUNNER_ERROR_MARKERS = (

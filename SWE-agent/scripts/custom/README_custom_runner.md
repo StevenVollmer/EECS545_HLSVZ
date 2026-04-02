@@ -29,7 +29,7 @@ and reads case-local bootstrap commands from the JSON.
 Run it with:
 
 ```bash
-./env/bin/python SWE-agent/scripts/run_custom_swebench.py \
+./env/bin/python SWE-agent/scripts/custom/run_custom_swebench.py \
   --preset openai_gpt4o_mini \
   --instances-type file \
   --instances-path SWE-agent/custom_cases/simple_mean_bug \
@@ -64,7 +64,7 @@ The repo is:
 Run it with:
 
 ```bash
-./env/bin/python SWE-agent/scripts/run_custom_swebench.py \
+./env/bin/python SWE-agent/scripts/custom/run_custom_swebench.py \
   --preset openai_gpt4o_mini \
   --instances-type file \
   --instances-path SWE-agent/custom_cases/label_formatter \
@@ -81,7 +81,7 @@ The repo is:
 Run it with:
 
 ```bash
-./env/bin/python SWE-agent/scripts/run_custom_swebench.py \
+./env/bin/python SWE-agent/scripts/custom/run_custom_swebench.py \
   --preset openai_gpt4o_mini \
   --instances-type file \
   --instances-path SWE-agent/custom_cases/nested_app \
@@ -102,7 +102,7 @@ The repo is:
 Run it with:
 
 ```bash
-./env/bin/python SWE-agent/scripts/run_custom_swebench.py \
+./env/bin/python SWE-agent/scripts/custom/run_custom_swebench.py \
   --preset openai_gpt4o_mini \
   --instances-type file \
   --instances-path SWE-agent/custom_cases/digest_preview \
@@ -113,7 +113,7 @@ Run it with:
 `board_rollup_001` is a medium-sized nested fixture with a cleaner failing test and a bug in the service/presenter pipeline.
 
 ```bash
-./env/bin/python SWE-agent/scripts/run_custom_swebench.py \
+./env/bin/python SWE-agent/scripts/custom/run_custom_swebench.py \
   --preset openai_gpt4o_mini \
   --instances-type file \
   --instances-path SWE-agent/custom_cases/board_rollup \
@@ -124,7 +124,7 @@ Run it with:
 `budget_snapshot_001` is a larger manual-repro fixture where the exact threshold bug is not covered by the existing tests.
 
 ```bash
-./env/bin/python SWE-agent/scripts/run_custom_swebench.py \
+./env/bin/python SWE-agent/scripts/custom/run_custom_swebench.py \
   --preset openai_gpt4o_mini \
   --instances-type file \
   --instances-path SWE-agent/custom_cases/budget_snapshot \
@@ -138,7 +138,7 @@ Run it with:
 - the likely fix is not at the entrypoint
 
 ```bash
-./env/bin/python SWE-agent/scripts/run_custom_swebench.py \
+./env/bin/python SWE-agent/scripts/custom/run_custom_swebench.py \
   --preset openai_gpt4o_mini \
   --instances-type file \
   --instances-path SWE-agent/custom_cases/workspace_digest \
@@ -152,7 +152,7 @@ Run it with:
 - a naive shared-helper fix can regress the export path
 
 ```bash
-./env/bin/python SWE-agent/scripts/run_custom_swebench.py \
+./env/bin/python SWE-agent/scripts/custom/run_custom_swebench.py \
   --preset openai_gpt4o_mini \
   --agent-architecture planner_coder_reviewer \
   --instances-type file \
@@ -175,12 +175,12 @@ Run it with:
 
 ## Judging Cases
 
-Use [judge_custom_case.py](/Users/rafe/classes/eecs545/project/SWE-agent/scripts/judge_custom_case.py) to evaluate whether a fixture is in the expected broken state or whether a patch/run fixes it.
+Use [judge_custom_case.py](/Users/rafe/classes/eecs545/project/SWE-agent/scripts/custom/judge_custom_case.py) to evaluate whether a fixture is in the expected broken state or whether a patch/run fixes it.
 
 Baseline check:
 
 ```bash
-./env/bin/python SWE-agent/scripts/judge_custom_case.py \
+./env/bin/python SWE-agent/scripts/custom/judge_custom_case.py \
   --case SWE-agent/custom_cases/digest_preview \
   --mode baseline
 ```
@@ -188,7 +188,7 @@ Baseline check:
 Judge a run patch:
 
 ```bash
-./env/bin/python SWE-agent/scripts/judge_custom_case.py \
+./env/bin/python SWE-agent/scripts/custom/judge_custom_case.py \
   --case SWE-agent/custom_cases/digest_preview \
   --mode patch \
   --patch-file SWE-agent/custom_runs/digest_preview_openai/digest_preview_001/digest_preview_001.patch
@@ -199,10 +199,10 @@ Each case defines:
 - `evaluation.baseline_checks` for proving the bug exists
 - `evaluation.success_checks` for proving the fix is correct
 
-Use [analyze_custom_runs.py](/Users/rafe/classes/eecs545/project/SWE-agent/scripts/analyze_custom_runs.py) for run-level scoring and reporting:
+Use [analyze_custom_runs.py](/Users/rafe/classes/eecs545/project/SWE-agent/scripts/custom/analyze_custom_runs.py) for run-level scoring and reporting:
 
 ```bash
-./env/bin/python SWE-agent/scripts/analyze_custom_runs.py \
+./env/bin/python SWE-agent/scripts/custom/analyze_custom_runs.py \
   SWE-agent/custom_runs/digest_preview_umich_qwen \
   --json
 ```
@@ -213,10 +213,10 @@ The analyzer combines:
 - protocol/tool stability signals from the custom trajectory
 - relative cost estimates normalized to `gpt-4o-mini`
 
-Use [run_custom_experiment_matrix.py](/Users/rafe/classes/eecs545/project/SWE-agent/scripts/run_custom_experiment_matrix.py) to run a preset x architecture x case sweep and analyze every run automatically:
+Use [run_custom_experiment_matrix.py](/Users/rafe/classes/eecs545/project/SWE-agent/scripts/custom/run_custom_experiment_matrix.py) to run a preset x architecture x case sweep and analyze every run automatically:
 
 ```bash
-./env/bin/python SWE-agent/scripts/run_custom_experiment_matrix.py \
+./env/bin/python SWE-agent/scripts/custom/run_custom_experiment_matrix.py \
   --presets openai_gpt4o_mini,umich_qwen,ollama_qwen35_9b \
   --architectures single,planner_coder,planner_coder_reviewer \
   --cases simple_mean_bug,label_formatter,nested_app,digest_preview,board_rollup,budget_snapshot,workspace_digest,owner_recap \
@@ -239,7 +239,7 @@ Presets live in [custom_runner_model_presets.yaml](/Users/rafe/classes/eecs545/p
 Preset examples:
 
 ```bash
-./env/bin/python SWE-agent/scripts/run_custom_swebench.py \
+./env/bin/python SWE-agent/scripts/custom/run_custom_swebench.py \
   --preset openai_gpt4o_mini \
   --instances-type file \
   --instances-path SWE-agent/custom_cases/simple_mean_bug \
@@ -248,7 +248,7 @@ Preset examples:
 ```
 
 ```bash
-./env/bin/python SWE-agent/scripts/run_custom_swebench.py \
+./env/bin/python SWE-agent/scripts/custom/run_custom_swebench.py \
   --preset lmstudio_local \
   --instances-type file \
   --instances-path SWE-agent/custom_cases/simple_mean_bug \
@@ -257,7 +257,7 @@ Preset examples:
 ```
 
 ```bash
-./env/bin/python SWE-agent/scripts/run_custom_swebench.py \
+./env/bin/python SWE-agent/scripts/custom/run_custom_swebench.py \
   --preset umich_gptoss_120b \
   --instances-type file \
   --instances-path SWE-agent/custom_cases/simple_mean_bug \
@@ -266,7 +266,7 @@ Preset examples:
 ```
 
 ```bash
-./env/bin/python SWE-agent/scripts/run_custom_swebench.py \
+./env/bin/python SWE-agent/scripts/custom/run_custom_swebench.py \
   --preset ollama_qwen35_9b \
   --instances-type file \
   --instances-path SWE-agent/custom_cases/simple_mean_bug \
@@ -277,7 +277,7 @@ Preset examples:
 OpenAI:
 
 ```bash
-./env/bin/python SWE-agent/scripts/run_custom_swebench.py \
+./env/bin/python SWE-agent/scripts/custom/run_custom_swebench.py \
   --backend openai \
   --model gpt-4o-mini \
   --filter pydicom__pydicom-1458 \
@@ -287,7 +287,7 @@ OpenAI:
 Ollama:
 
 ```bash
-./env/bin/python SWE-agent/scripts/run_custom_swebench.py \
+./env/bin/python SWE-agent/scripts/custom/run_custom_swebench.py \
   --backend ollama \
   --model qwen2.5-coder:7b-instruct \
   --filter pydicom__pydicom-1458 \
@@ -297,7 +297,7 @@ Ollama:
 LM Studio:
 
 ```bash
-./env/bin/python SWE-agent/scripts/run_custom_swebench.py \
+./env/bin/python SWE-agent/scripts/custom/run_custom_swebench.py \
   --backend lmstudio \
   --model openai/local-model \
   --filter pydicom__pydicom-1458 \
@@ -307,7 +307,7 @@ LM Studio:
 UMich endpoint:
 
 ```bash
-./env/bin/python SWE-agent/scripts/run_custom_swebench.py \
+./env/bin/python SWE-agent/scripts/custom/run_custom_swebench.py \
   --backend umich \
   --model openai/openai/gpt-oss-120b \
   --filter pydicom__pydicom-1458 \

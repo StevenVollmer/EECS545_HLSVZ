@@ -65,7 +65,7 @@ BACKEND_DEFAULTS: dict[str, dict[str, str]] = {
 
 
 def _preset_config_path() -> Path:
-    return Path(__file__).resolve().parents[1] / "config" / "custom_configs" / "custom_runner_model_presets.yaml"
+    return Path(__file__).resolve().parents[2] / "config" / "custom_configs" / "custom_runner_model_presets.yaml"
 
 
 def _load_presets() -> dict[str, dict[str, Any]]:
@@ -1818,19 +1818,19 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Examples:
   OpenAI preset:
-    ./env/bin/python SWE-agent/scripts/run_custom_swebench.py --preset openai_gpt4o_mini --filter pydicom__pydicom-1458 --output-dir SWE-agent/custom_runs/openai_gpt4omini
+    ./env/bin/python SWE-agent/scripts/custom/run_custom_swebench.py --preset openai_gpt4o_mini --filter pydicom__pydicom-1458 --output-dir SWE-agent/custom_runs/openai_gpt4omini
 
   OpenAI:
-    ./env/bin/python SWE-agent/scripts/run_custom_swebench.py --backend openai --model gpt-4o-mini --filter pydicom__pydicom-1458
+    ./env/bin/python SWE-agent/scripts/custom/run_custom_swebench.py --backend openai --model gpt-4o-mini --filter pydicom__pydicom-1458
 
   Ollama:
-    ./env/bin/python SWE-agent/scripts/run_custom_swebench.py --backend ollama --model qwen2.5-coder:7b-instruct --filter pydicom__pydicom-1458
+    ./env/bin/python SWE-agent/scripts/custom/run_custom_swebench.py --backend ollama --model qwen2.5-coder:7b-instruct --filter pydicom__pydicom-1458
 
   LM Studio:
-    ./env/bin/python SWE-agent/scripts/run_custom_swebench.py --backend lmstudio --model openai/local-model --filter pydicom__pydicom-1458
+    ./env/bin/python SWE-agent/scripts/custom/run_custom_swebench.py --backend lmstudio --model openai/local-model --filter pydicom__pydicom-1458
 
   UMich:
-    ./env/bin/python SWE-agent/scripts/run_custom_swebench.py --backend umich --model openai/openai/gpt-oss-120b --filter pydicom__pydicom-1458
+    ./env/bin/python SWE-agent/scripts/custom/run_custom_swebench.py --backend umich --model openai/openai/gpt-oss-120b --filter pydicom__pydicom-1458
 """,
     )
     parser.add_argument("--preset", choices=preset_names)

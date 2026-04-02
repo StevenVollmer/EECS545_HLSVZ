@@ -13,8 +13,8 @@ from pathlib import Path
 from typing import Any
 
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-ANALYZER_SCRIPT = REPO_ROOT / "SWE-agent" / "scripts" / "analyze_custom_runs.py"
+REPO_ROOT = Path(__file__).resolve().parents[3]
+ANALYZER_SCRIPT = REPO_ROOT / "SWE-agent" / "scripts" / "custom" / "analyze_custom_runs.py"
 
 
 def _load_json(path: Path) -> dict[str, Any]:
