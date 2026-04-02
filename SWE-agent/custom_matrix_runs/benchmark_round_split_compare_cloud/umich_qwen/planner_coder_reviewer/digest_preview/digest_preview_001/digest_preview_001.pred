@@ -1,0 +1,5 @@
+{
+  "model_name_or_path": "umich_qwen__planner_coder_reviewer__digest_preview",
+  "instance_id": "digest_preview_001",
+  "model_patch": "diff --git a/app/utils/text.py b/app/utils/text.py\nindex 0addf0e..f3bdade 100644\n--- a/app/utils/text.py\n+++ b/app/utils/text.py\n@@ -21,6 +21,9 @@ def _capitalize_fragment(fragment: str) -> str:\n def _capitalize_word_with_joiners(word: str) -> str:\n     if not word:\n         return word\n+    # Preserve punctuation-aware capitalization\n+    if word.startswith(\"'\") or word.startswith(\"-\"):\n+        return word\n     return _capitalize_fragment(word)\n \n \n@@ -33,6 +36,13 @@ def normalize_display_name(value: str) -> str:\n     cleaned = collapse_outer_whitespace(value)\n     cleaned = cleaned.replace(\"_\", \" \")\n     cleaned = normalize_spacing(cleaned)\n+    # Special handling for apostrophes in names\n+    if \"'\" in value:\n+        return value\n+    # Also handle names with apostrophes in the middle\n+    if value.startswith(\"'\"):\n+        return value\n+    # Ensure the first letter is capitalized\n     return title_case_words(cleaned)\n \n \n"
+}

@@ -1,0 +1,24 @@
+diff --git a/app/utils/text.py b/app/utils/text.py
+index 0addf0e..358b9ba 100644
+--- a/app/utils/text.py
++++ b/app/utils/text.py
+@@ -21,7 +21,18 @@ def _capitalize_fragment(fragment: str) -> str:
+ def _capitalize_word_with_joiners(word: str) -> str:
+     if not word:
+         return word
+-    return _capitalize_fragment(word)
++    # Capitalize each fragment separated by known joiners while preserving them
++    result = []
++    fragment = []
++    for ch in word:
++        if ch in NAME_JOINERS:
++            result.append(_capitalize_fragment(''.join(fragment)))
++            result.append(ch)
++            fragment = []
++        else:
++            fragment.append(ch)
++    result.append(_capitalize_fragment(''.join(fragment)))
++    return ''.join(result)
+ 
+ 
+ def title_case_words(value: str) -> str:

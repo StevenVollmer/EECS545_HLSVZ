@@ -1,0 +1,23 @@
+diff --git a/app/utils/text.py b/app/utils/text.py
+index 0addf0e..62bd87a 100644
+--- a/app/utils/text.py
++++ b/app/utils/text.py
+@@ -21,7 +21,17 @@ def _capitalize_fragment(fragment: str) -> str:
+ def _capitalize_word_with_joiners(word: str) -> str:
+     if not word:
+         return word
+-    return _capitalize_fragment(word)
++    # Preserve capitalization after joiners like apostrophes and hyphens
++    if word[0] in NAME_JOINERS:
++        return word
++    # Also preserve capitalization after joiners in the middle of the word
++    if any(word[i] in NAME_JOINERS and i > 0 for i in range(1, len(word))):
++        return word
++    # Capitalize only if the word starts with a letter and is not a joiner
++    if word[0].isalpha() and word[0] not in NAME_JOINERS:
++        return _capitalize_fragment(word)
++    # If the word starts with a non-alphabetic character that is not a joiner, preserve it
++    return word
+ 
+ 
+ def title_case_words(value: str) -> str:

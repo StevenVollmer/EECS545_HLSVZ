@@ -1,0 +1,17 @@
+diff --git a/app/utils/text.py b/app/utils/text.py
+index 0addf0e..7ec79ff 100644
+--- a/app/utils/text.py
++++ b/app/utils/text.py
+@@ -21,7 +21,11 @@ def _capitalize_fragment(fragment: str) -> str:
+ def _capitalize_word_with_joiners(word: str) -> str:
+     if not word:
+         return word
+-    return _capitalize_fragment(word)
++    import re
++    parts = re.split(r'([-\'\"/])', word)
++    # Capitalize fragments at even indices (non-delimiters)
++    capitalized = [ _capitalize_fragment(p) if i % 2 == 0 else p for i, p in enumerate(parts) ]
++    return ''.join(capitalized)
+ 
+ 
+ def title_case_words(value: str) -> str:
