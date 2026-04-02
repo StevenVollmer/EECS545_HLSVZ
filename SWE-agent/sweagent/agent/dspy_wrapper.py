@@ -94,82 +94,69 @@ class DSPyPolicyWrapper:
         dspy.settings.configure(lm=lm)
         dspy.settings.experimental = True
         
-	# Fix these with better examples
         examples = [
             dspy.Example(
-                history="ImportError: cannot import name 'parse'",
-                plan="search for parse definition",
+                history="Test failure mentions raw_building.py line 470",
+                plan="inspect relevant lines",
                 action=(
                     "DISCUSSION\n"
-                    "Search for where parse is defined to fix the import.\n\n"
+                    "View the relevant lines around the failure location.\n\n"
                     "```\n"
-                    "grep -n parse -R .\n"
+                    "str_replace_editor view /testbed/astroid/raw_building.py --view_range 460 480\n"
                     "```"
                 )
             ).with_inputs("history"),
 
             dspy.Example(
-                history="ModuleNotFoundError: utils.helpers",
-                plan="find helpers module",
+                history="Deprecation warning from numpy attribute access",
+                plan="find problematic getattr usage",
                 action=(
                     "DISCUSSION\n"
-                    "Locate the helpers module to fix the import path.\n\n"
+                    "Search for getattr usage that may trigger numpy warnings.\n\n"
                     "```\n"
-                    "grep -n helpers -R .\n"
+                    "grep -n getattr -R /testbed\n"
+                    "```"
+                )
+            ).with_inputs("history"),
+            
+            dspy.Example(
+                history="Found getattr(sys.modules[modname], name) causing warning",
+                plan="patch unsafe getattr",
+                action=(
+                    "DISCUSSION\n"
+                    "Modify getattr usage to safely handle deprecated numpy attributes.\n\n"
+                    "```\n"
+                    "str_replace_editor str_replace /testbed/astroid/raw_building.py --old_str 'getattr(sys.modules[modname], name)' --new_str 'getattr(sys.modules.get(modname, None), name, None)'\n"
                     "```"
                 )
             ).with_inputs("history"),
 
             dspy.Example(
-                history="AttributeError: visit_unknown missing",
-                plan="locate method usage",
+                history="Edited code but unsure if issue fixed",
+                plan="run tests",
                 action=(
                     "DISCUSSION\n"
-                    "Search for visit_unknown to see where it should be implemented.\n\n"
+                    "Run the test suite to verify the fix.\n\n"
                     "```\n"
-                    "grep -n visit_unknown -R .\n"
+                    "pytest -q\n"
                     "```"
                 )
             ).with_inputs("history"),
 
             dspy.Example(
-                history="AssertionError: expected 5 but got 4",
-                plan="find failing assertion",
+                history="Tests still failing after patch",
+                plan="reinspect failure",
                 action=(
                     "DISCUSSION\n"
-                    "Search for the failing assertion to inspect the logic.\n\n"
+                    "Search for remaining occurrences of problematic pattern.\n\n"
                     "```\n"
-                    "grep -n AssertionError -R .\n"
+                    "grep -n getattr -R /testbed\n"
                     "```"
                 )
             ).with_inputs("history"),
 
             dspy.Example(
-                history="Test failed in test_parser.py line 42",
-                plan="open test file",
-                action=(
-                    "DISCUSSION\n"
-                    "Open the failing test file to inspect the issue.\n\n"
-                    "```\n"
-                    "open_file test_parser.py\n"
-                    "```"
-                )
-            ).with_inputs("history"),
-
-            dspy.Example(
-                history="Bug in logic",
-                plan="edit code",
-                action=(
-                    "DISCUSSION\n"
-                    "Edit the incorrect logic in the code.\n\n"
-                    "```\n"
-                    "str_replace_editor\n"
-                    "```"
-                )
-            ).with_inputs("history"),
-
-            dspy.Example(
-                history="All tests passing",
+                history="All tests passing successfully",
                 plan="submit solution",
                 action=(
                     "DISCUSSION\n"
@@ -179,27 +166,27 @@ class DSPyPolicyWrapper:
                     "```"
                 )
             ).with_inputs("history"),
-            
+
             dspy.Example(
-                history="Ran tests, failure in parser.py line 42",
-                plan="inspect failing file",
+                history="Already inspected relevant file and identified issue",
+                plan="apply fix",
                 action=(
                     "DISCUSSION\n"
-                    "Open the file causing the failure to inspect the issue.\n\n"
+                    "Apply the identified fix instead of further searching.\n\n"
                     "```\n"
-                    "open_file parser.py\n"
+                    "str_replace_editor str_replace /testbed/file.py --old_str 'buggy_code' --new_str 'fixed_code'\n"
                     "```"
                 )
             ).with_inputs("history"),
 
             dspy.Example(
-                history="Edited code, tests still failing",
-                plan="iterate fix",
+                history="Repeated grep commands with no new info",
+                plan="take action",
                 action=(
                     "DISCUSSION\n"
-                    "Search for related logic to refine the fix.\n\n"
+                    "Stop searching and modify the code based on current findings.\n\n"
                     "```\n"
-                    "grep -n parser -R .\n"
+                    "str_replace_editor str_replace /testbed/file.py --old_str 'x' --new_str 'y'\n"
                     "```"
                 )
             ).with_inputs("history"),
@@ -220,25 +207,122 @@ class DSPyPolicyWrapper:
         ]
         
         def metric(example, pred, trace=None):
-            # Rewards progression
-            
             action = str(pred.action).lower()
+            history = example.history.lower()
+
             score = 0
 
             if any(tool in action for tool in VALID_TOOLS):
                 score += 1
+            else:
+                return -5  # invalid actions are fatal
 
-            if "error" in example.history.lower() and "grep" in action:
-                score += 2
 
-            if "test" in example.history.lower() and "open_file" in action:
-                score += 2
+            def action_type(a):
+                if "submit" in a:
+                    return "submit"
+                if "str_replace_editor" in a:
+                    return "edit"
+                if any(x in a for x in ["pytest", "test"]):
+                    return "validate"
+                if any(x in a for x in ["view", "open_file"]):
+                    return "inspect"
+                if "grep" in a or "search" in a:
+                    return "search"
+                return "other"
 
-            if "submit" in action:
-                if "pass" in example.history.lower():
-                    score += 5
-                else:
+            a_type = action_type(action)
+
+            weights = {
+                "search": 1,
+                "inspect": 2,
+                "edit": 5,
+                "validate": 4,
+                "submit": 6
+            }
+
+            score += weights.get(a_type, 0)
+
+            def infer_stage(hist):
+                if "pass" in hist or "all tests passing" in hist:
+                    return "ready_to_submit"
+                if any(k in hist for k in ["edited", "patch", "modified"]):
+                    return "post_edit"
+                if any(k in hist for k in ["line", "file", "def ", "class "]):
+                    return "localized"
+                if any(k in hist for k in ["error", "fail", "warning", "traceback"]):
+                    return "diagnosing"
+                return "start"
+
+            stage = infer_stage(history)
+
+            ideal = {
+                "start": "search",
+                "diagnosing": "search",
+                "localized": "edit",
+                "post_edit": "validate",
+                "ready_to_submit": "submit"
+            }
+
+            if a_type == ideal.get(stage):
+                score += 4
+            else:
+                score -= 2
+
+            if trace and hasattr(trace, "steps") and len(trace.steps) >= 2:
+                prev = str(trace.steps[-2].pred.action).lower()
+                prev_type = action_type(prev)
+
+                # reward forward transitions
+                transitions = {
+                    ("search", "inspect"): +2,
+                    ("inspect", "edit"): +4,
+                    ("edit", "validate"): +3,
+                    ("validate", "submit"): +5
+                }
+
+                score += transitions.get((prev_type, a_type), 0)
+
+                # penalize backward moves
+                if prev_type == "edit" and a_type == "search":
+                    score -= 4
+                if prev_type == "validate" and a_type == "search":
+                    score -= 3
+
+            # penalize repititions
+            if trace and hasattr(trace, "steps"):
+                past = [str(s.pred.action).strip().lower() for s in trace.steps[:-1]]
+
+                if action.strip() in past:
                     score -= 5
+
+                # repeated grep penalty
+                if a_type == "search":
+                    recent = past[-3:]
+                    if sum("grep" in x for x in recent) >= 2:
+                        score -= 3
+
+            # reward narrowing scope
+            if a_type == "inspect" and "/" in action:
+                score += 1  # file-level inspection
+
+            if a_type == "edit" and "--old_str" in action:
+                score += 2  # targeted edit
+
+            
+            if a_type == "submit":
+                if stage == "ready_to_submit":
+                    score += 6
+                else:
+                    score -= 8
+
+            # stagnation
+            if trace and hasattr(trace, "steps") and len(trace.steps) >= 4:
+                last_types = [action_type(str(s.pred.action)) for s in trace.steps[-4:]]
+
+                # no edit after many steps → bad
+                if "edit" not in last_types:
+                    score -= 3
 
             return score
 
