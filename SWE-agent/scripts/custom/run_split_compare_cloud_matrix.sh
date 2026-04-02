@@ -18,7 +18,7 @@ echo "Baseline presets: ${BASELINE_PRESETS}"
 echo "Parallel workers: ${PARALLEL}"
 
 echo "Running cloud split architectures into ${ROOT}"
-./env/bin/python SWE-agent/scripts/custom/run_custom_experiment_matrix.py \
+python SWE-agent/scripts/custom/run_custom_experiment_matrix.py \
     --presets "${SPLIT_PRESETS}" \
     --architectures planner_coder,planner_coder_reviewer \
     --cases "${CASES}" \
@@ -29,7 +29,7 @@ echo "Running cloud split architectures into ${ROOT}"
 
 echo
 echo "Running cloud single-model baselines into ${ROOT}"
-./env/bin/python SWE-agent/scripts/custom/run_custom_experiment_matrix.py \
+python SWE-agent/scripts/custom/run_custom_experiment_matrix.py \
     --presets "${BASELINE_PRESETS}" \
     --architectures single \
     --cases "${CASES}" \
