@@ -6,6 +6,8 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import json
+import os
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -21,6 +23,13 @@ RUNNER_SCRIPT = REPO_ROOT / "SWE-agent" / "scripts" / "run_custom_swebench.py"
 ANALYZER_SCRIPT = REPO_ROOT / "SWE-agent" / "scripts" / "analyze_custom_runs.py"
 PRESET_FILE = REPO_ROOT / "SWE-agent" / "config" / "custom_configs" / "custom_runner_model_presets.yaml"
 CUSTOM_CASES_ROOT = REPO_ROOT / "SWE-agent" / "custom_cases"
+TRANSIENT_RUNNER_ERROR_MARKERS = (
+    "Runtime did not start within timeout",
+    "ClientConnectorError:",
+    "Cannot connect to host 127.0.0.1:",
+    "swerex-remote: not found",
+    "DockerPullError:",
+)
 
 
 @dataclass
@@ -59,6 +68,32 @@ def _load_cases(root: Path) -> dict[str, dict[str, Any]]:
             "problem_statement": str(item.get("problem_statement", "")),
         }
     return cases
+
+
+def _credential_ready(preset_name: str, preset: dict[str, Any]) -> tuple[bool, str | None]:
+    if preset.get("api_key"):
+        return True, None
+    backend = str(preset.get("backend", ""))
+    if backend == "openai":
+        if os.environ.get("OPENAI_API_KEY"):
+            return True, None
+        return False, "missing OPENAI_API_KEY"
+    if backend == "umich":
+        env_name = "UMICH_API_KEY"
+        if os.environ.get(env_name):
+            return True, None
+        # UMich presets usually carry explicit api_key in the preset, so falling
+        # back to env-only would be unexpected but still worth checking.
+        return False, f"missing {env_name} and preset has no api_key"
+    if backend == "ollama":
+        return True, None
+    if backend == "lmstudio":
+        return True, None
+    return True, None
+
+
+def _is_split_preset(preset: dict[str, Any]) -> bool:
+    return bool(preset.get("planner_model") or preset.get("reviewer_model"))
 
 
 def _split_csv(value: str | None) -> list[str]:
@@ -132,6 +167,51 @@ def _build_analyzer_cmd(job: MatrixJob) -> list[str]:
     ]
 
 
+def _read_text(path: Path) -> str:
+    if not path.exists():
+        return ""
+    return path.read_text()
+
+
+def _runner_failed_before_agent_loop(stdout_text: str, stderr_text: str) -> bool:
+    combined = f"{stdout_text}\n{stderr_text}"
+    if "[turn 1] calling model" in combined:
+        return False
+    return any(marker in combined for marker in TRANSIENT_RUNNER_ERROR_MARKERS)
+
+
+def _is_completed_job(job: MatrixJob) -> bool:
+    instance_dir = job.output_dir / job.instance_id
+    traj_path = instance_dir / f"{job.instance_id}.traj"
+    analysis_path = job.output_dir / "analysis.json"
+    if not traj_path.exists() or not analysis_path.exists():
+        return False
+    try:
+        traj = json.loads(traj_path.read_text())
+        analysis = json.loads(analysis_path.read_text())
+    except Exception:
+        return False
+    if not isinstance(traj, dict) or not isinstance(analysis, dict):
+        return False
+    stopped_reason = str(traj.get("stopped_reason", "") or "")
+    if not stopped_reason:
+        return False
+    results = analysis.get("results", [])
+    if not isinstance(results, list) or not results:
+        return False
+    return True
+
+
+def _cleanup_partial_job(job: MatrixJob) -> None:
+    if not job.output_dir.exists():
+        return
+    for child in job.output_dir.iterdir():
+        if child.is_dir():
+            shutil.rmtree(child)
+        else:
+            child.unlink()
+
+
 def _execute_job(job: MatrixJob, args: argparse.Namespace) -> dict[str, Any]:
     job.output_dir.mkdir(parents=True, exist_ok=True)
     _write_json(job.output_dir / "job_manifest.json", _job_manifest(job))
@@ -141,30 +221,58 @@ def _execute_job(job: MatrixJob, args: argparse.Namespace) -> dict[str, Any]:
         "runner_exit_code": None,
         "analyzer_exit_code": None,
         "skipped": False,
+        "skip_reason": None,
+        "runner_attempts": 0,
     }
-    traj_path = job.output_dir / job.instance_id / f"{job.instance_id}.traj"
     runner_cmd = _build_runner_cmd(job, args)
     analyzer_cmd = _build_analyzer_cmd(job)
     result["runner_cmd"] = runner_cmd
     result["analyzer_cmd"] = analyzer_cmd
 
-    if args.skip_existing and traj_path.exists():
+    partial_cleanup = False
+    if args.skip_existing and _is_completed_job(job):
         result["runner_exit_code"] = 0
         result["skipped"] = True
-    elif not args.analyze_only and not args.dry_run:
-        runner_proc = subprocess.run(
-            runner_cmd,
-            cwd=str(REPO_ROOT),
-            text=True,
-            capture_output=True,
-        )
-        result["runner_exit_code"] = runner_proc.returncode
-        _write_text(job.output_dir / "runner.stdout.log", runner_proc.stdout)
-        _write_text(job.output_dir / "runner.stderr.log", runner_proc.stderr)
-    elif not args.analyze_only:
+        result["skip_reason"] = "existing completed job"
+    elif args.skip_existing and job.output_dir.exists() and any(job.output_dir.iterdir()):
+        _cleanup_partial_job(job)
+        partial_cleanup = True
+        result["partial_cleanup"] = True
+    if args.skip_presets and job.preset in args.skip_presets and not result["skipped"]:
+        result["runner_exit_code"] = 0
+        result["skipped"] = True
+        result["skip_reason"] = f"preset preflight failed: {args.skip_presets[job.preset]}"
+    elif not result["skipped"] and not args.analyze_only and not args.dry_run:
+        max_attempts = max(1, int(args.runner_retries) + 1)
+        runner_proc: subprocess.CompletedProcess[str] | None = None
+        runner_stdout = ""
+        runner_stderr = ""
+        for attempt in range(1, max_attempts + 1):
+            result["runner_attempts"] = attempt
+            runner_proc = subprocess.run(
+                runner_cmd,
+                cwd=str(REPO_ROOT),
+                text=True,
+                capture_output=True,
+            )
+            runner_stdout = runner_proc.stdout
+            runner_stderr = runner_proc.stderr
+            if (
+                runner_proc.returncode == 0
+                or attempt >= max_attempts
+                or not _runner_failed_before_agent_loop(runner_stdout, runner_stderr)
+            ):
+                break
+            time_marker = f"\n\n[retry {attempt}/{max_attempts - 1}] transient runner/bootstrap failure detected, retrying job\n"
+            runner_stdout += time_marker
+        result["runner_exit_code"] = runner_proc.returncode if runner_proc else 1
+        _write_text(job.output_dir / "runner.stdout.log", runner_stdout)
+        _write_text(job.output_dir / "runner.stderr.log", runner_stderr)
+    elif not result["skipped"] and not args.analyze_only:
         result["runner_exit_code"] = 0
 
-    if not args.dry_run:
+    should_analyze = not result["skipped"]
+    if not args.dry_run and should_analyze:
         analyzer_proc = subprocess.run(
             analyzer_cmd,
             cwd=str(REPO_ROOT),
@@ -176,6 +284,9 @@ def _execute_job(job: MatrixJob, args: argparse.Namespace) -> dict[str, Any]:
         _write_text(job.output_dir / "analyzer.stderr.log", analyzer_proc.stderr)
         preview = analyzer_proc.stdout.splitlines()[:12]
         result["analyzer_preview"] = preview
+    elif result["skipped"]:
+        result["analyzer_exit_code"] = 0
+        result["analyzer_preview"] = [f"skipped analysis: {result['skip_reason']}"]
     else:
         result["analyzer_exit_code"] = 0
         result["analyzer_preview"] = []
@@ -201,7 +312,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-tokens", type=int)
     parser.add_argument("--reviewer-rounds", type=int)
     parser.add_argument("--parallel", type=int, default=1, help="Number of jobs to run concurrently.")
+    parser.add_argument("--runner-retries", type=int, default=1, help="Retries for transient runner/bootstrap failures.")
     parser.add_argument("--skip-existing", action="store_true")
+    parser.add_argument(
+        "--skip-single-for-split-presets",
+        action="store_true",
+        default=True,
+        help="Do not schedule `single` architecture jobs for presets that already define planner/reviewer split models.",
+    )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--analyze-only", action="store_true")
     return parser.parse_args()
@@ -228,7 +346,10 @@ def main() -> None:
 
     jobs: list[MatrixJob] = []
     for preset in selected_presets:
+        preset_cfg = presets[preset]
         for architecture in selected_architectures:
+            if args.skip_single_for_split_presets and architecture == "single" and _is_split_preset(preset_cfg):
+                continue
             for case_name in selected_cases:
                 case_meta = cases[case_name]
                 jobs.append(
@@ -248,10 +369,22 @@ def main() -> None:
         "output_root": str(output_root),
         "jobs": [_job_manifest(job) for job in jobs],
     }
+    skip_presets: dict[str, str] = {}
+    for preset_name in selected_presets:
+        ok, reason = _credential_ready(preset_name, presets[preset_name])
+        if not ok and reason:
+            skip_presets[preset_name] = reason
+    args.skip_presets = skip_presets
+    if skip_presets:
+        manifest["skipped_presets"] = skip_presets
     _write_json(output_root / "matrix_manifest.json", manifest)
 
     print(f"output_root: {output_root}")
     print(f"jobs: {len(jobs)}")
+    if skip_presets:
+        print("skipping presets due to missing credentials:", flush=True)
+        for preset_name, reason in sorted(skip_presets.items()):
+            print(f"  - {preset_name}: {reason}", flush=True)
 
     job_results: list[dict[str, Any]] = []
     for index, job in enumerate(jobs, start=1):

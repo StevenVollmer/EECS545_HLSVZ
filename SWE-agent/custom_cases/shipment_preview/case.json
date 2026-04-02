@@ -1,0 +1,77 @@
+[
+  {
+    "image_name": "python:3.11",
+    "instance_id": "shipment_preview_001",
+    "problem_statement": "A customer-facing shipment preview renders recipient names in the wrong format. Existing tests still pass, and the export path must keep its current uppercase routing code. Reproduce the preview bug directly, fix it in the correct layer without regressing export behavior, run the relevant validations, inspect the diff, and submit.",
+    "repo_path": "repo",
+    "install_commands": [
+      "pip install pytest"
+    ],
+    "analysis": {
+      "showcase": "reviewer",
+      "difficulty": "medium",
+      "likely_fix_paths": [
+        "app/presenters/preview_presenter.py",
+        "app/utils/text.py",
+        "app/exports/csv_writer.py"
+      ]
+    },
+    "evaluation": {
+      "baseline_checks": [
+        {
+          "name": "existing_tests_still_pass",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "5 passed"
+          ]
+        },
+        {
+          "name": "preview_is_wrong",
+          "command": "python scripts/demo_preview.py",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "Recipient: MCINTYRE-ROSS"
+          ]
+        },
+        {
+          "name": "export_is_currently_correct",
+          "command": "python scripts/demo_export.py",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "route_code=MCINTYRE-ROSS"
+          ]
+        }
+      ],
+      "success_checks": [
+        {
+          "name": "tests_still_pass_after_fix",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "5 passed"
+          ]
+        },
+        {
+          "name": "preview_is_fixed",
+          "command": "python scripts/demo_preview.py",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "Recipient: McIntyre-Ross"
+          ],
+          "stdout_not_contains": [
+            "Recipient: MCINTYRE-ROSS"
+          ]
+        },
+        {
+          "name": "export_is_unchanged",
+          "command": "python scripts/demo_export.py",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "route_code=MCINTYRE-ROSS"
+          ]
+        }
+      ]
+    }
+  }
+]

@@ -207,6 +207,8 @@ def _resolve_api_key(backend: str, explicit: str | None) -> str | None:
 
 
 def _normalize_model_name(backend: str, model: str) -> str:
+    if "/" in model:
+        return model
     if backend == "ollama" and not model.startswith("ollama/"):
         return f"ollama/{model}"
     return model
@@ -221,12 +223,14 @@ Rules:
 - Do not think out loud or reveal reasoning. Take actions with tools instead.
 - Reproduce the bug before the first source edit when feasible.
 - Fix executable runtime logic before touching tests, docs, comments, or examples.
+- Do not change tests to match an incorrect implementation unless the case explicitly allows test edits.
 - Prefer targeted inspection and one deliberate block replacement over many tiny edits.
 - If you are not sure about an exact file path, use `bash` with `find`, `rg --files`, or `ls` before calling `view` or editing tools.
 - If a file tool reports that a path does not exist, stop guessing filenames and discover the real path first.
 - For multi-line replacements, pass actual multi-line strings in tool arguments. Do not insert literal backslash-n text unless you truly want `\\n` in the file.
 - Never replace a bare identifier when it can appear in multiple places. Replace the smallest unique surrounding block.
 - After the first successful semantic code edit, validate immediately before making more edits.
+- If the case provides exact success checks, those checks are the definition of done. Generic tests passing is not enough if a required success check still fails.
 - If you corrupt formatting or insert literal `\\n` text by mistake, use undo_edit or replace the whole block cleanly.
 - Before submit, inspect the diff and make sure you changed executable source code and ran a relevant validation.
 - Assume standard tools and project dependencies are already present when possible. Only install packages after a command proves they are missing and the package is necessary for required validation or reproduction.
@@ -298,6 +302,7 @@ Do not put tool arguments in normal assistant text.
 Do not return raw JSON in message content.
 Do not describe a plan instead of calling a tool.
 If you want to inspect, edit, validate, or submit, do it via a native tool call.
+Do not change tests to make an incorrect implementation look correct.
 """
 
 
@@ -318,6 +323,10 @@ Workflow:
 4. Validate immediately.
 5. Inspect `git diff`.
 6. Call `submit`.
+
+Important:
+- Existing tests may only reflect the current buggy behavior. Do not assume a passing baseline test means the behavior is correct.
+- Do not edit tests to fit a wrong implementation unless the case explicitly allows test edits.
 """
 
 
@@ -335,6 +344,107 @@ Startup observations:
 """
 
 
+def _build_case_validation_prompt(problem_statement) -> str:
+    extra_fields = getattr(problem_statement, "extra_fields", {}) or {}
+    evaluation = extra_fields.get("evaluation", {})
+    policy = extra_fields.get("policy", {})
+    if not isinstance(evaluation, dict):
+        return ""
+    allow_test_edits = bool(policy.get("allow_test_edits", False)) if isinstance(policy, dict) else False
+    baseline = evaluation.get("baseline_checks", [])
+    success = evaluation.get("success_checks", [])
+    baseline_cmds = [str(item.get("command", "")) for item in baseline if isinstance(item, dict) and item.get("command")]
+    success_cmds = [str(item.get("command", "")) for item in success if isinstance(item, dict) and item.get("command")]
+    if not baseline_cmds and not success_cmds:
+        return ""
+    lines = [
+        "Case validation hints:",
+        "- Use these exact commands when they fit the task. Do not invent narrower test names unless you have verified they exist.",
+        "- Treat the success checks as the real definition of done, even if some older baseline tests still pass or still encode the buggy behavior.",
+    ]
+    if not allow_test_edits:
+        lines.append("- Do not modify tests for this case. Fix runtime code so the required success checks pass.")
+    if baseline_cmds:
+        lines.append("- Reproduction commands:")
+        lines.extend(f"  - {cmd}" for cmd in baseline_cmds[:3])
+    if success_cmds:
+        lines.append("- Success validation commands:")
+        lines.extend(f"  - {cmd}" for cmd in success_cmds[:3])
+    return "\n".join(lines)
+
+
+def _extract_case_evaluation(problem_statement) -> dict[str, Any]:
+    extra_fields = getattr(problem_statement, "extra_fields", {}) or {}
+    evaluation = extra_fields.get("evaluation", {})
+    if not isinstance(evaluation, dict):
+        return {}
+    return evaluation
+
+
+def _extract_case_success_commands(problem_statement) -> list[str]:
+    evaluation = _extract_case_evaluation(problem_statement)
+    success = evaluation.get("success_checks", [])
+    commands: list[str] = []
+    for item in success:
+        if isinstance(item, dict) and item.get("command"):
+            commands.append(str(item["command"]).strip())
+    return commands
+
+
+def _extract_case_success_checks(problem_statement) -> list[dict[str, Any]]:
+    evaluation = _extract_case_evaluation(problem_statement)
+    success = evaluation.get("success_checks", [])
+    checks: list[dict[str, Any]] = []
+    for item in success:
+        if isinstance(item, dict) and item.get("command"):
+            checks.append(dict(item))
+    return checks
+
+
+def _extract_case_policy(problem_statement) -> dict[str, Any]:
+    extra_fields = getattr(problem_statement, "extra_fields", {}) or {}
+    policy = extra_fields.get("policy", {})
+    if not isinstance(policy, dict):
+        policy = {}
+    return {
+        "allow_test_edits": bool(policy.get("allow_test_edits", False)),
+        "allow_doc_edits": bool(policy.get("allow_doc_edits", False)),
+    }
+
+
+def _command_output_satisfies_check(check: dict[str, Any], *, exit_code: int | None, output: str) -> bool:
+    if exit_code is None:
+        return False
+    expected_exit = int(check.get("expect_exit_code", 0))
+    if exit_code != expected_exit:
+        return False
+    haystack = output or ""
+    for text in check.get("stdout_contains", []):
+        if str(text) not in haystack:
+            return False
+    for text in check.get("stdout_not_contains", []):
+        if str(text) in haystack:
+            return False
+    return True
+
+
+def _command_output_failure_reasons(check: dict[str, Any], *, exit_code: int | None, output: str) -> list[str]:
+    failures: list[str] = []
+    expected_exit = int(check.get("expect_exit_code", 0))
+    if exit_code is None or exit_code != expected_exit:
+        failures.append(f"expected exit code {expected_exit}, got {exit_code}")
+    haystack = output or ""
+    for text in check.get("stdout_contains", []):
+        value = str(text)
+        if value not in haystack:
+            failures.append(f"missing expected text {value!r}")
+    for text in check.get("stdout_not_contains", []):
+        value = str(text)
+        if value in haystack:
+            failures.append(f"unexpected text present {value!r}")
+    return failures
+
+
 def _build_planner_system_prompt(repo_root: str) -> str:
     return f"""You are the planner for a software repair task.
 
@@ -350,6 +460,7 @@ Rules:
 - Do not invent exact file paths unless the runtime context strongly supports them.
 - If uncertain, name modules/directories/functions and one discovery command instead of hallucinating filenames.
 - Keep `files_likely_affected` to at most 4 entries, ordered from most likely to least likely.
+- Prefer runtime code over tests. Do not list test files as likely fix locations unless the case explicitly allows test edits or the issue is clearly about missing coverage.
 
 Return a JSON object with these keys:
 - problem_summary: short string
@@ -384,6 +495,9 @@ Constraints:
 - If the code location is uncertain, say so in `root_cause_hypothesis` and keep `files_likely_affected` conservative.
 - Use `first_actions` to tell the coder exactly how to start: discovery, repro, inspect.
 - Use `reproduction_steps` and `required_validations` to name the highest-signal checks only.
+- Only name exact test commands or script paths if they already appear in the runtime context or the problem statement.
+- If existing tests pass at baseline but the problem statement still describes a user-visible bug, do not treat the baseline tests as proof of correctness.
+- Prefer a runtime fix plan over a test-adjustment plan. Existing tests may be lagging indicators of the intended behavior.
 """
 
 
@@ -400,6 +514,9 @@ Rules:
 - Be conservative about rejection. Do not reject for style, naming preference, or hypothetical cleanup.
 - Accept if the observed fix is behaviorally correct, validations are sufficient for the case, and the patch is reasonably focused.
 - Reject only when there is concrete evidence of a remaining bug, missing required validation, wrong-file fix, or regression risk.
+- If case-defined success checks exist, do not accept unless those checks were actually run after the final edit and their observed results support the fix.
+- Treat edits to tests as a rejection reason unless the case explicitly allows test edits or a targeted regression test accompanies a real runtime fix.
+- If the issue is behavioral and existing checks are weak, consider requiring one targeted test or one stronger regression check before acceptance.
 - When rejecting, give at most 3 required changes and at most 3 files to revisit.
 
 Return a JSON object with these keys:
@@ -420,6 +537,8 @@ def _build_reviewer_task_prompt(
     planner_handoff: dict[str, Any] | None,
     coder_result: dict[str, Any],
     patch_text: str,
+    case_evaluation: dict[str, Any] | None,
+    case_policy: dict[str, Any] | None,
 ) -> str:
     stats = coder_result.get("stats", {}) if isinstance(coder_result.get("stats"), dict) else {}
     validations_run = []
@@ -435,7 +554,14 @@ def _build_reviewer_task_prompt(
                 if isinstance(arguments, dict):
                     command = str(arguments.get("command", ""))
                 output = str(result.get("output", ""))[:600]
-                validations_run.append({"command": command, "output": output, "is_error": bool(result.get("is_error"))})
+                validations_run.append(
+                    {
+                        "command": command,
+                        "output": output,
+                        "is_error": bool(result.get("is_error")),
+                        "exit_code": result.get("exit_code"),
+                    }
+                )
     condensed_turns = [
         {
             "turn": turn.get("turn"),
@@ -447,6 +573,12 @@ def _build_reviewer_task_prompt(
     return json.dumps(
         {
             "planner_handoff": planner_handoff or {},
+            "case_evaluation": case_evaluation or {},
+            "case_policy": case_policy or {},
+            "review_focus": [
+                "Reject solutions that modify tests to hide a behavior bug unless the case explicitly allows test edits.",
+                "If baseline tests and required success checks disagree, trust the required success checks and the problem statement."
+            ],
             "coder_summary": {
                 "submitted": coder_result.get("submitted", False),
                 "submission_summary": coder_result.get("submission_summary", ""),
@@ -454,6 +586,7 @@ def _build_reviewer_task_prompt(
                 "stats": stats,
                 "condensed_turns": condensed_turns,
                 "validations_run": validations_run[-8:],
+                "satisfied_success_checks": list((coder_result.get("loop_state", {}) or {}).get("satisfied_success_checks", [])),
             },
             "patch": patch_text,
         },
@@ -476,7 +609,9 @@ def _build_reviewer_feedback_prompt(review_feedback: dict[str, Any]) -> str:
         + json.dumps(review_feedback, indent=2)
         + "\nAddress the required_changes first. "
         "Revisit only the listed files unless new evidence forces a broader search. "
-        "Run the requested validations before submit."
+        "Run the requested validations before submit. "
+        "If the reviewer says `revise`, do not submit until the rejection is resolved. "
+        "Do not change tests to satisfy the reviewer unless the case explicitly allows test edits."
     )
 
 
@@ -533,6 +668,38 @@ def _extract_first_json_dict(text: str) -> dict[str, Any]:
     raise ValueError("unterminated JSON object")
 
 
+def _default_planner_handoff() -> dict[str, Any]:
+    return {
+        "problem_summary": "",
+        "root_cause_hypothesis": "Planner output could not be parsed cleanly. Reproduce first and inspect the most likely runtime files from the repository context.",
+        "files_likely_affected": [],
+        "target_symbols": [],
+        "first_actions": [
+            "Run one high-signal reproduction or targeted validation command.",
+            "Inspect the most likely runtime files from the startup context before editing.",
+        ],
+        "reproduction_steps": [],
+        "required_validations": [],
+        "allowed_change_types": ["targeted runtime code fixes"],
+        "forbidden_edits": ["broad refactors without evidence"],
+        "escalation_conditions": ["If the issue is still unclear after targeted inspection and reproduction."],
+    }
+
+
+def _default_reviewer_feedback() -> dict[str, Any]:
+    return {
+        "decision": "revise",
+        "summary": "Reviewer output could not be parsed cleanly. Continue with focused reproduction, inspection, and validation.",
+        "required_changes": [
+            "Use one concrete next action tied to reproduction, inspection, editing, or validation.",
+        ],
+        "files_to_revisit": [],
+        "validations_to_rerun": [],
+        "plan_adherence": "Unable to assess due to malformed reviewer output.",
+        "risk_assessment": "Proceed cautiously and validate before submit.",
+    }
+
+
 def _call_json_role(
     *,
     model: str,
@@ -543,6 +710,7 @@ def _call_json_role(
     num_ctx: int | None,
     system_prompt: str,
     user_prompt: str,
+    fallback_payload: dict[str, Any],
 ) -> tuple[dict[str, Any], dict[str, int], str]:
     import litellm
 
@@ -562,17 +730,39 @@ def _call_json_role(
         completion_kwargs["reasoning_effort"] = "none"
         if num_ctx is not None:
             completion_kwargs["num_ctx"] = num_ctx
-    response = litellm.completion(**completion_kwargs)
-    usage = getattr(response, "usage", None)
-    stats = {
-        "tokens_in": int(getattr(usage, "prompt_tokens", 0) or 0),
-        "tokens_out": int(getattr(usage, "completion_tokens", 0) or 0),
-        "api_calls": 1,
-    }
-    message = response.choices[0].message
-    content = message.content or ""
-    parsed = _extract_first_json_dict(content if isinstance(content, str) else json.dumps(content))
-    return parsed, stats, str(content)
+    messages = completion_kwargs["messages"]
+    total_in = 0
+    total_out = 0
+    raw_content = ""
+
+    for attempt in range(2):
+        completion_kwargs["messages"] = messages
+        response = litellm.completion(**completion_kwargs)
+        usage = getattr(response, "usage", None)
+        total_in += int(getattr(usage, "prompt_tokens", 0) or 0)
+        total_out += int(getattr(usage, "completion_tokens", 0) or 0)
+        message = response.choices[0].message
+        content = message.content or ""
+        raw_content = str(content)
+        try:
+            parsed = _extract_first_json_dict(raw_content)
+            return parsed, {"tokens_in": total_in, "tokens_out": total_out, "api_calls": attempt + 1}, raw_content
+        except ValueError:
+            if attempt == 0:
+                messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                    {"role": "assistant", "content": raw_content},
+                    {
+                        "role": "user",
+                        "content": "Return the same answer as exactly one valid JSON object and nothing else. Do not include explanations or markdown.",
+                    },
+                ]
+
+    fallback = dict(fallback_payload)
+    fallback["_parse_error"] = "role_json_parse_failed"
+    fallback["_raw_response_preview"] = raw_content[:500]
+    return fallback, {"tokens_in": total_in, "tokens_out": total_out, "api_calls": 2}, raw_content
 
 
 @dataclass
@@ -581,6 +771,7 @@ class ToolExecutionRecord:
     arguments: dict[str, Any]
     output: str
     is_error: bool = False
+    exit_code: int | None = None
 
 
 @dataclass
@@ -611,7 +802,11 @@ class ParseOutcome:
 class LoopState:
     executable_edit_made: bool = False
     validation_passed: bool = False
+    validation_attempted_after_edit: bool = False
     diff_checked: bool = False
+    successful_post_edit_commands: set[str] = field(default_factory=set)
+    satisfied_success_checks: set[str] = field(default_factory=set)
+    changed_files: set[str] = field(default_factory=set)
 
 
 class ToolRuntime:
@@ -654,13 +849,32 @@ class ToolRuntime:
         self.edit_history[path].append(self._read(path))
         self.env.write_file(path, content)
 
-    def bash(self, command: str, timeout: int = 30) -> str:
+    def bash(self, command: str, timeout: int = 30) -> tuple[str, int]:
+        sentinel = "__CODEX_EXIT_CODE__:"
         output = self.env.communicate(
-            input=f"cd {shlex.quote(self.repo_root)}\n{command}",
+            input=(
+                f"cd {shlex.quote(self.repo_root)}\n"
+                "{\n"
+                f"{command}\n"
+                "}\n"
+                "status=$?\n"
+                f"printf '\\n{sentinel}%s\\n' \"$status\"\n"
+            ),
             timeout=timeout,
             check="ignore",
         )
-        return output or "(no output)"
+        text = output or ""
+        exit_code = 0
+        marker_index = text.rfind(sentinel)
+        if marker_index != -1:
+            trailer = text[marker_index + len(sentinel):].strip().splitlines()
+            if trailer:
+                try:
+                    exit_code = int(trailer[0].strip())
+                except ValueError:
+                    exit_code = 0
+            text = text[:marker_index].rstrip()
+        return (text or "(no output)", exit_code)
 
     def view(self, path: str, start_line: int | None = None, end_line: int | None = None) -> str:
         path = self._validate_path(path)
@@ -719,10 +933,30 @@ class ToolRuntime:
         self.submit_summary = summary
         return f"Submission recorded. Summary: {summary or '(none)'}"
 
+    @staticmethod
+    def _output_indicates_tool_failure(name: str, output: str) -> bool:
+        text = (output or "").strip().lower()
+        if not text:
+            return False
+        if name == "view":
+            return (
+                "does not exist" in text
+                or "is not a regular file" in text
+            )
+        if name == "str_replace":
+            return (
+                text.startswith("no replacement was performed")
+                or "multiple occurrences of old_str" in text
+            )
+        if name == "undo_edit":
+            return text.startswith("no edit history available")
+        return False
+
     def execute(self, name: str, arguments: dict[str, Any]) -> ToolExecutionRecord:
         try:
             if name == "bash":
-                output = self.bash(arguments["command"], int(arguments.get("timeout", 30)))
+                output, exit_code = self.bash(arguments["command"], int(arguments.get("timeout", 30)))
+                return ToolExecutionRecord(name=name, arguments=arguments, output=output, is_error=exit_code != 0, exit_code=exit_code)
             elif name == "view":
                 output = self.view(
                     arguments["path"],
@@ -739,9 +973,15 @@ class ToolRuntime:
                 output = self.submit(arguments.get("summary", ""))
             else:
                 raise ValueError(f"Unknown tool {name}")
-            return ToolExecutionRecord(name=name, arguments=arguments, output=output, is_error=False)
+            return ToolExecutionRecord(
+                name=name,
+                arguments=arguments,
+                output=output,
+                is_error=self._output_indicates_tool_failure(name, output),
+                exit_code=0,
+            )
         except Exception as exc:  # noqa: BLE001
-            return ToolExecutionRecord(name=name, arguments=arguments, output=f"{type(exc).__name__}: {exc}", is_error=True)
+            return ToolExecutionRecord(name=name, arguments=arguments, output=f"{type(exc).__name__}: {exc}", is_error=True, exit_code=None)
 
 
 class CustomAgentLoop:
@@ -761,6 +1001,9 @@ class CustomAgentLoop:
         runtime_context: str,
         max_identical_tool_failures: int,
         tool_call_mode: str,
+        success_validation_commands: list[str] | None = None,
+        success_validation_checks: list[dict[str, Any]] | None = None,
+        case_policy: dict[str, Any] | None = None,
         role_name: str = "coder",
         extra_user_prompts: list[str] | None = None,
         log_fn: Callable[[str], None] | None = None,
@@ -778,6 +1021,9 @@ class CustomAgentLoop:
         self.runtime_context = runtime_context
         self.max_identical_tool_failures = max_identical_tool_failures
         self.tool_call_mode = tool_call_mode
+        self.success_validation_commands = [cmd.strip() for cmd in (success_validation_commands or []) if str(cmd).strip()]
+        self.success_validation_checks = [dict(item) for item in (success_validation_checks or []) if isinstance(item, dict)]
+        self.case_policy = dict(case_policy or {})
         self.role_name = role_name
         self.extra_user_prompts = extra_user_prompts or []
         self.tools = ToolRuntime(env, repo_root)
@@ -995,10 +1241,11 @@ class CustomAgentLoop:
                             tool_calls=[first_call],
                             error="Returned the same action multiple times in one response; recovered the first action only.",
                         )
-                return ParseOutcome(
-                    tool_calls=[],
-                    error="Returned multiple actions, but react_json mode requires exactly one JSON object per response.",
-                )
+                    return ParseOutcome(
+                        tool_calls=[first_call],
+                        error="Returned multiple actions in one response; executed only the first action.",
+                    )
+                return ParseOutcome(tool_calls=[], error="Returned multiple actions, but react_json mode requires exactly one JSON object per response.")
             if not isinstance(payload, dict):
                 continue
             parsed_call = cls._payload_to_tool_call(payload)
@@ -1026,30 +1273,108 @@ class CustomAgentLoop:
     def _hash_tool_call(name: str, arguments: dict[str, Any]) -> str:
         return json.dumps({"name": name, "arguments": arguments}, sort_keys=True)
 
-    def _append_loop_warning_if_needed(self, messages: list[dict[str, Any]], tool_name: str, arguments: dict[str, Any]) -> None:
+    def _append_loop_warning_if_needed(self, tool_name: str, arguments: dict[str, Any]) -> str | None:
         digest = self._hash_tool_call(tool_name, arguments)
         self.repeat_hashes.append(digest)
         recent = self.repeat_hashes[-4:]
         if len(recent) == 4 and len(set(recent)) == 1:
             self._log(f"[loop-warning] repeated tool call detected: {tool_name} {json.dumps(arguments, sort_keys=True)}")
-            messages.append(
-                {
-                    "role": "user",
-                    "content": "You are repeating the same tool call. Stop looping, inspect a larger unique block, validate, or undo the bad edit.",
-                }
-            )
+            return "You are repeating the same tool call. Stop looping, inspect a larger unique block, validate, or undo the bad edit."
+        return None
 
     def _update_state_from_tool_result(self, result: ToolExecutionRecord) -> None:
         if result.is_error:
             return
         if result.name in {"str_replace", "insert", "undo_edit"}:
             self.state.executable_edit_made = True
+            path = str(result.arguments.get("path", "")).strip()
+            if path:
+                self.state.changed_files.add(path)
         if result.name == "bash":
+            if self.state.executable_edit_made:
+                self.state.validation_attempted_after_edit = True
+                command = str(result.arguments.get("command", "")).strip()
+                if command and (result.exit_code == 0):
+                    self.state.successful_post_edit_commands.add(command)
+                if command:
+                    for check in self.success_validation_checks:
+                        if str(check.get("command", "")).strip() != command:
+                            continue
+                        check_name = str(check.get("name", command))
+                        if _command_output_satisfies_check(check, exit_code=result.exit_code, output=result.output):
+                            self.state.satisfied_success_checks.add(check_name)
             lowered = result.output.lower()
             if "passed" in lowered and "failed" not in lowered:
                 self.state.validation_passed = True
             if "diff --git" in result.output:
                 self.state.diff_checked = True
+
+    def _current_changed_files(self) -> list[str]:
+        output = self.env.communicate(
+            input=f"cd {shlex.quote(self.repo_root)}\ngit diff --name-only",
+            timeout=20,
+            check="ignore",
+        )
+        return [line.strip() for line in (output or "").splitlines() if line.strip()]
+
+    def _submit_precheck(self) -> str | None:
+        if not self.state.executable_edit_made:
+            return "Do not submit yet. No code edit has been made."
+        patch = self.env.communicate(
+            input=f"cd {shlex.quote(self.repo_root)}\ngit diff --no-color",
+            timeout=20,
+            check="ignore",
+        )
+        if not patch.strip():
+            return "Do not submit yet. There is no patch in git diff."
+        changed_files = self._current_changed_files()
+        if changed_files and not bool(self.case_policy.get("allow_test_edits", False)):
+            test_like_paths = [path for path in changed_files if path.startswith("tests/") or "/tests/" in path]
+            if test_like_paths:
+                preview = ", ".join(test_like_paths[:3])
+                return (
+                    "Do not submit yet. This case does not allow changing tests to make the behavior pass. "
+                    f"Revert the test edits and fix runtime code instead. Changed test files: {preview}"
+                )
+        if not self.state.validation_attempted_after_edit:
+            return "Do not submit yet. Run at least one reproduction or validation command after your edit."
+        if self.success_validation_checks:
+            missing_names = []
+            for check in self.success_validation_checks:
+                check_name = str(check.get("name", check.get("command", "")))
+                if check_name not in self.state.satisfied_success_checks:
+                    missing_names.append(check_name)
+            if missing_names:
+                preview = "; ".join(missing_names[:2])
+                return f"Do not submit yet. Required case success checks have not passed yet: {preview}"
+        elif self.success_validation_commands:
+            missing = [cmd for cmd in self.success_validation_commands if cmd not in self.state.successful_post_edit_commands]
+            if missing:
+                preview = "; ".join(missing[:2])
+                return f"Do not submit yet. Run the required case success checks after your edit: {preview}"
+        if not self.state.diff_checked:
+            return "Do not submit yet. Inspect `git diff` first."
+        return None
+
+    def _case_check_feedback(self, result: ToolExecutionRecord) -> str | None:
+        if result.name != "bash":
+            return None
+        command = str(result.arguments.get("command", "")).strip()
+        if not command:
+            return None
+        matching = [check for check in self.success_validation_checks if str(check.get("command", "")).strip() == command]
+        if not matching:
+            return None
+        check = matching[0]
+        check_name = str(check.get("name", command))
+        if _command_output_satisfies_check(check, exit_code=result.exit_code, output=result.output):
+            return f"Required success check `{check_name}` now passes."
+        reasons = _command_output_failure_reasons(check, exit_code=result.exit_code, output=result.output)
+        preview = "; ".join(reasons[:3])
+        return (
+            f"Required success check `{check_name}` still fails: {preview}. "
+            "Do not optimize for generic tests alone; fix the behavior that this check is measuring."
+        )
 
     def run(self) -> dict[str, Any]:
         import litellm
@@ -1108,6 +1433,11 @@ class CustomAgentLoop:
                 parse_outcome = self._parse_react_json(content if isinstance(content, str) else json.dumps(content))
                 tool_calls = parse_outcome.tool_calls
                 parse_error = parse_outcome.error
+
+            if len(tool_calls) > 1:
+                tool_calls = tool_calls[:1]
+                extra = "Returned multiple tool calls in one response; executed only the first action."
+                parse_error = f"{parse_error} {extra}".strip() if parse_error else extra
 
             turn_record = TurnRecord(
                 turn=turn,
@@ -1174,13 +1504,35 @@ class CustomAgentLoop:
                 )
                 continue
 
+            pending_user_messages: list[str] = []
+            if parse_error:
+                pending_user_messages.append(
+                    "You returned an invalid action payload. Only the first valid action was executed. Next response must contain exactly one action and no extra plan text."
+                )
             for call in tool_calls:
                 self.stats.tool_calls += 1
                 self._log(f"[turn {turn}] tool {call['name']} {json.dumps(call['arguments'], sort_keys=True)}")
-                self._append_loop_warning_if_needed(messages, call["name"], call["arguments"])
-                result = self.tools.execute(call["name"], call["arguments"])
+                loop_warning = self._append_loop_warning_if_needed(call["name"], call["arguments"])
+                if loop_warning:
+                    pending_user_messages.append(loop_warning)
+                if call["name"] == "submit":
+                    submit_block = self._submit_precheck()
+                    if submit_block:
+                        result = ToolExecutionRecord(
+                            name="submit",
+                            arguments=call["arguments"],
+                            output=submit_block,
+                            is_error=True,
+                        )
+                    else:
+                        result = self.tools.execute(call["name"], call["arguments"])
+                else:
+                    result = self.tools.execute(call["name"], call["arguments"])
                 turn_record.tool_results.append(result)
                 self._update_state_from_tool_result(result)
+                case_feedback = self._case_check_feedback(result)
+                if case_feedback:
+                    pending_user_messages.append(case_feedback)
                 level = "tool-error" if result.is_error else "tool-output"
                 self._log(f"[turn {turn}] {level} {result.name}: {self._clip(result.output)}")
                 repeated_success_warning = False
@@ -1196,14 +1548,8 @@ class CustomAgentLoop:
                 if result.is_error:
                     self.consecutive_failure_counts[failure_key] += 1
                     self.consecutive_success_counts.clear()
-                    messages.append(
-                        {
-                            "role": "user",
-                            "content": (
-                                "That tool call failed. Use the runtime context, repo root, pwd/ls output, and recent tool output to correct the next step. "
-                                "Do not retry the same failing call unchanged."
-                            ),
-                        }
+                    pending_user_messages.append(
+                        "That tool call failed. Use the runtime context, repo root, pwd/ls output, and recent tool output to correct the next step. Do not retry the same failing call unchanged."
                     )
                     if self.consecutive_failure_counts[failure_key] >= self.max_identical_tool_failures:
                         stopped_reason = "repeated_tool_failure"
@@ -1221,15 +1567,8 @@ class CustomAgentLoop:
                             f"[run] repeated successful tool call threshold={self.max_identical_tool_failures} "
                             f"tool={result.name}"
                         )
-                        messages.append(
-                            {
-                                "role": "user",
-                                "content": (
-                                    "You already ran that exact tool call and got the same result multiple times. "
-                                    "Do not run it again. Use the observed output to take a different next step: "
-                                    "inspect a different file, edit code, run a broader validation, inspect `git diff`, or `submit`."
-                                ),
-                            }
+                        pending_user_messages.append(
+                            "You already ran that exact tool call and got the same result multiple times. Do not run it again. Use the observed output to take a different next step: inspect a different file, edit code, run a broader validation, inspect `git diff`, or `submit`."
                         )
                         repeated_success_warning = True
                 messages.append(
@@ -1240,6 +1579,8 @@ class CustomAgentLoop:
                         "content": result.output,
                     }
                 )
+            for pending in pending_user_messages:
+                messages.append({"role": "user", "content": pending})
             if stopped_reason == "repeated_tool_failure":
                 break
 
@@ -1257,6 +1598,12 @@ class CustomAgentLoop:
         return {
             "turns": [asdict(turn) for turn in self.turns],
             "stats": asdict(self.stats),
+            "loop_state": {
+                **asdict(self.state),
+                "successful_post_edit_commands": sorted(self.state.successful_post_edit_commands),
+                "satisfied_success_checks": sorted(self.state.satisfied_success_checks),
+                "changed_files": sorted(self.state.changed_files),
+            },
             "stopped_reason": stopped_reason,
             "submitted": self.tools.submitted,
             "submission_summary": self.tools.submit_summary,
@@ -1384,7 +1731,7 @@ def _load_custom_file_instances(path: Path, filter_regex: str, slice_spec: str, 
         instances.append(
             BatchInstance(
                 env=EnvironmentConfig.model_construct(
-                    deployment=DockerDeploymentConfig(image=image_name),
+                    deployment=DockerDeploymentConfig(image=image_name, pull="missing"),
                     repo=PlainLocalDirectoryRepo(path=repo_path, base_commit=base_commit),
                     post_startup_commands=[],
                     post_startup_command_timeout=500,
@@ -1699,6 +2046,11 @@ def main() -> None:
             role_model_stats: dict[str, dict[str, Any]] = {}
             planner_handoff: dict[str, Any] | None = None
             review_feedback: dict[str, Any] | None = None
+            case_validation_prompt = _build_case_validation_prompt(instance.problem_statement)
+            case_evaluation = _extract_case_evaluation(instance.problem_statement)
+            case_policy = _extract_case_policy(instance.problem_statement)
+            success_validation_commands = _extract_case_success_commands(instance.problem_statement)
+            success_validation_checks = _extract_case_success_checks(instance.problem_statement)
 
             if args.agent_architecture in {"planner_coder", "planner_coder_reviewer"}:
                 log_line(f"[planner] calling model={planner_model}")
@@ -1710,7 +2062,11 @@ def main() -> None:
                     max_tokens=args.max_tokens,
                     num_ctx=args.num_ctx,
                     system_prompt=_build_planner_system_prompt(repo_root),
-                    user_prompt=_build_planner_task_prompt(instance.problem_statement.text, repo_root, runtime_context),
+                    user_prompt=(
+                        _build_planner_task_prompt(instance.problem_statement.text, repo_root, runtime_context)
+                        + ("\n\n" + case_validation_prompt if case_validation_prompt else "")
+                    ),
+                    fallback_payload=_default_planner_handoff(),
                 )
                 role_model_stats["planner"] = {"model": planner_model, **planner_stats}
                 log_line(f"[planner] handoff {json.dumps(planner_handoff, sort_keys=True)}")
@@ -1726,6 +2082,8 @@ def main() -> None:
                     extra_prompts.append(_build_planner_handoff_prompt(planner_handoff))
                 if review_feedback:
                     extra_prompts.append(_build_reviewer_feedback_prompt(review_feedback))
+                if case_validation_prompt:
+                    extra_prompts.append(case_validation_prompt)
 
                 loop = CustomAgentLoop(
                     model=model,
@@ -1741,6 +2099,9 @@ def main() -> None:
                     runtime_context=runtime_context,
                     max_identical_tool_failures=args.max_identical_tool_failures,
                     tool_call_mode=args.tool_call_mode,
+                    success_validation_commands=success_validation_commands,
+                    success_validation_checks=success_validation_checks,
+                    case_policy=case_policy,
                     role_name="coder",
                     extra_user_prompts=extra_prompts,
                     log_fn=log_line,
@@ -1788,7 +2149,10 @@ def main() -> None:
                         planner_handoff=planner_handoff,
                         coder_result=coder_result,
                         patch_text=patch_text,
+                        case_evaluation=case_evaluation,
+                        case_policy=case_policy,
                     ),
+                    fallback_payload=_default_reviewer_feedback(),
                 )
                 prior = role_model_stats.get("reviewer", {"model": reviewer_model, "tokens_in": 0, "tokens_out": 0, "api_calls": 0})
                 role_model_stats["reviewer"] = {
@@ -1808,6 +2172,11 @@ def main() -> None:
 
             assert coder_result is not None
             result = coder_result
+            if args.agent_architecture == "planner_coder_reviewer" and str((review_feedback or {}).get("decision", "")).lower() != "accept":
+                result["submitted"] = False
+                result["submission_summary"] = ""
+                result["stopped_reason"] = "reviewer_rejected"
+                log_line("[reviewer] final decision is revise; marking run as reviewer_rejected")
             role_model_stats["coder"] = {"model": model, **coder_accumulated_stats}
             result["agent_architecture"] = args.agent_architecture
             result["role_model_stats"] = role_model_stats

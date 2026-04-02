@@ -72,7 +72,7 @@ def _markdown_table(headers: list[str], rows: list[list[str]]) -> str:
 
 
 def _group_key(result: dict[str, Any]) -> tuple[str, str]:
-    return str(result.get("model", "")), str(result.get("architecture", ""))
+    return str(result.get("config_label", result.get("model", ""))), str(result.get("architecture", ""))
 
 
 def _preset_architecture_summary(results: list[dict[str, Any]]) -> list[list[str]]:
@@ -81,19 +81,155 @@ def _preset_architecture_summary(results: list[dict[str, Any]]) -> list[list[str
         grouped[_group_key(result)].append(result)
 
     rows: list[list[str]] = []
-    for (model, architecture), group in sorted(grouped.items()):
+    for (config_label, architecture), group in sorted(grouped.items()):
         rows.append(
             [
-                model,
+                config_label,
                 architecture,
                 str(len(group)),
                 _fmt_float(sum(1 for r in group if r.get("success_passed")) / len(group), 3),
                 _fmt_float(sum(1 for r in group if r.get("observed_success_passed")) / len(group), 3),
                 _fmt_float(_mean([float(r.get("total_score", 0)) for r in group])),
                 _fmt_float(_mean([float(r.get("relative_cost_to_4o_mini", 0)) for r in group]), 3),
+                _fmt_float(_mean([float(r.get("score_per_cost", 0)) for r in group]), 2),
                 _fmt_float(_mean([float(r.get("turns", 0)) for r in group]), 1),
                 _fmt_float(_mean([float(r.get("parse_errors", 0)) for r in group]), 1),
                 _fmt_float(_mean([float(r.get("tool_error_count", 0)) for r in group]), 1),
+            ]
+        )
+    return rows
+
+
+def _architecture_summary(results: list[dict[str, Any]]) -> list[list[str]]:
+    grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for result in results:
+        grouped[str(result.get("architecture", ""))].append(result)
+    rows: list[list[str]] = []
+    for architecture, group in sorted(grouped.items()):
+        rows.append(
+            [
+                architecture,
+                str(len(group)),
+                _fmt_float(sum(1 for r in group if r.get("success_passed")) / len(group), 3),
+                _fmt_float(_mean([float(r.get("total_score", 0)) for r in group])),
+                _fmt_float(_mean([float(r.get("relative_cost_to_4o_mini", 0)) for r in group]), 3),
+                _fmt_float(_mean([float(r.get("score_per_cost", 0)) for r in group]), 2),
+            ]
+        )
+    return rows
+
+
+def _size_split_summary(results: list[dict[str, Any]]) -> list[list[str]]:
+    rows: list[list[str]] = []
+    multi = [r for r in results if str(r.get("architecture", "")) != "single"]
+    grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for result in multi:
+        grouped[str(result.get("config_label", result.get("model", "")))].append(result)
+    for config_label, group in sorted(grouped.items()):
+        sample = group[0]
+        rows.append(
+            [
+                config_label,
+                str(sample.get("planner_size_rank", "")),
+                str(sample.get("coder_size_rank", "")),
+                str(sample.get("reviewer_size_rank", "")),
+                "yes" if sample.get("mixed_size") else "no",
+                str(len(group)),
+                _fmt_float(sum(1 for r in group if r.get("success_passed")) / len(group), 3),
+                _fmt_float(_mean([float(r.get("total_score", 0)) for r in group])),
+                _fmt_float(_mean([float(r.get("relative_cost_to_4o_mini", 0)) for r in group]), 3),
+                _fmt_float(_mean([float(r.get("score_per_cost", 0)) for r in group]), 2),
+            ]
+        )
+    return rows
+
+
+def _hypothesis_architecture_order(results: list[dict[str, Any]]) -> list[list[str]]:
+    grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for result in results:
+        grouped[str(result.get("instance_id", ""))].append(result)
+    rows: list[list[str]] = []
+    for case_id, group in sorted(grouped.items()):
+        best_by_arch: dict[str, dict[str, Any]] = {}
+        for architecture in ("single", "planner_coder", "planner_coder_reviewer"):
+            candidates = [r for r in group if str(r.get("architecture", "")) == architecture]
+            if candidates:
+                best_by_arch[architecture] = max(
+                    candidates,
+                    key=lambda item: (
+                        bool(item.get("success_passed")),
+                        float(item.get("total_score", 0)),
+                        -float(item.get("relative_cost_to_4o_mini", 0)),
+                    ),
+                )
+        single = best_by_arch.get("single")
+        pc = best_by_arch.get("planner_coder")
+        pcr = best_by_arch.get("planner_coder_reviewer")
+        def sig(item: dict[str, Any] | None) -> tuple[int, float]:
+            if not item:
+                return (-1, -1.0)
+            return (1 if item.get("success_passed") else 0, float(item.get("total_score", 0)))
+        order_ok = "n/a"
+        if single and pc and pcr:
+            order_ok = "yes" if (sig(pcr) >= sig(pc) >= sig(single)) else "no"
+        rows.append(
+            [
+                case_id,
+                str(single.get("total_score", "")) if single else "n/a",
+                str(pc.get("total_score", "")) if pc else "n/a",
+                str(pcr.get("total_score", "")) if pcr else "n/a",
+                order_ok,
+            ]
+        )
+    return rows
+
+
+def _mixed_vs_big_summary(results: list[dict[str, Any]]) -> list[list[str]]:
+    grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for result in results:
+        grouped[str(result.get("instance_id", ""))].append(result)
+    rows: list[list[str]] = []
+    for case_id, group in sorted(grouped.items()):
+        mixed = [r for r in group if r.get("mixed_size")]
+        big_only = [
+            r for r in group
+            if str(r.get("architecture", "")) != "single"
+            and not r.get("mixed_size")
+            and int(r.get("planner_size_rank", 0)) == int(r.get("coder_size_rank", 0))
+        ]
+        if not mixed or not big_only:
+            continue
+        best_mixed = max(
+            mixed,
+            key=lambda item: (
+                bool(item.get("success_passed")),
+                float(item.get("total_score", 0)),
+                -float(item.get("relative_cost_to_4o_mini", 0)),
+            ),
+        )
+        best_big = max(
+            big_only,
+            key=lambda item: (
+                bool(item.get("success_passed")),
+                float(item.get("total_score", 0)),
+                -float(item.get("relative_cost_to_4o_mini", 0)),
+            ),
+        )
+        similar_or_better = "yes" if (
+            (1 if best_mixed.get("success_passed") else 0, float(best_mixed.get("total_score", 0)))
+            >=
+            (1 if best_big.get("success_passed") else 0, float(best_big.get("total_score", 0)) - 5.0)
+        ) else "no"
+        rows.append(
+            [
+                case_id,
+                str(best_mixed.get("config_label", "")),
+                str(best_mixed.get("total_score", "")),
+                _fmt_float(float(best_mixed.get("relative_cost_to_4o_mini", 0)), 3),
+                str(best_big.get("config_label", "")),
+                str(best_big.get("total_score", "")),
+                _fmt_float(float(best_big.get("relative_cost_to_4o_mini", 0)), 3),
+                similar_or_better,
             ]
         )
     return rows
@@ -114,7 +250,7 @@ def _case_summary(results: list[dict[str, Any]]) -> list[list[str]]:
                 _fmt_float(sum(1 for r in group if r.get("success_passed")) / len(group), 3),
                 _fmt_float(sum(1 for r in group if r.get("observed_success_passed")) / len(group), 3),
                 _fmt_float(_mean([float(r.get("total_score", 0)) for r in group])),
-                str(best.get("model", "")),
+                str(best.get("config_label", best.get("model", ""))),
                 str(best.get("architecture", "")),
                 str(best.get("total_score", "")),
             ]
@@ -141,7 +277,7 @@ def _per_case_detail(results: list[dict[str, Any]]) -> str:
             run_dir = Path(str(result.get("run_dir", "")))
             rows.append(
                 [
-                    str(result.get("model", "")),
+                    str(result.get("config_label", result.get("model", ""))),
                     str(result.get("architecture", "")),
                     str(result.get("total_score", "")),
                     "yes" if result.get("success_passed") else "no",
@@ -156,7 +292,7 @@ def _per_case_detail(results: list[dict[str, Any]]) -> str:
         blocks.append(
             _markdown_table(
                 [
-                    "Model",
+                    "Config",
                     "Architecture",
                     "Score",
                     "Strict Success",
@@ -190,7 +326,7 @@ def _interesting_failures(results: list[dict[str, Any]], limit: int) -> str:
     for result in failures[:limit]:
         notes = "; ".join(str(note) for note in result.get("notes", [])[:4])
         lines.append(
-            f"- `{result.get('instance_id')}` | `{result.get('model')}` | `{result.get('architecture')}` | "
+            f"- `{result.get('instance_id')}` | `{result.get('config_label', result.get('model'))}` | `{result.get('architecture')}` | "
             f"score `{result.get('total_score')}` | cost `{_fmt_float(float(result.get('relative_cost_to_4o_mini', 0)), 3)}`"
             + (f" | {notes}" if notes else "")
         )
@@ -210,7 +346,7 @@ def _top_runs(results: list[dict[str, Any]], limit: int) -> str:
     lines: list[str] = []
     for result in top[:limit]:
         lines.append(
-            f"- `{result.get('instance_id')}` | `{result.get('model')}` | `{result.get('architecture')}` | "
+            f"- `{result.get('instance_id')}` | `{result.get('config_label', result.get('model'))}` | `{result.get('architecture')}` | "
             f"score `{result.get('total_score')}` | strict `{result.get('success_passed')}` | "
             f"observed `{result.get('observed_success_passed')}` | cost `{_fmt_float(float(result.get('relative_cost_to_4o_mini', 0)), 3)}`"
         )
@@ -229,23 +365,94 @@ def render_report(matrix_root: Path, summary: dict[str, Any], results: list[dict
     lines.append(f"- Avg total score: `{aggregate.get('avg_total_score', 0)}`")
     lines.append(f"- Avg relative cost to 4o-mini: `{aggregate.get('avg_relative_cost_to_4o_mini', 0)}`")
     lines.append("")
-    lines.append("## By Model And Architecture")
+    lines.append("## By Architecture")
     lines.append("")
     lines.append(
         _markdown_table(
             [
-                "Model",
+                "Architecture",
+                "Runs",
+                "Strict Resolve",
+                "Avg Score",
+                "Avg Rel Cost",
+                "Avg Score/Cost",
+            ],
+            _architecture_summary(results),
+        )
+    )
+    lines.append("")
+    lines.append("## By Config And Architecture")
+    lines.append("")
+    lines.append(
+        _markdown_table(
+            [
+                "Config",
                 "Architecture",
                 "Runs",
                 "Strict Resolve",
                 "Observed Resolve",
                 "Avg Score",
                 "Avg Rel Cost",
+                "Avg Score/Cost",
                 "Avg Turns",
                 "Avg Parse Err",
                 "Avg Tool Err",
             ],
             _preset_architecture_summary(results),
+        )
+    )
+    lines.append("")
+    lines.append("## Size Split Comparison")
+    lines.append("")
+    lines.append(
+        _markdown_table(
+            [
+                "Config",
+                "Planner Size",
+                "Coder Size",
+                "Reviewer Size",
+                "Mixed Sizes",
+                "Runs",
+                "Strict Resolve",
+                "Avg Score",
+                "Avg Rel Cost",
+                "Avg Score/Cost",
+            ],
+            _size_split_summary(results),
+        )
+    )
+    lines.append("")
+    lines.append("## Hypothesis Check: PCR >= PC >= Single")
+    lines.append("")
+    lines.append(
+        _markdown_table(
+            [
+                "Case",
+                "Single Score",
+                "PC Score",
+                "PCR Score",
+                "Order Holds",
+            ],
+            _hypothesis_architecture_order(results),
+        )
+    )
+    lines.append("")
+    lines.append("## Mixed-Size vs Big-Only")
+    lines.append("")
+    mixed_rows = _mixed_vs_big_summary(results)
+    lines.append(
+        _markdown_table(
+            [
+                "Case",
+                "Best Mixed Config",
+                "Mixed Score",
+                "Mixed Cost",
+                "Best Big-Only Config",
+                "Big Score",
+                "Big Cost",
+                "Similar Or Better",
+            ],
+            mixed_rows,
         )
     )
     lines.append("")
@@ -259,7 +466,7 @@ def render_report(matrix_root: Path, summary: dict[str, Any], results: list[dict
                 "Strict Resolve",
                 "Observed Resolve",
                 "Avg Score",
-                "Best Model",
+                "Best Config",
                 "Best Architecture",
                 "Best Score",
             ],

@@ -24,6 +24,7 @@ OPENAI_COST_MULTIPLIERS = {
     "gpt-4o-mini": {"input": 1.0, "output": 4.0},
     "gpt-4o": {"input": 16.67, "output": 16.67},
 }
+PRESET_FILE = Path(__file__).resolve().parents[1] / "config" / "custom_configs" / "custom_runner_model_presets.yaml"
 
 
 @dataclass
@@ -35,6 +36,79 @@ class RunArtifact:
     patch_path: Path
     info_log_path: Path | None
     run_config_path: Path
+
+
+def _load_presets() -> dict[str, dict[str, Any]]:
+    if not PRESET_FILE.exists():
+        return {}
+    raw = yaml.safe_load(PRESET_FILE.read_text()) or {}
+    presets = raw.get("presets", {})
+    return presets if isinstance(presets, dict) else {}
+
+
+def _infer_preset_name(run_dir: Path, presets: dict[str, dict[str, Any]]) -> str:
+    for parent in run_dir.parents:
+        if parent.name in presets:
+            return parent.name
+    return ""
+
+
+def _infer_model_size_rank(model_name: str) -> int:
+    lowered = (model_name or "").lower()
+    if "gpt-4o-mini" in lowered:
+        return 2
+    match = MODEL_SIZE_RE.search(lowered)
+    if not match:
+        return 0
+    size = float(match.group("size"))
+    if size >= 100:
+        return 5
+    if size >= 30:
+        return 4
+    if size >= 10:
+        return 3
+    if size > 0:
+        return 1
+    return 0
+
+
+def _role_size_ranks(
+    *,
+    preset_name: str,
+    presets: dict[str, dict[str, Any]],
+    architecture: str,
+    model_name: str,
+    planner_model_name: str,
+    reviewer_model_name: str,
+) -> tuple[int, int, int]:
+    preset = presets.get(preset_name, {})
+    preset_rank = int(preset.get("size_rank", 0) or 0)
+    coder_rank = int(preset.get("coder_size_rank", 0) or 0)
+    planner_rank = int(preset.get("planner_size_rank", 0) or 0)
+    reviewer_rank = int(preset.get("reviewer_size_rank", 0) or 0)
+
+    inferred_coder = _infer_model_size_rank(model_name)
+    inferred_planner = _infer_model_size_rank(planner_model_name or model_name)
+    inferred_reviewer = _infer_model_size_rank(reviewer_model_name or planner_model_name or model_name)
+
+    if architecture == "single":
+        coder_rank = coder_rank or preset_rank or inferred_coder
+        planner_rank = 0
+        reviewer_rank = 0
+    elif architecture == "planner_coder":
+        coder_rank = coder_rank or preset_rank or inferred_coder
+        planner_rank = planner_rank or preset_rank or inferred_planner
+        reviewer_rank = 0
+    else:
+        coder_rank = coder_rank or inferred_coder or preset_rank
+        planner_rank = planner_rank or preset_rank or inferred_planner
+        reviewer_rank = reviewer_rank or planner_rank or inferred_reviewer
+
+    if architecture != "single" and planner_rank == 0:
+        planner_rank = inferred_planner or coder_rank
+    if architecture == "planner_coder_reviewer" and reviewer_rank == 0:
+        reviewer_rank = inferred_reviewer or planner_rank or coder_rank
+    return planner_rank, coder_rank, reviewer_rank
 
 
 def _resolve_cases_root(path: Path) -> Path:
@@ -259,12 +333,15 @@ def _note(notes: list[str], message: str) -> None:
 def analyze_artifact(artifact: RunArtifact, case_entry: dict[str, Any], run_install: bool) -> dict[str, Any]:
     traj = _load_json(artifact.traj_path)
     run_config = _load_yaml(artifact.run_config_path)
+    presets = _load_presets()
     case_item = case_entry["item"]
     case_file = case_entry["case_file"]
     analysis_meta = _case_analysis_metadata(case_item)
     likely_fix_paths = {_normalize_path(path) for path in analysis_meta.get("likely_fix_paths", [])}
     showcase = str(analysis_meta.get("showcase", "") or "")
     difficulty = str(analysis_meta.get("difficulty", "") or "")
+    case_policy = case_item.get("policy", {}) if isinstance(case_item.get("policy", {}), dict) else {}
+    allow_test_edits = bool(case_policy.get("allow_test_edits", False))
 
     patch_text = artifact.patch_path.read_text() if artifact.patch_path.exists() else ""
     changed_files = _extract_changed_files(patch_text)
@@ -397,6 +474,7 @@ def analyze_artifact(artifact: RunArtifact, case_entry: dict[str, Any], run_inst
     regression_safety = 0
     search_grounding = 0
     efficiency_control = 0
+    disallowed_test_edit_penalty = False
     notes: list[str] = []
 
     if changed_files:
@@ -417,6 +495,11 @@ def analyze_artifact(artifact: RunArtifact, case_entry: dict[str, Any], run_inst
         repair_precision += 2
     elif changed_files_set:
         _note(notes, "patch includes tests/docs changes")
+    if changed_files_set and not allow_test_edits:
+        changed_test_files = [path for path in changed_files if path.startswith("tests/") or "/tests/" in path]
+        if changed_test_files:
+            disallowed_test_edit_penalty = True
+            _note(notes, f"case disallows test edits but patch changed tests: {changed_test_files[:3]}")
 
     if patch_text.strip():
         regression_safety += 3
@@ -470,6 +553,9 @@ def analyze_artifact(artifact: RunArtifact, case_entry: dict[str, Any], run_inst
         efficiency_control -= 1
         _note(notes, "loop control triggered")
     efficiency_control = max(0, efficiency_control)
+    if disallowed_test_edit_penalty:
+        repair_precision = max(0, repair_precision - 6)
+        regression_safety = max(0, regression_safety - 4)
     observed_success = success_effective_checks > 0 and math.isclose(success_effective_fraction, 1.0)
 
     if not submitted:
@@ -494,6 +580,37 @@ def analyze_artifact(artifact: RunArtifact, case_entry: dict[str, Any], run_inst
             }
         }
 
+    architecture = run_config.get("agent_architecture", "single")
+    planner_model_name = ""
+    reviewer_model_name = ""
+    if isinstance(role_stats.get("planner"), dict):
+        planner_model_name = str(role_stats["planner"].get("model", "") or "")
+    if isinstance(role_stats.get("reviewer"), dict):
+        reviewer_model_name = str(role_stats["reviewer"].get("model", "") or "")
+    if not planner_model_name:
+        planner_model_name = str(run_config.get("planner_model", "") or "")
+    if not reviewer_model_name:
+        reviewer_model_name = str(run_config.get("reviewer_model", "") or "")
+    if architecture == "single":
+        config_label = f"single::{model_name}"
+    elif architecture == "planner_coder":
+        config_label = f"planner_coder::{planner_model_name or model_name}->{model_name}"
+    else:
+        config_label = f"planner_coder_reviewer::{planner_model_name or model_name}->{model_name}->{reviewer_model_name or model_name}"
+    preset_name = _infer_preset_name(artifact.run_dir, presets)
+    planner_size_rank, coder_size_rank, reviewer_size_rank = _role_size_ranks(
+        preset_name=preset_name,
+        presets=presets,
+        architecture=architecture,
+        model_name=model_name,
+        planner_model_name=planner_model_name,
+        reviewer_model_name=reviewer_model_name,
+    )
+    effective_cost = max(float(relative_to_4o_mini), 0.001)
+    score_per_cost = round(float(total_score) / effective_cost, 3)
+    resolved_per_cost = round((1.0 if success_eval["passed"] else 0.0) / effective_cost, 3)
+    mixed_size = architecture != "single" and planner_size_rank > coder_size_rank
+
     return {
         "run_dir": str(artifact.run_dir),
         "run_name": artifact.run_dir.name,
@@ -502,8 +619,16 @@ def analyze_artifact(artifact: RunArtifact, case_entry: dict[str, Any], run_inst
         "case_file": str(case_file),
         "case_showcase": showcase,
         "case_difficulty": difficulty,
-        "architecture": run_config.get("agent_architecture", "single"),
+        "architecture": architecture,
+        "preset_name": preset_name,
         "model": model_name,
+        "planner_model": planner_model_name,
+        "reviewer_model": reviewer_model_name,
+        "config_label": config_label,
+        "planner_size_rank": planner_size_rank,
+        "coder_size_rank": coder_size_rank,
+        "reviewer_size_rank": reviewer_size_rank,
+        "mixed_size": mixed_size,
         "tool_call_mode": run_config.get("tool_call_mode", ""),
         "submitted": submitted,
         "stopped_reason": stopped_reason,
@@ -513,6 +638,8 @@ def analyze_artifact(artifact: RunArtifact, case_entry: dict[str, Any], run_inst
         "output_tokens": output_tokens,
         "relative_cost_units": round(relative_cost_units, 2),
         "relative_cost_to_4o_mini": round(relative_to_4o_mini, 3),
+        "score_per_cost": score_per_cost,
+        "resolved_per_cost": resolved_per_cost,
         "cost_model": {
             "baseline": "gpt-4o-mini-equivalent token cost units",
             **cost_detail,
