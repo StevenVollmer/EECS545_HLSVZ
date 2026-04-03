@@ -1,12 +1,17 @@
 diff --git a/app/utils/currency.py b/app/utils/currency.py
-index 6c2af37..10c980e 100644
+index 6c2af37..e5ab9f0 100644
 --- a/app/utils/currency.py
 +++ b/app/utils/currency.py
-@@ -1,6 +1,6 @@
+@@ -1,6 +1,11 @@
  def abbreviate_currency(amount: float) -> str:
      if amount >= 1_000_000:
          return f"${amount / 1_000_000:.1f}M"
 -    if amount >= 1_000:
++    # Use millions for amounts very close to a million to avoid displaying
++    # an awkward "1000.0K" label. If the amount is within 500 of a million,
++    # treat it as a million value.
++    if amount >= 999_500:
++        return f"${amount / 1_000_000:.1f}M"
 +    if amount >= 10_000:
          return f"${round(amount / 1_000, 1):.1f}K"
      return f"${amount:.0f}"

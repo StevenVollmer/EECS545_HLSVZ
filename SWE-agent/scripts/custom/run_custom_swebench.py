@@ -505,6 +505,9 @@ Constraints:
 - Prefer a runtime fix plan over a test-adjustment plan. Existing tests may be lagging indicators of the intended behavior.
 - Avoid fragile commands with nested quotes or apostrophe-heavy literals when a safer script/test command exists.
 - Rank the most likely files and symbols so the coder can inspect quickly instead of re-searching the whole repo.
+- Prefer at most 1 safe reproduction command and at most 2 required validation commands.
+- Put the safest, highest-signal command first. Prefer `python scripts/...`, `pytest ...`, or direct file inspection over complex inline `python -c` commands.
+- Use `reproduction_notes` to warn about quoting hazards, manual observations, or when the coder should prefer an equivalent script/test command.
 """
 
 
@@ -695,6 +698,75 @@ def _default_planner_handoff() -> dict[str, Any]:
         "forbidden_edits": ["broad refactors without evidence"],
         "escalation_conditions": ["If the issue is still unclear after targeted inspection and reproduction."],
     }
+
+
+def _string_list(value: Any, *, limit: int) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    items: list[str] = []
+    for item in value:
+        text = str(item).strip()
+        if not text:
+            continue
+        items.append(text)
+        if len(items) >= limit:
+            break
+    return items
+
+
+def _is_brittle_command(text: str) -> bool:
+    lowered = text.lower()
+    if "python -c" in lowered or "python3 -c" in lowered:
+        return True
+    if text.count("'") >= 3 or text.count('"') >= 6:
+        return True
+    return False
+
+
+def _normalize_planner_handoff(raw: dict[str, Any]) -> dict[str, Any]:
+    handoff = dict(_default_planner_handoff())
+    if not isinstance(raw, dict):
+        return handoff
+
+    for key in ("problem_summary", "root_cause_hypothesis"):
+        value = str(raw.get(key, "")).strip()
+        if value:
+            handoff[key] = value
+
+    files_likely = _string_list(raw.get("files_likely_affected"), limit=4)
+    discovery_priority = _string_list(raw.get("discovery_priority"), limit=4)
+    target_symbols = _string_list(raw.get("target_symbols"), limit=6)
+    first_actions = _string_list(raw.get("first_actions"), limit=3)
+    required_validations = _string_list(raw.get("required_validations"), limit=2)
+    allowed_change_types = _string_list(raw.get("allowed_change_types"), limit=4)
+    forbidden_edits = _string_list(raw.get("forbidden_edits"), limit=4)
+    escalation_conditions = _string_list(raw.get("escalation_conditions"), limit=4)
+    reproduction_notes = _string_list(raw.get("reproduction_notes"), limit=3)
+
+    safe_repro = _string_list(raw.get("safe_reproduction_steps"), limit=3)
+    if not safe_repro:
+        safe_repro = _string_list(raw.get("reproduction_steps"), limit=3)
+    safe_repro = [cmd for cmd in safe_repro if not _is_brittle_command(cmd)]
+    if not safe_repro and _string_list(raw.get("safe_reproduction_steps"), limit=3):
+        reproduction_notes.append("Planner suggested only brittle reproduction commands; prefer an equivalent script, pytest command, or direct file inspection first.")
+
+    handoff["files_likely_affected"] = files_likely
+    handoff["discovery_priority"] = discovery_priority or files_likely[:3]
+    handoff["target_symbols"] = target_symbols
+    handoff["first_actions"] = first_actions or handoff["first_actions"]
+    handoff["safe_reproduction_steps"] = safe_repro[:1]
+    handoff["reproduction_notes"] = reproduction_notes
+    handoff["required_validations"] = required_validations
+    handoff["allowed_change_types"] = allowed_change_types or handoff["allowed_change_types"]
+    handoff["forbidden_edits"] = forbidden_edits or handoff["forbidden_edits"]
+    handoff["escalation_conditions"] = escalation_conditions or handoff["escalation_conditions"]
+
+    if handoff["safe_reproduction_steps"]:
+        first = handoff["safe_reproduction_steps"][0]
+        if all(first not in action for action in handoff["first_actions"]):
+            handoff["first_actions"] = [f"Run `{first}` first to confirm the behavior."] + handoff["first_actions"][:2]
+
+    return handoff
 
 
 def _default_reviewer_feedback() -> dict[str, Any]:
@@ -2079,6 +2151,7 @@ def main() -> None:
                     ),
                     fallback_payload=_default_planner_handoff(),
                 )
+                planner_handoff = _normalize_planner_handoff(planner_handoff)
                 role_model_stats["planner"] = {"model": planner_model, **planner_stats}
                 log_line(f"[planner] handoff {json.dumps(planner_handoff, sort_keys=True)}")
                 if planner_raw.strip() and planner_raw.strip() != json.dumps(planner_handoff):

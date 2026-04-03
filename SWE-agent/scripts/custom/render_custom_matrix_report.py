@@ -90,8 +90,8 @@ def _preset_architecture_summary(results: list[dict[str, Any]]) -> list[list[str
                 _fmt_float(sum(1 for r in group if r.get("success_passed")) / len(group), 3),
                 _fmt_float(sum(1 for r in group if r.get("observed_success_passed")) / len(group), 3),
                 _fmt_float(_mean([float(r.get("total_score", 0)) for r in group])),
-                _fmt_float(_mean([float(r.get("relative_cost_to_4o_mini", 0)) for r in group]), 3),
-                _fmt_float(_mean([float(r.get("score_per_cost", 0)) for r in group]), 2),
+                _fmt_float(_mean([float(r.get("relative_compute_to_4o_mini", 0)) for r in group]), 3),
+                _fmt_float(_mean([float(r.get("score_per_compute", 0)) for r in group]), 2),
                 _fmt_float(_mean([float(r.get("turns", 0)) for r in group]), 1),
                 _fmt_float(_mean([float(r.get("parse_errors", 0)) for r in group]), 1),
                 _fmt_float(_mean([float(r.get("tool_error_count", 0)) for r in group]), 1),
@@ -112,8 +112,8 @@ def _architecture_summary(results: list[dict[str, Any]]) -> list[list[str]]:
                 str(len(group)),
                 _fmt_float(sum(1 for r in group if r.get("success_passed")) / len(group), 3),
                 _fmt_float(_mean([float(r.get("total_score", 0)) for r in group])),
-                _fmt_float(_mean([float(r.get("relative_cost_to_4o_mini", 0)) for r in group]), 3),
-                _fmt_float(_mean([float(r.get("score_per_cost", 0)) for r in group]), 2),
+                _fmt_float(_mean([float(r.get("relative_compute_to_4o_mini", 0)) for r in group]), 3),
+                _fmt_float(_mean([float(r.get("score_per_compute", 0)) for r in group]), 2),
             ]
         )
     return rows
@@ -137,8 +137,8 @@ def _size_split_summary(results: list[dict[str, Any]]) -> list[list[str]]:
                 str(len(group)),
                 _fmt_float(sum(1 for r in group if r.get("success_passed")) / len(group), 3),
                 _fmt_float(_mean([float(r.get("total_score", 0)) for r in group])),
-                _fmt_float(_mean([float(r.get("relative_cost_to_4o_mini", 0)) for r in group]), 3),
-                _fmt_float(_mean([float(r.get("score_per_cost", 0)) for r in group]), 2),
+                _fmt_float(_mean([float(r.get("relative_compute_to_4o_mini", 0)) for r in group]), 3),
+                _fmt_float(_mean([float(r.get("score_per_compute", 0)) for r in group]), 2),
             ]
         )
     return rows
@@ -159,7 +159,7 @@ def _hypothesis_architecture_order(results: list[dict[str, Any]]) -> list[list[s
                     key=lambda item: (
                         bool(item.get("success_passed")),
                         float(item.get("total_score", 0)),
-                        -float(item.get("relative_cost_to_4o_mini", 0)),
+                        -float(item.get("relative_compute_to_4o_mini", 0)),
                     ),
                 )
         single = best_by_arch.get("single")
@@ -204,7 +204,7 @@ def _mixed_vs_big_summary(results: list[dict[str, Any]]) -> list[list[str]]:
             key=lambda item: (
                 bool(item.get("success_passed")),
                 float(item.get("total_score", 0)),
-                -float(item.get("relative_cost_to_4o_mini", 0)),
+                -float(item.get("relative_compute_to_4o_mini", 0)),
             ),
         )
         best_big = max(
@@ -212,7 +212,7 @@ def _mixed_vs_big_summary(results: list[dict[str, Any]]) -> list[list[str]]:
             key=lambda item: (
                 bool(item.get("success_passed")),
                 float(item.get("total_score", 0)),
-                -float(item.get("relative_cost_to_4o_mini", 0)),
+                -float(item.get("relative_compute_to_4o_mini", 0)),
             ),
         )
         similar_or_better = "yes" if (
@@ -225,10 +225,10 @@ def _mixed_vs_big_summary(results: list[dict[str, Any]]) -> list[list[str]]:
                 case_id,
                 str(best_mixed.get("config_label", "")),
                 str(best_mixed.get("total_score", "")),
-                _fmt_float(float(best_mixed.get("relative_cost_to_4o_mini", 0)), 3),
+                _fmt_float(float(best_mixed.get("relative_compute_to_4o_mini", 0)), 3),
                 str(best_big.get("config_label", "")),
                 str(best_big.get("total_score", "")),
-                _fmt_float(float(best_big.get("relative_cost_to_4o_mini", 0)), 3),
+                _fmt_float(float(best_big.get("relative_compute_to_4o_mini", 0)), 3),
                 similar_or_better,
             ]
         )
@@ -282,7 +282,7 @@ def _per_case_detail(results: list[dict[str, Any]]) -> str:
                     str(result.get("total_score", "")),
                     "yes" if result.get("success_passed") else "no",
                     "yes" if result.get("observed_success_passed") else "no",
-                    _fmt_float(float(result.get("relative_cost_to_4o_mini", 0)), 3),
+                    _fmt_float(float(result.get("relative_compute_to_4o_mini", 0)), 3),
                     str(result.get("turns", "")),
                     str(result.get("parse_errors", "")),
                     str(result.get("tool_error_count", "")),
@@ -319,7 +319,7 @@ def _interesting_failures(results: list[dict[str, Any]], limit: int) -> str:
     failures.sort(
         key=lambda item: (
             -float(item.get("total_score", 0)),
-            float(item.get("relative_cost_to_4o_mini", 0)),
+            float(item.get("relative_compute_to_4o_mini", 0)),
         )
     )
     lines: list[str] = []
@@ -327,7 +327,7 @@ def _interesting_failures(results: list[dict[str, Any]], limit: int) -> str:
         notes = "; ".join(str(note) for note in result.get("notes", [])[:4])
         lines.append(
             f"- `{result.get('instance_id')}` | `{result.get('config_label', result.get('model'))}` | `{result.get('architecture')}` | "
-            f"score `{result.get('total_score')}` | cost `{_fmt_float(float(result.get('relative_cost_to_4o_mini', 0)), 3)}`"
+            f"score `{result.get('total_score')}` | compute `{_fmt_float(float(result.get('relative_compute_to_4o_mini', 0)), 3)}`"
             + (f" | {notes}" if notes else "")
         )
     return "\n".join(lines) if lines else "- None"
@@ -339,7 +339,7 @@ def _top_runs(results: list[dict[str, Any]], limit: int) -> str:
         key=lambda item: (
             bool(item.get("success_passed")),
             float(item.get("total_score", 0)),
-            -float(item.get("relative_cost_to_4o_mini", 0)),
+            -float(item.get("relative_compute_to_4o_mini", 0)),
         ),
         reverse=True,
     )
@@ -348,7 +348,7 @@ def _top_runs(results: list[dict[str, Any]], limit: int) -> str:
         lines.append(
             f"- `{result.get('instance_id')}` | `{result.get('config_label', result.get('model'))}` | `{result.get('architecture')}` | "
             f"score `{result.get('total_score')}` | strict `{result.get('success_passed')}` | "
-            f"observed `{result.get('observed_success_passed')}` | cost `{_fmt_float(float(result.get('relative_cost_to_4o_mini', 0)), 3)}`"
+            f"observed `{result.get('observed_success_passed')}` | compute `{_fmt_float(float(result.get('relative_compute_to_4o_mini', 0)), 3)}`"
         )
     return "\n".join(lines) if lines else "- None"
 
@@ -363,7 +363,7 @@ def render_report(matrix_root: Path, summary: dict[str, Any], results: list[dict
     lines.append(f"- Strict resolved rate: `{aggregate.get('resolved_rate', 0)}`")
     lines.append(f"- Observed resolved rate: `{aggregate.get('observed_resolved_rate', 0)}`")
     lines.append(f"- Avg total score: `{aggregate.get('avg_total_score', 0)}`")
-    lines.append(f"- Avg relative cost to 4o-mini: `{aggregate.get('avg_relative_cost_to_4o_mini', 0)}`")
+    lines.append(f"- Avg relative compute burden to 4o-mini: `{aggregate.get('avg_relative_compute_to_4o_mini', 0)}`")
     lines.append("")
     lines.append("## By Architecture")
     lines.append("")
@@ -374,8 +374,8 @@ def render_report(matrix_root: Path, summary: dict[str, Any], results: list[dict
                 "Runs",
                 "Strict Resolve",
                 "Avg Score",
-                "Avg Rel Cost",
-                "Avg Score/Cost",
+                "Avg Rel Compute",
+                "Avg Score/Compute",
             ],
             _architecture_summary(results),
         )
@@ -392,8 +392,8 @@ def render_report(matrix_root: Path, summary: dict[str, Any], results: list[dict
                 "Strict Resolve",
                 "Observed Resolve",
                 "Avg Score",
-                "Avg Rel Cost",
-                "Avg Score/Cost",
+                "Avg Rel Compute",
+                "Avg Score/Compute",
                 "Avg Turns",
                 "Avg Parse Err",
                 "Avg Tool Err",
@@ -415,8 +415,8 @@ def render_report(matrix_root: Path, summary: dict[str, Any], results: list[dict
                 "Runs",
                 "Strict Resolve",
                 "Avg Score",
-                "Avg Rel Cost",
-                "Avg Score/Cost",
+                "Avg Rel Compute",
+                "Avg Score/Compute",
             ],
             _size_split_summary(results),
         )

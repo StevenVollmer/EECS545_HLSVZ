@@ -1,28 +1,14 @@
 diff --git a/app/utils/text.py b/app/utils/text.py
-index 0addf0e..f3bdade 100644
+index 0addf0e..8063970 100644
 --- a/app/utils/text.py
 +++ b/app/utils/text.py
-@@ -21,6 +21,9 @@ def _capitalize_fragment(fragment: str) -> str:
+@@ -21,7 +21,8 @@ def _capitalize_fragment(fragment: str) -> str:
  def _capitalize_word_with_joiners(word: str) -> str:
      if not word:
          return word
-+    # Preserve punctuation-aware capitalization
-+    if word.startswith("'") or word.startswith("-"):
-+        return word
-     return _capitalize_fragment(word)
+-    return _capitalize_fragment(word)
++    # Capitalize first letter, preserve internal punctuation
++    return word[0].upper() + word[1:].lower() if word[1:] else word[0].upper()
  
  
-@@ -33,6 +36,13 @@ def normalize_display_name(value: str) -> str:
-     cleaned = collapse_outer_whitespace(value)
-     cleaned = cleaned.replace("_", " ")
-     cleaned = normalize_spacing(cleaned)
-+    # Special handling for apostrophes in names
-+    if "'" in value:
-+        return value
-+    # Also handle names with apostrophes in the middle
-+    if value.startswith("'"):
-+        return value
-+    # Ensure the first letter is capitalized
-     return title_case_words(cleaned)
- 
- 
+ def title_case_words(value: str) -> str:

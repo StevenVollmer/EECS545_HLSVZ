@@ -36,9 +36,9 @@ Other important outputs:
 - `success_passed`: strict case success checks passed
 - `observed_success_passed`: effective success ignoring blocked host checks
 - `evaluation_blocked`: local grading environment was missing something needed to evaluate
-- `relative_cost_to_4o_mini`: normalized cost estimate
-- `score_per_cost`: quality divided by normalized cost
-- `resolved_per_cost`: solved / normalized cost
+- `relative_compute_to_4o_mini`: normalized compute-burden estimate
+- `score_per_compute`: quality divided by normalized compute burden
+- `resolved_per_compute`: solved / normalized compute burden
 
 Artifacts used by the grader:
 

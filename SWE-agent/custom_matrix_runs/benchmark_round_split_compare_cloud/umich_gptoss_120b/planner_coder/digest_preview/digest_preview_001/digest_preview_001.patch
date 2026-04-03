@@ -1,16 +1,20 @@
 diff --git a/app/utils/text.py b/app/utils/text.py
-index 0addf0e..7ec79ff 100644
+index 0addf0e..534ffa8 100644
 --- a/app/utils/text.py
 +++ b/app/utils/text.py
-@@ -21,7 +21,11 @@ def _capitalize_fragment(fragment: str) -> str:
+@@ -21,7 +21,15 @@ def _capitalize_fragment(fragment: str) -> str:
  def _capitalize_word_with_joiners(word: str) -> str:
      if not word:
          return word
 -    return _capitalize_fragment(word)
++    # Preserve joiner characters while capitalizing each fragment
 +    import re
-+    parts = re.split(r'([-\'\"/])', word)
-+    # Capitalize fragments at even indices (non-delimiters)
-+    capitalized = [ _capitalize_fragment(p) if i % 2 == 0 else p for i, p in enumerate(parts) ]
++    parts = re.split(r"([\-'/])", word)
++    # parts includes delimiters as separate items
++    capitalized = [
++        _capitalize_fragment(p) if p not in NAME_JOINERS else p
++        for p in parts
++    ]
 +    return ''.join(capitalized)
  
  

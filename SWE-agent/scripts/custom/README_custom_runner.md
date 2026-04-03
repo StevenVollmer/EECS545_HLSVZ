@@ -211,7 +211,7 @@ The analyzer combines:
 - deterministic case evaluation from `case.json`
 - patch precision and grounding heuristics
 - protocol/tool stability signals from the custom trajectory
-- relative cost estimates normalized to `gpt-4o-mini`
+- relative compute-burden estimates normalized to `gpt-4o-mini`
 
 Use [run_custom_experiment_matrix.py](/Users/rafe/classes/eecs545/project/SWE-agent/scripts/custom/run_custom_experiment_matrix.py) to run a preset x architecture x case sweep and analyze every run automatically:
 

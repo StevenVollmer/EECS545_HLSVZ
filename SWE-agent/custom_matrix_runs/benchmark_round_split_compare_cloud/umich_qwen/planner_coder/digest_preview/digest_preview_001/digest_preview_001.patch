@@ -1,13 +1,35 @@
 diff --git a/app/utils/text.py b/app/utils/text.py
-index 0addf0e..d1f0481 100644
+index 0addf0e..007bf15 100644
 --- a/app/utils/text.py
 +++ b/app/utils/text.py
-@@ -26,7 +26,7 @@ def _capitalize_word_with_joiners(word: str) -> str:
- 
- def title_case_words(value: str) -> str:
-     words = value.split(" ")
--    return " ".join(_capitalize_word_with_joiners(word) for word in words)
-+    return " ".join(_capitalize_word_with_joiners(word) for word in words if word)
+@@ -29,6 +29,30 @@ def title_case_words(value: str) -> str:
+     return " ".join(_capitalize_word_with_joiners(word) for word in words)
  
  
++def _capitalize_word_with_joiners(word: str) -> str:
++    if not word:
++        return word
++    # Preserve apostrophes and hyphens in capitalization
++    if word.startswith("'") or word.startswith("-"):
++        return word[0] + _capitalize_fragment(word[1:])
++    # Handle apostrophes in the middle of words
++    if "'" in word:
++        parts = word.split("'")
++        if len(parts) > 1:
++            return parts[0] + "'" + _capitalize_fragment(parts[1])
++    # Ensure the first letter after apostrophe is capitalized
++    if "'" in word:
++        parts = word.split("'")
++        if len(parts) > 1:
++            return parts[0] + "'" + _capitalize_fragment(parts[1])
++    # Handle uppercase letters after apostrophes
++    if "'" in word:
++        parts = word.split("'")
++        if len(parts) > 1:
++            return parts[0] + "'" + _capitalize_fragment(parts[1])
++    return _capitalize_fragment(word)
++
++
  def normalize_display_name(value: str) -> str:
+     cleaned = collapse_outer_whitespace(value)
+     cleaned = cleaned.replace("_", " ")

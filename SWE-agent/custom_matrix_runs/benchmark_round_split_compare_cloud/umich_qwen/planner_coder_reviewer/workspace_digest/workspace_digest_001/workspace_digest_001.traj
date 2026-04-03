@@ -2,13 +2,13 @@
   "turns": [
     {
       "turn": 1,
-      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"pytest tests/test_digest_builder.py::test_digest_attention_count\"}}\n",
+      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"python -m pytest tests/test_digest_builder.py::test_workspace_digest_attention_count\"}}\n",
       "tool_calls": [
         {
           "id": "react-1-bash",
           "name": "bash",
           "arguments": {
-            "command": "pytest tests/test_digest_builder.py::test_digest_attention_count"
+            "command": "python -m pytest tests/test_digest_builder.py::test_workspace_digest_attention_count"
           }
         }
       ],
@@ -16,9 +16,9 @@
         {
           "name": "bash",
           "arguments": {
-            "command": "pytest tests/test_digest_builder.py::test_digest_attention_count"
+            "command": "python -m pytest tests/test_digest_builder.py::test_workspace_digest_attention_count"
           },
-          "output": "============================= test session starts ==============================\nplatform linux -- Python 3.11.15, pytest-9.0.2, pluggy-1.6.0\nrootdir: /repo\ncollecting ... \rcollected 0 items                                                              \n\n============================ no tests ran in 0.00s =============================\nERROR: not found: /repo/tests/test_digest_builder.py::test_digest_attention_count\n(no match in any of [<Module test_digest_builder.py>])",
+          "output": "============================= test session starts ==============================\nplatform linux -- Python 3.11.15, pytest-9.0.2, pluggy-1.6.0\nrootdir: /repo\ncollecting ... \rcollected 0 items                                                              \n\n============================ no tests ran in 0.00s =============================\nERROR: not found: /repo/tests/test_digest_builder.py::test_workspace_digest_attention_count\n(no match in any of [<Module test_digest_builder.py>])",
           "is_error": true,
           "exit_code": 4
         }
@@ -28,13 +28,13 @@
     },
     {
       "turn": 2,
-      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"find /repo -type f -name \\\"*.py\\\" | grep -i \\\"digest\\\"\"}}\n\n",
+      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"find /repo -type f -name \\\"test_digest_builder.py\\\"\"}}\n\n",
       "tool_calls": [
         {
           "id": "react-1-bash",
           "name": "bash",
           "arguments": {
-            "command": "find /repo -type f -name \"*.py\" | grep -i \"digest\""
+            "command": "find /repo -type f -name \"test_digest_builder.py\""
           }
         }
       ],
@@ -42,9 +42,9 @@
         {
           "name": "bash",
           "arguments": {
-            "command": "find /repo -type f -name \"*.py\" | grep -i \"digest\""
+            "command": "find /repo -type f -name \"test_digest_builder.py\""
           },
-          "output": "/repo/tests/test_digest_builder.py\n/repo/app/services/digest_builder.py",
+          "output": "/repo/tests/test_digest_builder.py",
           "is_error": false,
           "exit_code": 0
         }
@@ -84,29 +84,25 @@
     },
     {
       "turn": 4,
-      "assistant_text": "{\"tool\":\"view\",\"arguments\":{\"path\":\"/repo/app/services/digest_builder.py\",\"start_line\":1,\"end_line\":100}}\n\n\n\n",
+      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"grep -r \\\"test_workspace_digest_attention_count\\\" /repo/tests/\"}}\n\n\n\n",
       "tool_calls": [
         {
-          "id": "react-1-view",
-          "name": "view",
+          "id": "react-1-bash",
+          "name": "bash",
           "arguments": {
-            "path": "/repo/app/services/digest_builder.py",
-            "start_line": 1,
-            "end_line": 100
+            "command": "grep -r \"test_workspace_digest_attention_count\" /repo/tests/"
           }
         }
       ],
       "tool_results": [
         {
-          "name": "view",
+          "name": "bash",
           "arguments": {
-            "path": "/repo/app/services/digest_builder.py",
-            "start_line": 1,
-            "end_line": 100
+            "command": "grep -r \"test_workspace_digest_attention_count\" /repo/tests/"
           },
-          "output": "Here's the result of running `cat -n` on /repo/app/services/digest_builder.py:\n     1\tfrom app.models.workspace import Workspace, WorkspaceDigest\n     2\tfrom app.services.board_rollup import alert_rollup\n     3\tfrom app.utils.filters import actionable_alerts\n     4\t\n     5\t\n     6\tdef build_workspace_digest(workspace: Workspace) -> WorkspaceDigest:\n     7\t    rollup = alert_rollup(workspace.alerts)\n     8\t    actionable = actionable_alerts(workspace.alerts)\n     9\t    return WorkspaceDigest(\n    10\t        name=workspace.name,\n    11\t        visible_alert_count=len([alert for alert in workspace.alerts if not alert.snoozed]),\n    12\t        open_alert_count=rollup[\"open\"],\n    13\t        critical_alert_count=len([alert for alert in actionable if alert.severity == \"critical\"]),\n    14\t    )",
-          "is_error": false,
-          "exit_code": 0
+          "output": "(no output)",
+          "is_error": true,
+          "exit_code": 1
         }
       ],
       "finish_reason": "stop",
@@ -114,27 +110,23 @@
     },
     {
       "turn": 5,
-      "assistant_text": "{\"tool\":\"str_replace\",\"arguments\":{\"path\":\"/repo/app/services/digest_builder.py\",\"old_str\":\"visible_alert_count=len([alert for alert in workspace.alerts if not alert.snoozed])\",\"new_str\":\"visible_alert_count=len([alert for alert in actionable if not alert.snoozed])\"}}\n\n\n\n\n",
+      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"grep -r \\\"attention\\\" /repo/tests/\"}}\n\n\n\n\n",
       "tool_calls": [
         {
-          "id": "react-1-str_replace",
-          "name": "str_replace",
+          "id": "react-1-bash",
+          "name": "bash",
           "arguments": {
-            "path": "/repo/app/services/digest_builder.py",
-            "old_str": "visible_alert_count=len([alert for alert in workspace.alerts if not alert.snoozed])",
-            "new_str": "visible_alert_count=len([alert for alert in actionable if not alert.snoozed])"
+            "command": "grep -r \"attention\" /repo/tests/"
           }
         }
       ],
       "tool_results": [
         {
-          "name": "str_replace",
+          "name": "bash",
           "arguments": {
-            "path": "/repo/app/services/digest_builder.py",
-            "old_str": "visible_alert_count=len([alert for alert in workspace.alerts if not alert.snoozed])",
-            "new_str": "visible_alert_count=len([alert for alert in actionable if not alert.snoozed])"
+            "command": "grep -r \"attention\" /repo/tests/"
           },
-          "output": "Here's the result of running `cat -n` on /repo/app/services/digest_builder.py:\n     1\tfrom app.models.workspace import Workspace, WorkspaceDigest\n     2\tfrom app.services.board_rollup import alert_rollup\n     3\tfrom app.utils.filters import actionable_alerts\n     4\t\n     5\t\n     6\tdef build_workspace_digest(workspace: Workspace) -> WorkspaceDigest:\n     7\t    rollup = alert_rollup(workspace.alerts)\n     8\t    actionable = actionable_alerts(workspace.alerts)\n     9\t    return WorkspaceDigest(\n    10\t        name=workspace.name,\n    11\t        visible_alert_count=len([alert for alert in actionable if not alert.snoozed]),\n    12\t        open_alert_count=rollup[\"open\"],\n    13\t        critical_alert_count=len([alert for alert in actionable if alert.severity == \"critical\"]),\n    14\t    )",
+          "output": "/repo/tests/test_dashboard_presenter.py:def test_attention_count_excludes_snoozed_items() -> None:\n/repo/tests/test_dashboard_presenter.py:    assert rendered == \"Workspace core west: 1 items need attention (1 critical, 2 open)\"\n/repo/tests/test_dashboard_presenter.py:def test_attention_count_handles_multiple_actionable_items() -> None:\n/repo/tests/test_dashboard_presenter.py:    assert rendered == \"Workspace core west: 2 items need attention (1 critical, 2 open)\"\n/repo/tests/test_dashboard_presenter.py:def test_attention_count_ignores_info_alerts_for_visible_attention() -> None:\n/repo/tests/test_dashboard_presenter.py:    assert rendered == \"Workspace core west: 0 items need attention (0 critical, 1 open)\"\ngrep: /repo/tests/__pycache__/test_dashboard_presenter.cpython-311-pytest-9.0.2.pyc: binary file matches\ngrep: /repo/tests/__pycache__/test_dashboard_presenter.cpython-313-pytest-9.0.2.pyc: binary file matches",
           "is_error": false,
           "exit_code": 0
         }
@@ -144,23 +136,27 @@
     },
     {
       "turn": 6,
-      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"pytest tests/test_digest_builder.py::test_digest_builder_preserves_open_count\"}}\n\n\n\n\n",
+      "assistant_text": "{\"tool\":\"view\",\"arguments\":{\"path\":\"/repo/tests/test_dashboard_presenter.py\",\"start_line\":1,\"end_line\":100}}\n\n\n\n",
       "tool_calls": [
         {
-          "id": "react-1-bash",
-          "name": "bash",
+          "id": "react-1-view",
+          "name": "view",
           "arguments": {
-            "command": "pytest tests/test_digest_builder.py::test_digest_builder_preserves_open_count"
+            "path": "/repo/tests/test_dashboard_presenter.py",
+            "start_line": 1,
+            "end_line": 100
           }
         }
       ],
       "tool_results": [
         {
-          "name": "bash",
+          "name": "view",
           "arguments": {
-            "command": "pytest tests/test_digest_builder.py::test_digest_builder_preserves_open_count"
+            "path": "/repo/tests/test_dashboard_presenter.py",
+            "start_line": 1,
+            "end_line": 100
           },
-          "output": "============================= test session starts ==============================\nplatform linux -- Python 3.11.15, pytest-9.0.2, pluggy-1.6.0\nrootdir: /repo\ncollecting ... \rcollected 1 item                                                               \n\ntests/test_digest_builder.py .                                           [100%]\n\n============================== 1 passed in 0.00s ===============================",
+          "output": "Here's the result of running `cat -n` on /repo/tests/test_dashboard_presenter.py:\n     1\tfrom app.main import render_workspace_dashboard\n     2\tfrom app.models.workspace import AlertItem\n     3\t\n     4\t\n     5\tdef test_attention_count_excludes_snoozed_items() -> None:\n     6\t    alerts = [\n     7\t        AlertItem(title=\"cpu\", state=\"open\", snoozed=False, severity=\"critical\"),\n     8\t        AlertItem(title=\"memory\", state=\"open\", snoozed=True, severity=\"warning\"),\n     9\t        AlertItem(title=\"audit\", state=\"closed\", snoozed=False, severity=\"warning\"),\n    10\t    ]\n    11\t\n    12\t    rendered = render_workspace_dashboard(\"core west\", alerts)\n    13\t\n    14\t    assert rendered == \"Workspace core west: 1 items need attention (1 critical, 2 open)\"\n    15\t\n    16\t\n    17\tdef test_attention_count_handles_multiple_actionable_items() -> None:\n    18\t    alerts = [\n    19\t        AlertItem(title=\"cpu\", state=\"open\", snoozed=False, severity=\"critical\"),\n    20\t        AlertItem(title=\"disk\", state=\"open\", snoozed=False, severity=\"warning\"),\n    21\t    ]\n    22\t\n    23\t    rendered = render_workspace_dashboard(\"core west\", alerts)\n    24\t    assert rendered == \"Workspace core west: 2 items need attention (1 critical, 2 open)\"\n    25\t\n    26\t\n    27\tdef test_attention_count_ignores_info_alerts_for_visible_attention() -> None:\n    28\t    alerts = [\n    29\t        AlertItem(title=\"cpu\", state=\"open\", snoozed=False, severity=\"info\"),\n    30\t    ]\n    31\t\n    32\t    rendered = render_workspace_dashboard(\"core west\", alerts)\n    33\t    assert rendered == \"Workspace core west: 0 items need attention (0 critical, 1 open)\"",
           "is_error": false,
           "exit_code": 0
         }
@@ -170,13 +166,133 @@
     },
     {
       "turn": 7,
-      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"pytest tests/test_digest_builder.py::test_digest_builder_counts_critical_actionable_alerts\"}}\n\n\n\n\n\n",
+      "assistant_text": "{\"tool\":\"view\",\"arguments\":{\"path\":\"/repo/app/services/digest_builder.py\",\"start_line\":1,\"end_line\":100}}\n\n\n\n\n",
+      "tool_calls": [
+        {
+          "id": "react-1-view",
+          "name": "view",
+          "arguments": {
+            "path": "/repo/app/services/digest_builder.py",
+            "start_line": 1,
+            "end_line": 100
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "/repo/app/services/digest_builder.py",
+            "start_line": 1,
+            "end_line": 100
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/services/digest_builder.py:\n     1\tfrom app.models.workspace import Workspace, WorkspaceDigest\n     2\tfrom app.services.board_rollup import alert_rollup\n     3\tfrom app.utils.filters import actionable_alerts\n     4\t\n     5\t\n     6\tdef build_workspace_digest(workspace: Workspace) -> WorkspaceDigest:\n     7\t    rollup = alert_rollup(workspace.alerts)\n     8\t    actionable = actionable_alerts(workspace.alerts)\n     9\t    return WorkspaceDigest(\n    10\t        name=workspace.name,\n    11\t        visible_alert_count=len(actionable_alerts(workspace.alerts)),\n    12\t        open_alert_count=rollup[\"open\"],\n    13\t        critical_alert_count=len([alert for alert in actionable if alert.severity == \"critical\"]),\n    14\t    )",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 8,
+      "assistant_text": "{\"tool\":\"view\",\"arguments\":{\"path\":\"/repo/app/services/board_rollup.py\",\"start_line\":1,\"end_line\":100}}\n\n\n\n\n",
+      "tool_calls": [
+        {
+          "id": "react-1-view",
+          "name": "view",
+          "arguments": {
+            "path": "/repo/app/services/board_rollup.py",
+            "start_line": 1,
+            "end_line": 100
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "/repo/app/services/board_rollup.py",
+            "start_line": 1,
+            "end_line": 100
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/services/board_rollup.py:\n     1\tfrom app.models.workspace import AlertItem\n     2\t\n     3\t\n     4\tdef alert_rollup(alerts: list[AlertItem]) -> dict[str, int]:\n     5\t    open_alerts = [alert for alert in alerts if alert.state == \"open\"]\n     6\t    critical_alerts = [alert for alert in open_alerts if alert.severity == \"critical\"]\n     7\t    return {\n     8\t        \"open\": len(open_alerts),\n     9\t        \"critical\": len(critical_alerts),\n    10\t    }",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 9,
+      "assistant_text": "{\"tool\":\"view\",\"arguments\":{\"path\":\"/repo/app/utils/filters.py\",\"start_line\":1,\"end_line\":50}}\n\n\n\n\n\n",
+      "tool_calls": [
+        {
+          "id": "react-1-view",
+          "name": "view",
+          "arguments": {
+            "path": "/repo/app/utils/filters.py",
+            "start_line": 1,
+            "end_line": 50
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "/repo/app/utils/filters.py",
+            "start_line": 1,
+            "end_line": 50
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/utils/filters.py:\n     1\tfrom app.models.workspace import AlertItem\n     2\t\n     3\t\n     4\tdef actionable_alerts(alerts: list[AlertItem]) -> list[AlertItem]:\n     5\t    return [\n     6\t        alert\n     7\t        for alert in alerts\n     8\t        if alert.state == \"open\" and not alert.snoozed and alert.severity != \"info\"\n     9\t    ]",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 10,
+      "assistant_text": "{\"tool\":\"str_replace\",\"arguments\":{\"path\":\"/repo/app/services/digest_builder.py\",\"old_str\":\"visible_alert_count=len(actionable_alerts(workspace.alerts))\",\"new_str\":\"visible_alert_count=len([alert for alert in workspace.alerts if alert.state == \\\"open\\\" and not alert.snoozed and alert.severity != \\\"info\\\"])\"}}\n\n\n\n\n",
+      "tool_calls": [
+        {
+          "id": "react-1-str_replace",
+          "name": "str_replace",
+          "arguments": {
+            "path": "/repo/app/services/digest_builder.py",
+            "old_str": "visible_alert_count=len(actionable_alerts(workspace.alerts))",
+            "new_str": "visible_alert_count=len([alert for alert in workspace.alerts if alert.state == \"open\" and not alert.snoozed and alert.severity != \"info\"])"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "/repo/app/services/digest_builder.py",
+            "old_str": "visible_alert_count=len(actionable_alerts(workspace.alerts))",
+            "new_str": "visible_alert_count=len([alert for alert in workspace.alerts if alert.state == \"open\" and not alert.snoozed and alert.severity != \"info\"])"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/services/digest_builder.py:\n     1\tfrom app.models.workspace import Workspace, WorkspaceDigest\n     2\tfrom app.services.board_rollup import alert_rollup\n     3\tfrom app.utils.filters import actionable_alerts\n     4\t\n     5\t\n     6\tdef build_workspace_digest(workspace: Workspace) -> WorkspaceDigest:\n     7\t    rollup = alert_rollup(workspace.alerts)\n     8\t    actionable = actionable_alerts(workspace.alerts)\n     9\t    return WorkspaceDigest(\n    10\t        name=workspace.name,\n    11\t        visible_alert_count=len([alert for alert in workspace.alerts if alert.state == \"open\" and not alert.snoozed and alert.severity != \"info\"]),\n    12\t        open_alert_count=rollup[\"open\"],\n    13\t        critical_alert_count=len([alert for alert in actionable if alert.severity == \"critical\"]),\n    14\t    )",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 11,
+      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"python -m pytest tests/test_dashboard_presenter.py::test_attention_count_excludes_snoozed_items\"}}\n\n\n\n\n",
       "tool_calls": [
         {
           "id": "react-1-bash",
           "name": "bash",
           "arguments": {
-            "command": "pytest tests/test_digest_builder.py::test_digest_builder_counts_critical_actionable_alerts"
+            "command": "python -m pytest tests/test_dashboard_presenter.py::test_attention_count_excludes_snoozed_items"
           }
         }
       ],
@@ -184,7 +300,33 @@
         {
           "name": "bash",
           "arguments": {
-            "command": "pytest tests/test_digest_builder.py::test_digest_builder_counts_critical_actionable_alerts"
+            "command": "python -m pytest tests/test_dashboard_presenter.py::test_attention_count_excludes_snoozed_items"
+          },
+          "output": "============================= test session starts ==============================\nplatform linux -- Python 3.11.15, pytest-9.0.2, pluggy-1.6.0\nrootdir: /repo\ncollecting ... \rcollected 1 item                                                               \n\ntests/test_dashboard_presenter.py .                                      [100%]\n\n============================== 1 passed in 0.00s ===============================",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 12,
+      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"python -m pytest tests/test_digest_builder.py::test_digest_builder_preserves_open_count\"}}\n\n\n\n\n\n",
+      "tool_calls": [
+        {
+          "id": "react-1-bash",
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest tests/test_digest_builder.py::test_digest_builder_preserves_open_count"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest tests/test_digest_builder.py::test_digest_builder_preserves_open_count"
           },
           "output": "============================= test session starts ==============================\nplatform linux -- Python 3.11.15, pytest-9.0.2, pluggy-1.6.0\nrootdir: /repo\ncollecting ... \rcollected 1 item                                                               \n\ntests/test_digest_builder.py .                                           [100%]\n\n============================== 1 passed in 0.00s ===============================",
           "is_error": false,
@@ -195,14 +337,14 @@
       "parse_error": null
     },
     {
-      "turn": 8,
-      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"pytest tests/test_digest_builder.py\"}}\n\n\n\n\n\n\n",
+      "turn": 13,
+      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"python -m pytest tests/test_digest_builder.py::test_digest_builder_counts_critical_actionable_alerts\"}}\n\n\n\n\n\n\n",
       "tool_calls": [
         {
           "id": "react-1-bash",
           "name": "bash",
           "arguments": {
-            "command": "pytest tests/test_digest_builder.py"
+            "command": "python -m pytest tests/test_digest_builder.py::test_digest_builder_counts_critical_actionable_alerts"
           }
         }
       ],
@@ -210,9 +352,9 @@
         {
           "name": "bash",
           "arguments": {
-            "command": "pytest tests/test_digest_builder.py"
+            "command": "python -m pytest tests/test_digest_builder.py::test_digest_builder_counts_critical_actionable_alerts"
           },
-          "output": "============================= test session starts ==============================\nplatform linux -- Python 3.11.15, pytest-9.0.2, pluggy-1.6.0\nrootdir: /repo\ncollecting ... \rcollected 2 items                                                              \n\ntests/test_digest_builder.py ..                                          [100%]\n\n============================== 2 passed in 0.00s ===============================",
+          "output": "============================= test session starts ==============================\nplatform linux -- Python 3.11.15, pytest-9.0.2, pluggy-1.6.0\nrootdir: /repo\ncollecting ... \rcollected 1 item                                                               \n\ntests/test_digest_builder.py .                                           [100%]\n\n============================== 1 passed in 0.00s ===============================",
           "is_error": false,
           "exit_code": 0
         }
@@ -221,28 +363,24 @@
       "parse_error": null
     },
     {
-      "turn": 9,
-      "assistant_text": "{\"tool\":\"view\",\"arguments\":{\"path\":\"/repo/app/services/digest_builder.py\",\"start_line\":1,\"end_line\":15}}\n\n\n\n\n",
+      "turn": 14,
+      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"python -m pytest tests/test_dashboard_presenter.py::test_attention_count_handles_multiple_actionable_items\"}}\n\n\n\n\n\n\n",
       "tool_calls": [
         {
-          "id": "react-1-view",
-          "name": "view",
+          "id": "react-1-bash",
+          "name": "bash",
           "arguments": {
-            "path": "/repo/app/services/digest_builder.py",
-            "start_line": 1,
-            "end_line": 15
+            "command": "python -m pytest tests/test_dashboard_presenter.py::test_attention_count_handles_multiple_actionable_items"
           }
         }
       ],
       "tool_results": [
         {
-          "name": "view",
+          "name": "bash",
           "arguments": {
-            "path": "/repo/app/services/digest_builder.py",
-            "start_line": 1,
-            "end_line": 15
+            "command": "python -m pytest tests/test_dashboard_presenter.py::test_attention_count_handles_multiple_actionable_items"
           },
-          "output": "Here's the result of running `cat -n` on /repo/app/services/digest_builder.py:\n     1\tfrom app.models.workspace import Workspace, WorkspaceDigest\n     2\tfrom app.services.board_rollup import alert_rollup\n     3\tfrom app.utils.filters import actionable_alerts\n     4\t\n     5\t\n     6\tdef build_workspace_digest(workspace: Workspace) -> WorkspaceDigest:\n     7\t    rollup = alert_rollup(workspace.alerts)\n     8\t    actionable = actionable_alerts(workspace.alerts)\n     9\t    return WorkspaceDigest(\n    10\t        name=workspace.name,\n    11\t        visible_alert_count=len([alert for alert in actionable if not alert.snoozed]),\n    12\t        open_alert_count=rollup[\"open\"],\n    13\t        critical_alert_count=len([alert for alert in actionable if alert.severity == \"critical\"]),\n    14\t    )",
+          "output": "============================= test session starts ==============================\nplatform linux -- Python 3.11.15, pytest-9.0.2, pluggy-1.6.0\nrootdir: /repo\ncollecting ... \rcollected 1 item                                                               \n\ntests/test_dashboard_presenter.py .                                      [100%]\n\n============================== 1 passed in 0.01s ===============================",
           "is_error": false,
           "exit_code": 0
         }
@@ -251,7 +389,33 @@
       "parse_error": null
     },
     {
-      "turn": 10,
+      "turn": 15,
+      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"python -m pytest tests/test_dashboard_presenter.py::test_attention_count_ignores_info_alerts_for_visible_attention\"}}\n\n\n\n\n\n\n",
+      "tool_calls": [
+        {
+          "id": "react-1-bash",
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest tests/test_dashboard_presenter.py::test_attention_count_ignores_info_alerts_for_visible_attention"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest tests/test_dashboard_presenter.py::test_attention_count_ignores_info_alerts_for_visible_attention"
+          },
+          "output": "============================= test session starts ==============================\nplatform linux -- Python 3.11.15, pytest-9.0.2, pluggy-1.6.0\nrootdir: /repo\ncollecting ... \rcollected 1 item                                                               \n\ntests/test_dashboard_presenter.py .                                      [100%]\n\n============================== 1 passed in 0.00s ===============================",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 16,
       "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"git diff\"}}\n\n\n\n\n\n\n",
       "tool_calls": [
         {
@@ -268,7 +432,7 @@
           "arguments": {
             "command": "git diff"
           },
-          "output": "diff --git a/app/services/digest_builder.py b/app/services/digest_builder.py\nindex 4a2d373..2243628 100644\n--- a/app/services/digest_builder.py\n+++ b/app/services/digest_builder.py\n@@ -8,7 +8,7 @@ def build_workspace_digest(workspace: Workspace) -> WorkspaceDigest:\n     actionable = actionable_alerts(workspace.alerts)\n     return WorkspaceDigest(\n         name=workspace.name,\n-        visible_alert_count=len(workspace.alerts),\n+        visible_alert_count=len([alert for alert in actionable if not alert.snoozed]),\n         open_alert_count=rollup[\"open\"],\n         critical_alert_count=len([alert for alert in actionable if alert.severity == \"critical\"]),\n     )",
+          "output": "diff --git a/app/services/digest_builder.py b/app/services/digest_builder.py\nindex 4a2d373..f06c881 100644\n--- a/app/services/digest_builder.py\n+++ b/app/services/digest_builder.py\n@@ -8,7 +8,7 @@ def build_workspace_digest(workspace: Workspace) -> WorkspaceDigest:\n     actionable = actionable_alerts(workspace.alerts)\n     return WorkspaceDigest(\n         name=workspace.name,\n-        visible_alert_count=len(workspace.alerts),\n+        visible_alert_count=len([alert for alert in workspace.alerts if alert.state == \"open\" and not alert.snoozed and alert.severity != \"info\"]),\n         open_alert_count=rollup[\"open\"],\n         critical_alert_count=len([alert for alert in actionable if alert.severity == \"critical\"]),\n     )",
           "is_error": false,
           "exit_code": 0
         }
@@ -277,14 +441,14 @@
       "parse_error": null
     },
     {
-      "turn": 11,
-      "assistant_text": "{\"tool\":\"submit\",\"arguments\":{\"summary\":\"Fixed incorrect attention count by filtering visible alerts through actionable alerts and excluding snoozed ones.\"}}",
+      "turn": 17,
+      "assistant_text": "{\"tool\":\"submit\",\"arguments\":{\"summary\":\"Fixed the attention count calculation in digest builder by using the correct filtering logic for visible alerts.\"}}",
       "tool_calls": [
         {
           "id": "react-1-submit",
           "name": "submit",
           "arguments": {
-            "summary": "Fixed incorrect attention count by filtering visible alerts through actionable alerts and excluding snoozed ones."
+            "summary": "Fixed the attention count calculation in digest builder by using the correct filtering logic for visible alerts."
           }
         }
       ],
@@ -292,9 +456,9 @@
         {
           "name": "submit",
           "arguments": {
-            "summary": "Fixed incorrect attention count by filtering visible alerts through actionable alerts and excluding snoozed ones."
+            "summary": "Fixed the attention count calculation in digest builder by using the correct filtering logic for visible alerts."
           },
-          "output": "Submission recorded. Summary: Fixed incorrect attention count by filtering visible alerts through actionable alerts and excluding snoozed ones.",
+          "output": "Submission recorded. Summary: Fixed the attention count calculation in digest builder by using the correct filtering logic for visible alerts.",
           "is_error": false,
           "exit_code": 0
         }
@@ -304,10 +468,10 @@
     }
   ],
   "stats": {
-    "input_tokens": 5953,
-    "output_tokens": 839,
-    "turns": 11,
-    "tool_calls": 11,
+    "input_tokens": 6952,
+    "output_tokens": 961,
+    "turns": 17,
+    "tool_calls": 17,
     "api_calls": 3
   },
   "loop_state": {
@@ -317,9 +481,11 @@
     "diff_checked": true,
     "successful_post_edit_commands": [
       "git diff",
-      "pytest tests/test_digest_builder.py",
-      "pytest tests/test_digest_builder.py::test_digest_builder_counts_critical_actionable_alerts",
-      "pytest tests/test_digest_builder.py::test_digest_builder_preserves_open_count"
+      "python -m pytest tests/test_dashboard_presenter.py::test_attention_count_excludes_snoozed_items",
+      "python -m pytest tests/test_dashboard_presenter.py::test_attention_count_handles_multiple_actionable_items",
+      "python -m pytest tests/test_dashboard_presenter.py::test_attention_count_ignores_info_alerts_for_visible_attention",
+      "python -m pytest tests/test_digest_builder.py::test_digest_builder_counts_critical_actionable_alerts",
+      "python -m pytest tests/test_digest_builder.py::test_digest_builder_preserves_open_count"
     ],
     "satisfied_success_checks": [],
     "changed_files": [
@@ -329,25 +495,25 @@
   "stopped_reason": "reviewer_rejected",
   "submitted": false,
   "submission_summary": "",
-  "patch": "diff --git a/app/services/digest_builder.py b/app/services/digest_builder.py\nindex 4a2d373..2243628 100644\n--- a/app/services/digest_builder.py\n+++ b/app/services/digest_builder.py\n@@ -8,7 +8,7 @@ def build_workspace_digest(workspace: Workspace) -> WorkspaceDigest:\n     actionable = actionable_alerts(workspace.alerts)\n     return WorkspaceDigest(\n         name=workspace.name,\n-        visible_alert_count=len(workspace.alerts),\n+        visible_alert_count=len([alert for alert in actionable if not alert.snoozed]),\n         open_alert_count=rollup[\"open\"],\n         critical_alert_count=len([alert for alert in actionable if alert.severity == \"critical\"]),\n     )\n",
+  "patch": "diff --git a/app/services/digest_builder.py b/app/services/digest_builder.py\nindex 4a2d373..f06c881 100644\n--- a/app/services/digest_builder.py\n+++ b/app/services/digest_builder.py\n@@ -8,7 +8,7 @@ def build_workspace_digest(workspace: Workspace) -> WorkspaceDigest:\n     actionable = actionable_alerts(workspace.alerts)\n     return WorkspaceDigest(\n         name=workspace.name,\n-        visible_alert_count=len(workspace.alerts),\n+        visible_alert_count=len([alert for alert in workspace.alerts if alert.state == \"open\" and not alert.snoozed and alert.severity != \"info\"]),\n         open_alert_count=rollup[\"open\"],\n         critical_alert_count=len([alert for alert in actionable if alert.severity == \"critical\"]),\n     )\n",
   "info": {
-    "submission": "diff --git a/app/services/digest_builder.py b/app/services/digest_builder.py\nindex 4a2d373..2243628 100644\n--- a/app/services/digest_builder.py\n+++ b/app/services/digest_builder.py\n@@ -8,7 +8,7 @@ def build_workspace_digest(workspace: Workspace) -> WorkspaceDigest:\n     actionable = actionable_alerts(workspace.alerts)\n     return WorkspaceDigest(\n         name=workspace.name,\n-        visible_alert_count=len(workspace.alerts),\n+        visible_alert_count=len([alert for alert in actionable if not alert.snoozed]),\n         open_alert_count=rollup[\"open\"],\n         critical_alert_count=len([alert for alert in actionable if alert.severity == \"critical\"]),\n     )\n",
+    "submission": "diff --git a/app/services/digest_builder.py b/app/services/digest_builder.py\nindex 4a2d373..f06c881 100644\n--- a/app/services/digest_builder.py\n+++ b/app/services/digest_builder.py\n@@ -8,7 +8,7 @@ def build_workspace_digest(workspace: Workspace) -> WorkspaceDigest:\n     actionable = actionable_alerts(workspace.alerts)\n     return WorkspaceDigest(\n         name=workspace.name,\n-        visible_alert_count=len(workspace.alerts),\n+        visible_alert_count=len([alert for alert in workspace.alerts if alert.state == \"open\" and not alert.snoozed and alert.severity != \"info\"]),\n         open_alert_count=rollup[\"open\"],\n         critical_alert_count=len([alert for alert in actionable if alert.severity == \"critical\"]),\n     )\n",
     "submitted": true,
-    "submission_summary": "Fixed incorrect attention count by filtering visible alerts through actionable alerts and excluding snoozed ones.",
+    "submission_summary": "Fixed the attention count calculation in digest builder by using the correct filtering logic for visible alerts.",
     "stopped_reason": "submitted"
   },
   "agent_architecture": "planner_coder_reviewer",
   "role_model_stats": {
     "planner": {
       "model": "openai/Qwen/Qwen3-VL-30B-A3B-Instruct",
-      "tokens_in": 1011,
-      "tokens_out": 485,
+      "tokens_in": 1093,
+      "tokens_out": 494,
       "api_calls": 1
     },
     "reviewer": {
       "model": "openai/Qwen/Qwen3-VL-30B-A3B-Instruct",
-      "tokens_in": 4942,
-      "tokens_out": 354,
+      "tokens_in": 5859,
+      "tokens_out": 467,
       "api_calls": 2
     },
     "coder": {
@@ -355,8 +521,8 @@
       "tokens_in": 0,
       "tokens_out": 0,
       "api_calls": 0,
-      "turns": 28,
-      "tool_calls": 28
+      "turns": 77,
+      "tool_calls": 77
     }
   },
   "planner_handoff": {
@@ -380,21 +546,20 @@
       "app/presenters/dashboard_presenter.py"
     ],
     "first_actions": [
-      "Run `pytest tests/test_digest_builder.py::test_digest_attention_count` to reproduce the issue.",
-      "Inspect `app/services/board_rollup.py` for how attention counts are aggregated per workspace.",
-      "Check `app/services/digest_builder.py` to see how rollup results are passed to the presenter."
+      "Run `python -m pytest tests/test_digest_builder.py::test_workspace_digest_attention_count` first to confirm the behavior.",
+      "Run `pytest tests/test_digest_builder.py::test_workspace_digest_attention_count` to reproduce the issue.",
+      "Inspect `app/services/board_rollup.py` for how attention counts are aggregated per workspace."
     ],
     "safe_reproduction_steps": [
-      "pytest tests/test_digest_builder.py::test_digest_attention_count",
-      "python scripts/demo_workspace.py --workspace-id=example-id"
+      "python -m pytest tests/test_digest_builder.py::test_workspace_digest_attention_count"
     ],
     "reproduction_notes": [
-      "Ensure the test uses a workspace with known attention data to verify the count.",
-      "The demo script may help visualize the digest output and attention count."
+      "Ensure the test uses a workspace with known attention data to verify the count is wrong.",
+      "The test may require a specific fixture; verify the test data setup."
     ],
     "required_validations": [
-      "pytest tests/test_digest_builder.py::test_digest_attention_count",
-      "Check that the output of `DigestBuilder.build()` matches expected attention count."
+      "python -m pytest tests/test_digest_builder.py::test_workspace_digest_attention_count",
+      "python -m pytest tests/test_dashboard_presenter.py::test_dashboard_attention_display"
     ],
     "allowed_change_types": [
       "fix rollup logic",
@@ -402,31 +567,32 @@
       "adjust filtering in presenter"
     ],
     "forbidden_edits": [
-      "modify test assertions without understanding the expected behavior",
-      "change the public API of digest builder or presenter"
+      "modify test fixtures without validation",
+      "change the public API of digest_builder or presenter without review"
     ],
     "escalation_conditions": [
-      "The issue persists after checking all three likely files.",
-      "No clear source of miscalculation found in the rollup or digest pipeline."
+      "If the issue persists after checking board_rollup and digest_builder, escalate to the data pipeline team.",
+      "If no test reproduces the issue, request a minimal reproducible example from the user."
     ]
   },
   "review_feedback": {
     "decision": "revise",
-    "summary": "Patch fixes visible alert count but does not address the root cause; required validation not run and test name mismatch",
+    "summary": "Patch fixes the attention count logic but does not address the root cause in board_rollup; missing validation of the original test case.",
     "required_changes": [
-      "Fix the test name in the validation command to match the actual test",
-      "Ensure the fix aligns with the expected behavior of attention count",
-      "Verify the fix with the correct test suite"
+      "Fix the attention count calculation in board_rollup.py to match the correct filtering logic",
+      "Ensure the digest builder uses the correct rollup data from board_rollup",
+      "Run the original test case test_workspace_digest_attention_count to verify the fix"
     ],
     "files_to_revisit": [
+      "app/services/board_rollup.py",
       "app/services/digest_builder.py"
     ],
     "validations_to_rerun": [
-      "pytest tests/test_digest_builder.py::test_digest_attention_count"
+      "python -m pytest tests/test_digest_builder.py::test_workspace_digest_attention_count"
     ],
-    "plan_adherence": "The patch addresses the symptom but not the root cause; validation was not run with the correct test name",
-    "risk_assessment": "Low risk of regression, but fix may not be complete without proper validation"
+    "plan_adherence": "The coder fixed the digest builder but did not verify the original test case; the root cause is likely in board_rollup, which was not addressed.",
+    "risk_assessment": "High risk of regression because the fix is incomplete and the original test case was not validated."
   },
   "instance_id": "workspace_digest_001",
-  "duration_seconds": 313.87
+  "duration_seconds": 725.88
 }

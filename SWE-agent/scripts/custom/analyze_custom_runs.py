@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Analyze custom-run outputs with deterministic case evaluation and relative cost scoring."""
+"""Analyze custom-run outputs with deterministic case evaluation and relative compute-burden scoring."""
 
 from __future__ import annotations
 
@@ -259,7 +259,7 @@ def _extract_model_size(model_name: str) -> float | None:
     return float(match.group("size"))
 
 
-def _estimate_relative_cost(tokens_in: int, tokens_out: int, model_name: str) -> tuple[float, dict[str, float]]:
+def _estimate_relative_compute(tokens_in: int, tokens_out: int, model_name: str) -> tuple[float, dict[str, float]]:
     base_input = 1.0
     base_output = 4.0
     lowered = model_name.lower()
@@ -461,13 +461,13 @@ def analyze_artifact(artifact: RunArtifact, case_entry: dict[str, Any], run_inst
     model_name = str(run_config.get("model", ""))
     input_tokens = int(stats.get("input_tokens", 0) or 0)
     output_tokens = int(stats.get("output_tokens", 0) or 0)
-    cost_estimated = False
+    compute_estimated = False
     if input_tokens == 0 and output_tokens == 0 and turns:
         input_tokens, output_tokens = _estimate_missing_tokens(turns)
-        cost_estimated = True
-    relative_cost_units, cost_detail = _estimate_relative_cost(input_tokens, output_tokens, model_name)
-    reference_cost_units = (input_tokens * 1.0) + (output_tokens * 4.0)
-    relative_to_4o_mini = 0.0 if reference_cost_units == 0 else relative_cost_units / reference_cost_units
+        compute_estimated = True
+    relative_compute_units, compute_detail = _estimate_relative_compute(input_tokens, output_tokens, model_name)
+    reference_compute_units = (input_tokens * 1.0) + (output_tokens * 4.0)
+    relative_to_4o_mini = 0.0 if reference_compute_units == 0 else relative_compute_units / reference_compute_units
 
     functional_correctness = round((baseline_effective_fraction * 5.0) + (success_effective_fraction * 45.0))
     repair_precision = 0
@@ -606,9 +606,9 @@ def analyze_artifact(artifact: RunArtifact, case_entry: dict[str, Any], run_inst
         planner_model_name=planner_model_name,
         reviewer_model_name=reviewer_model_name,
     )
-    effective_cost = max(float(relative_to_4o_mini), 0.001)
-    score_per_cost = round(float(total_score) / effective_cost, 3)
-    resolved_per_cost = round((1.0 if success_eval["passed"] else 0.0) / effective_cost, 3)
+    effective_compute = max(float(relative_to_4o_mini), 0.001)
+    score_per_compute = round(float(total_score) / effective_compute, 3)
+    resolved_per_compute = round((1.0 if success_eval["passed"] else 0.0) / effective_compute, 3)
     mixed_size = architecture != "single" and planner_size_rank > coder_size_rank
 
     return {
@@ -636,15 +636,15 @@ def analyze_artifact(artifact: RunArtifact, case_entry: dict[str, Any], run_inst
         "turns": len(turns),
         "input_tokens": input_tokens,
         "output_tokens": output_tokens,
-        "relative_cost_units": round(relative_cost_units, 2),
-        "relative_cost_to_4o_mini": round(relative_to_4o_mini, 3),
-        "score_per_cost": score_per_cost,
-        "resolved_per_cost": resolved_per_cost,
-        "cost_model": {
-            "baseline": "gpt-4o-mini-equivalent token cost units",
-            **cost_detail,
+        "relative_compute_units": round(relative_compute_units, 2),
+        "relative_compute_to_4o_mini": round(relative_to_4o_mini, 3),
+        "score_per_compute": score_per_compute,
+        "resolved_per_compute": resolved_per_compute,
+        "compute_model": {
+            "baseline": "gpt-4o-mini-equivalent token compute units",
+            **compute_detail,
         },
-        "cost_estimated_from_trace": cost_estimated,
+        "compute_estimated_from_trace": compute_estimated,
         "functional_correctness": functional_correctness,
         "repair_precision": repair_precision,
         "regression_safety": regression_safety,
@@ -695,7 +695,7 @@ def _aggregate(results: list[dict[str, Any]]) -> dict[str, Any]:
             "runs": 0,
             "avg_total_score": 0.0,
             "resolved_rate": 0.0,
-            "avg_relative_cost_to_4o_mini": 0.0,
+            "avg_relative_compute_to_4o_mini": 0.0,
         }
     runs = len(results)
     resolved = sum(1 for result in results if result["success_passed"])
@@ -707,7 +707,7 @@ def _aggregate(results: list[dict[str, Any]]) -> dict[str, Any]:
         "observed_resolved_rate": round(observed_resolved / runs, 3),
         "evaluation_blocked_runs": blocked,
         "avg_total_score": round(sum(result["total_score"] for result in results) / runs, 2),
-        "avg_relative_cost_to_4o_mini": round(sum(result["relative_cost_to_4o_mini"] for result in results) / runs, 3),
+        "avg_relative_compute_to_4o_mini": round(sum(result["relative_compute_to_4o_mini"] for result in results) / runs, 3),
         "avg_turns": round(sum(result["turns"] for result in results) / runs, 2),
         "avg_parse_errors": round(sum(result["parse_errors"] for result in results) / runs, 2),
         "avg_tool_errors": round(sum(result["tool_error_count"] for result in results) / runs, 2),
@@ -763,7 +763,7 @@ def main() -> None:
     print(f"observed_resolved_rate: {payload['aggregate']['observed_resolved_rate']}")
     print(f"evaluation_blocked_runs: {payload['aggregate']['evaluation_blocked_runs']}")
     print(f"avg_total_score: {payload['aggregate']['avg_total_score']}")
-    print(f"avg_relative_cost_to_4o_mini: {payload['aggregate']['avg_relative_cost_to_4o_mini']}")
+    print(f"avg_relative_compute_to_4o_mini: {payload['aggregate']['avg_relative_compute_to_4o_mini']}")
     if payload["missing_cases"]:
         print(f"missing_cases: {', '.join(payload['missing_cases'])}")
 
@@ -784,8 +784,8 @@ def main() -> None:
             f" efficiency={result['efficiency_control']}"
         )
         print(
-            "  cost:"
-            f" relative_to_4o_mini={result['relative_cost_to_4o_mini']}"
+            "  compute:"
+            f" relative_to_4o_mini={result['relative_compute_to_4o_mini']}"
             f" input_tokens={result['input_tokens']}"
             f" output_tokens={result['output_tokens']}"
         )
