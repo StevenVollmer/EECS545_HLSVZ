@@ -4,7 +4,7 @@ set -euo pipefail
 # Cloud-only split comparison.
 # This excludes local backends like Ollama and LM Studio so architecture results
 # are not dominated by local protocol/runtime instability.
-PARALLEL=10
+PARALLEL=20
 RUNNER_RETRIES=1
 
 ROOT="${1:-SWE-agent/custom_matrix_runs/benchmark_round_split_compare_cloud}"
