@@ -107,6 +107,66 @@ Good progression:
 - medium: multiple likely files, less explicit issue text
 - hard: manual repro or behavioral bug not fully covered by tests
 
+## Current Tier List
+
+Current benchmark inventory: 20 cases.
+
+### Tier 1: Easy
+
+- `simple_mean_bug`
+- `label_formatter`
+- `median_window`
+- `status_slug`
+- `risk_score`
+- `owner_sort`
+
+These are mostly one-file runtime fixes with direct failing tests.
+
+### Tier 2: Medium
+
+- `board_rollup`
+- `incident_brief`
+- `invoice_footer`
+- `milestone_rollup`
+- `priority_snapshot`
+- `team_digest`
+- `workspace_digest`
+
+These usually involve a small app-shaped repo, multiple plausible files, or a service/presenter split.
+
+### Tier 3: Hard
+
+- `budget_snapshot`
+- `contact_card`
+- `digest_preview`
+- `nested_app`
+- `owner_recap`
+- `renewal_preview`
+- `shipment_preview`
+
+These are the most useful for planner/reviewer evaluation. They tend to involve manual repro, behavioral bugs not fully covered by the existing tests, punctuation/casing edge cases, or regression-sensitive fixes.
+
+### Showcase Tags
+
+- planner-favored:
+  - `board_rollup`
+  - `incident_brief`
+  - `invoice_footer`
+  - `milestone_rollup`
+  - `priority_snapshot`
+  - `team_digest`
+  - `workspace_digest`
+- reviewer-favored:
+  - `contact_card`
+  - `owner_recap`
+  - `renewal_preview`
+  - `shipment_preview`
+- coder/basic execution:
+  - `median_window`
+  - `owner_sort`
+  - `risk_score`
+  - `status_slug`
+
 ## Validate a new case
 
 Baseline:

@@ -412,6 +412,38 @@ def _extract_case_policy(problem_statement) -> dict[str, Any]:
     }
 
 
+def _extract_case_analysis(problem_statement) -> dict[str, Any]:
+    extra_fields = getattr(problem_statement, "extra_fields", {}) or {}
+    analysis = extra_fields.get("analysis", {})
+    if not isinstance(analysis, dict):
+        return {}
+    likely_fix_paths = [str(item).strip() for item in analysis.get("likely_fix_paths", []) if str(item).strip()]
+    return {
+        "likely_fix_paths": likely_fix_paths[:5],
+        "showcase": str(analysis.get("showcase", "")).strip(),
+        "difficulty": str(analysis.get("difficulty", "")).strip(),
+    }
+
+
+def _build_case_analysis_prompt(problem_statement) -> str:
+    analysis = _extract_case_analysis(problem_statement)
+    if not analysis:
+        return ""
+    lines = ["Case analysis hints:"]
+    likely_fix_paths = analysis.get("likely_fix_paths") or []
+    if likely_fix_paths:
+        lines.append("- Likely fix paths:")
+        lines.extend(f"  - {path}" for path in likely_fix_paths[:5])
+        lines.append("- Treat these as high-signal hints, not proof. Use them to rank inspection order, not to skip reproduction or evidence.")
+    showcase = analysis.get("showcase", "")
+    if showcase:
+        lines.append(f"- Case showcase emphasis: {showcase}")
+    difficulty = analysis.get("difficulty", "")
+    if difficulty:
+        lines.append(f"- Case difficulty: {difficulty}")
+    return "\n".join(lines)
+
+
 def _command_output_satisfies_check(check: dict[str, Any], *, exit_code: int | None, output: str) -> bool:
     if exit_code is None:
         return False
@@ -464,6 +496,9 @@ Rules:
 - Prefer robust reproduction and validation commands that already appear in the runtime context, README excerpt, or case metadata.
 - Avoid brittle shell one-liners that require tricky quoting or escaping. Prefer stable commands like `pytest ...`, `python scripts/...`, `rg`, `find`, and `view`.
 - If a repro requires a tricky quoted literal, describe the safer equivalent in `reproduction_notes` and keep the command itself simple.
+- Treat your plan as ranked guidance, not certainty. If the bug could live in more than one layer, reflect that in the file ordering and hypothesis rather than overcommitting.
+- Prefer one primary hypothesis and one secondary fallback over a broad list of speculative files.
+- Do not include target symbols you cannot justify from the issue text or runtime context.
 
 Return a JSON object with these keys:
 - problem_summary: short string
@@ -508,6 +543,8 @@ Constraints:
 - Prefer at most 1 safe reproduction command and at most 2 required validation commands.
 - Put the safest, highest-signal command first. Prefer `python scripts/...`, `pytest ...`, or direct file inspection over complex inline `python -c` commands.
 - Use `reproduction_notes` to warn about quoting hazards, manual observations, or when the coder should prefer an equivalent script/test command.
+- Use `files_likely_affected` and `discovery_priority` as a ranked shortlist. Do not pad them just to reach the limit.
+- If the issue could plausibly be in a presenter, service, or shared utility, express that uncertainty instead of pretending one layer is certain.
 """
 
 
@@ -521,13 +558,17 @@ Rules:
 - Output JSON only.
 - Do not include markdown fences.
 - Decide whether the current patch is ready or should go back to the coder.
+- Use the latest post-edit validation evidence as the primary review signal.
 - Be conservative about rejection. Do not reject for style, naming preference, or hypothetical cleanup.
 - Accept if the observed fix is behaviorally correct, validations are sufficient for the case, and the patch is reasonably focused.
 - Reject only when there is concrete evidence of a remaining bug, missing required validation, wrong-file fix, or regression risk.
 - If case-defined success checks exist, do not accept unless those checks were actually run after the final edit and their observed results support the fix.
+- If a required success check failed, treat that as the primary rejection reason.
+- If the patch looks good and all required success checks passed after the final edit, accept even if there were earlier parse or tool errors.
 - Treat edits to tests as a rejection reason unless the case explicitly allows test edits or a targeted regression test accompanies a real runtime fix.
 - If the issue is behavioral and existing checks are weak, consider requiring one targeted test or one stronger regression check before acceptance.
-- When rejecting, give at most 3 required changes and at most 3 files to revisit.
+- When rejecting, name one primary failure reason, give at most 2 required changes, at most 2 files to revisit, and at most 2 validations to rerun.
+- Tie every rejection to observed evidence from the patch, the latest failing validation output, or missing success checks.
 
 Return a JSON object with these keys:
 - decision: `accept` or `revise`
@@ -542,6 +583,145 @@ The repository root is `{repo_root}`.
 """
 
 
+def _is_validation_command(command: str) -> bool:
+    lowered = command.lower()
+    return any(
+        marker in lowered
+        for marker in (
+            "pytest",
+            "py.test",
+            "python -m pytest",
+            "python3 -m pytest",
+            "python scripts/",
+            "python3 scripts/",
+            "python app/",
+            "python3 app/",
+            "demo",
+            "preview",
+            "render",
+            "repr(",
+        )
+    )
+
+
+def _summarize_validation_events(
+    turns: list[dict[str, Any]],
+    success_checks: list[dict[str, Any]],
+) -> dict[str, Any]:
+    all_events: list[dict[str, Any]] = []
+    relevant_events: list[dict[str, Any]] = []
+    success_check_map: dict[str, dict[str, Any]] = {}
+    for check in success_checks:
+        command = str(check.get("command", "")).strip()
+        if command:
+            success_check_map[command] = check
+
+    for turn in turns:
+        if not isinstance(turn, dict):
+            continue
+        turn_number = turn.get("turn")
+        for result in turn.get("tool_results", []):
+            if not isinstance(result, dict) or result.get("name") != "bash":
+                continue
+            arguments = result.get("arguments")
+            command = ""
+            if isinstance(arguments, dict):
+                command = str(arguments.get("command", "")).strip()
+            if not command:
+                continue
+            output = str(result.get("output", ""))
+            output_short = output[:1200]
+            exit_code = result.get("exit_code")
+            matching_check = success_check_map.get(command)
+            event = {
+                "turn": turn_number,
+                "command": command,
+                "exit_code": exit_code,
+                "is_error": bool(result.get("is_error")),
+                "matched_success_check": str(matching_check.get("name", "")).strip() if matching_check else "",
+                "check_passed": _command_output_satisfies_check(matching_check, exit_code=exit_code, output=output) if matching_check else None,
+                "output": output_short,
+            }
+            all_events.append(event)
+            if matching_check or _is_validation_command(command):
+                relevant_events.append(event)
+
+    latest_by_command: dict[str, dict[str, Any]] = {}
+    for event in all_events:
+        latest_by_command[event["command"]] = event
+
+    passing_success_checks: list[dict[str, Any]] = []
+    failing_success_checks: list[dict[str, Any]] = []
+    missing_success_checks: list[dict[str, Any]] = []
+    for check in success_checks:
+        command = str(check.get("command", "")).strip()
+        name = str(check.get("name", "")).strip() or command
+        latest = latest_by_command.get(command)
+        if latest is None:
+            missing_success_checks.append({"name": name, "command": command})
+            continue
+        if bool(latest.get("check_passed")):
+            passing_success_checks.append(
+                {
+                    "name": name,
+                    "command": command,
+                    "turn": latest.get("turn"),
+                    "exit_code": latest.get("exit_code"),
+                }
+            )
+        else:
+            failing_success_checks.append(
+                {
+                    "name": name,
+                    "command": command,
+                    "turn": latest.get("turn"),
+                    "exit_code": latest.get("exit_code"),
+                    "output": str(latest.get("output", ""))[:800],
+                }
+            )
+
+    relevant_tail = relevant_events[-12:]
+    passing_validations = [
+        {
+            "turn": event.get("turn"),
+            "command": event.get("command"),
+            "matched_success_check": event.get("matched_success_check"),
+            "exit_code": event.get("exit_code"),
+        }
+        for event in relevant_tail
+        if not bool(event.get("is_error")) and (event.get("exit_code") in (0, None) or bool(event.get("check_passed")))
+    ][-6:]
+    failing_validations = [
+        {
+            "turn": event.get("turn"),
+            "command": event.get("command"),
+            "matched_success_check": event.get("matched_success_check"),
+            "exit_code": event.get("exit_code"),
+            "output": str(event.get("output", ""))[:800],
+        }
+        for event in relevant_tail
+        if bool(event.get("is_error")) or (event.get("exit_code") not in (0, None)) or event.get("check_passed") is False
+    ][-6:]
+
+    return {
+        "recent_commands": [
+            {
+                "turn": event.get("turn"),
+                "command": event.get("command"),
+                "matched_success_check": event.get("matched_success_check"),
+                "exit_code": event.get("exit_code"),
+                "output": str(event.get("output", ""))[:500],
+            }
+            for event in relevant_tail
+        ],
+        "passing_validations": passing_validations,
+        "failing_validations": failing_validations,
+        "passing_success_checks": passing_success_checks,
+        "failing_success_checks": failing_success_checks,
+        "missing_success_checks": missing_success_checks,
+    }
+
+
 def _build_reviewer_task_prompt(
     *,
     planner_handoff: dict[str, Any] | None,
@@ -551,27 +731,13 @@ def _build_reviewer_task_prompt(
     case_policy: dict[str, Any] | None,
 ) -> str:
     stats = coder_result.get("stats", {}) if isinstance(coder_result.get("stats"), dict) else {}
-    validations_run = []
-    for turn in coder_result.get("turns", []):
-        if not isinstance(turn, dict):
-            continue
-        for result in turn.get("tool_results", []):
-            if not isinstance(result, dict):
-                continue
-            if result.get("name") == "bash":
-                command = ""
-                arguments = result.get("arguments")
-                if isinstance(arguments, dict):
-                    command = str(arguments.get("command", ""))
-                output = str(result.get("output", ""))[:600]
-                validations_run.append(
-                    {
-                        "command": command,
-                        "output": output,
-                        "is_error": bool(result.get("is_error")),
-                        "exit_code": result.get("exit_code"),
-                    }
-                )
+    success_checks = []
+    if isinstance(case_evaluation, dict):
+        success_checks = [dict(item) for item in case_evaluation.get("success_checks", []) if isinstance(item, dict)]
+    validation_report = _summarize_validation_events(coder_result.get("turns", []), success_checks)
+    loop_state = coder_result.get("loop_state", {}) if isinstance(coder_result.get("loop_state"), dict) else {}
+    changed_files = [str(path) for path in loop_state.get("changed_files", []) if str(path).strip()]
+    satisfied_checks = list(loop_state.get("satisfied_success_checks", []))
     condensed_turns = [
         {
             "turn": turn.get("turn"),
@@ -587,17 +753,22 @@ def _build_reviewer_task_prompt(
             "case_policy": case_policy or {},
             "review_focus": [
                 "Reject solutions that modify tests to hide a behavior bug unless the case explicitly allows test edits.",
-                "If baseline tests and required success checks disagree, trust the required success checks and the problem statement."
+                "If baseline tests and required success checks disagree, trust the required success checks and the problem statement.",
+                "Use the latest failing validation output and the actual patch as the primary evidence for rejection.",
+                "Prefer one primary failure reason and at most two concrete next steps."
             ],
             "coder_summary": {
                 "submitted": coder_result.get("submitted", False),
                 "submission_summary": coder_result.get("submission_summary", ""),
                 "stopped_reason": coder_result.get("stopped_reason", ""),
                 "stats": stats,
+                "changed_files": changed_files,
                 "condensed_turns": condensed_turns,
-                "validations_run": validations_run[-8:],
-                "satisfied_success_checks": list((coder_result.get("loop_state", {}) or {}).get("satisfied_success_checks", [])),
+                "satisfied_success_checks": satisfied_checks,
+                "missing_success_check_names": [item.get("name", "") for item in validation_report.get("missing_success_checks", [])],
+                "failed_success_check_names": [item.get("name", "") for item in validation_report.get("failing_success_checks", [])],
             },
+            "validation_report": validation_report,
             "patch": patch_text,
         },
         indent=2,
@@ -608,9 +779,10 @@ def _build_planner_handoff_prompt(planner_handoff: dict[str, Any]) -> str:
     return (
         "Planner handoff JSON:\n"
         + json.dumps(planner_handoff, indent=2)
-        + "\nFollow this contract unless repository evidence disproves it. "
+        + "\nTreat this handoff as ranked guidance, not proof. "
+        "Follow it unless repository evidence disproves it. "
         "Start with the listed first_actions or safe_reproduction_steps. "
-        "Inspect discovery_priority and files_likely_affected before broad searching. "
+        "Inspect discovery_priority and files_likely_affected before broad searching, but do not stay anchored to a wrong layer once repro or file evidence points elsewhere. "
         "If a planner repro command looks brittle or quote-heavy, use the safer equivalent implied by reproduction_notes or the runtime context instead of retrying broken quoting variants."
     )
 
@@ -735,7 +907,7 @@ def _normalize_planner_handoff(raw: dict[str, Any]) -> dict[str, Any]:
 
     files_likely = _string_list(raw.get("files_likely_affected"), limit=4)
     discovery_priority = _string_list(raw.get("discovery_priority"), limit=4)
-    target_symbols = _string_list(raw.get("target_symbols"), limit=6)
+    target_symbols = _string_list(raw.get("target_symbols"), limit=4)
     first_actions = _string_list(raw.get("first_actions"), limit=3)
     required_validations = _string_list(raw.get("required_validations"), limit=2)
     allowed_change_types = _string_list(raw.get("allowed_change_types"), limit=4)
@@ -750,8 +922,25 @@ def _normalize_planner_handoff(raw: dict[str, Any]) -> dict[str, Any]:
     if not safe_repro and _string_list(raw.get("safe_reproduction_steps"), limit=3):
         reproduction_notes.append("Planner suggested only brittle reproduction commands; prefer an equivalent script, pytest command, or direct file inspection first.")
 
-    handoff["files_likely_affected"] = files_likely
-    handoff["discovery_priority"] = discovery_priority or files_likely[:3]
+    deduped_files: list[str] = []
+    seen_files: set[str] = set()
+    for item in files_likely:
+        normalized = item.lstrip("./")
+        if normalized in seen_files:
+            continue
+        seen_files.add(normalized)
+        deduped_files.append(normalized)
+    deduped_priority: list[str] = []
+    seen_priority: set[str] = set()
+    for item in discovery_priority or deduped_files[:3]:
+        normalized = item.lstrip("./")
+        if normalized in seen_priority:
+            continue
+        seen_priority.add(normalized)
+        deduped_priority.append(normalized)
+
+    handoff["files_likely_affected"] = deduped_files
+    handoff["discovery_priority"] = deduped_priority
     handoff["target_symbols"] = target_symbols
     handoff["first_actions"] = first_actions or handoff["first_actions"]
     handoff["safe_reproduction_steps"] = safe_repro[:1]
@@ -2130,6 +2319,7 @@ def main() -> None:
             planner_handoff: dict[str, Any] | None = None
             review_feedback: dict[str, Any] | None = None
             case_validation_prompt = _build_case_validation_prompt(instance.problem_statement)
+            case_analysis_prompt = _build_case_analysis_prompt(instance.problem_statement)
             case_evaluation = _extract_case_evaluation(instance.problem_statement)
             case_policy = _extract_case_policy(instance.problem_statement)
             success_validation_commands = _extract_case_success_commands(instance.problem_statement)
@@ -2147,6 +2337,7 @@ def main() -> None:
                     system_prompt=_build_planner_system_prompt(repo_root),
                     user_prompt=(
                         _build_planner_task_prompt(instance.problem_statement.text, repo_root, runtime_context)
+                        + ("\n\n" + case_analysis_prompt if case_analysis_prompt else "")
                         + ("\n\n" + case_validation_prompt if case_validation_prompt else "")
                     ),
                     fallback_payload=_default_planner_handoff(),
@@ -2200,26 +2391,6 @@ def main() -> None:
 
                 assert coder_result is not None
                 patch_text = str(coder_result.get("patch", ""))
-                has_patch = bool(patch_text.strip())
-                has_progress = has_patch or bool(coder_result.get("submitted")) or any(
-                    isinstance(turn, dict) and turn.get("tool_results") for turn in coder_result.get("turns", [])
-                )
-                if not has_progress:
-                    review_feedback = {
-                        "decision": "revise",
-                        "summary": "No concrete progress yet. Re-center on reproduction, localization, and one focused code edit.",
-                        "required_changes": [
-                            "Run one high-signal reproduction or targeted validation command.",
-                            "Inspect the most likely runtime files from the planner handoff or search results.",
-                            "Make one focused code edit before asking for another review.",
-                        ],
-                        "files_to_revisit": list((planner_handoff or {}).get("files_likely_affected", []))[:3],
-                        "validations_to_rerun": list((planner_handoff or {}).get("required_validations", []))[:2],
-                        "plan_adherence": "Insufficient progress to review patch quality.",
-                        "risk_assessment": "Continuing without a concrete edit will waste turns.",
-                    }
-                    log_line("[reviewer] skipped model call because coder made no concrete progress")
-                    continue
                 log_line(f"[reviewer] calling model={reviewer_model} round={reviewer_round + 1}")
                 review_feedback, reviewer_stats, reviewer_raw = _call_json_role(
                     model=reviewer_model,

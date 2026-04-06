@@ -11,14 +11,16 @@ ROOT="${1:-SWE-agent/custom_matrix_runs/benchmark_round_split_compare_cloud}"
 CASES="${CASES:-$(find SWE-agent/custom_cases -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort | paste -sd, -)}"
 SPLIT_PRESETS="${SPLIT_PRESETS:-umich_gptoss_120b,umich_qwen,umich_gptoss_planner_umich_qwen_coder}"
 BASELINE_PRESETS="${BASELINE_PRESETS:-openai_gpt4o_mini,umich_gptoss_120b,umich_qwen}"
+CASE_COUNT="$(printf '%s' "${CASES}" | tr ',' '\n' | sed '/^$/d' | wc -l | tr -d ' ')"
 
 echo "Cases: ${CASES}"
+echo "Case count: ${CASE_COUNT}"
 echo "Split presets: ${SPLIT_PRESETS}"
 echo "Baseline presets: ${BASELINE_PRESETS}"
 echo "Parallel workers: ${PARALLEL}"
 
 echo "Running cloud split architectures into ${ROOT}"
-python SWE-agent/scripts/custom/run_custom_experiment_matrix.py \
+./env/bin/python SWE-agent/scripts/custom/run_custom_experiment_matrix.py \
     --presets "${SPLIT_PRESETS}" \
     --architectures planner_coder,planner_coder_reviewer \
     --cases "${CASES}" \
@@ -29,7 +31,7 @@ python SWE-agent/scripts/custom/run_custom_experiment_matrix.py \
 
 echo
 echo "Running cloud single-model baselines into ${ROOT}"
-python SWE-agent/scripts/custom/run_custom_experiment_matrix.py \
+./env/bin/python SWE-agent/scripts/custom/run_custom_experiment_matrix.py \
     --presets "${BASELINE_PRESETS}" \
     --architectures single \
     --cases "${CASES}" \
