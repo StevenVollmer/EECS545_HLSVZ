@@ -1,0 +1,33 @@
+[
+  {
+    "image_name": "python:3.11",
+    "instance_id": "risk_score_001",
+    "problem_statement": "The `attention_ratio(alerts)` function in `risk.py` uses the wrong denominator, so the score undercounts actionable critical alerts. Reproduce the issue, fix the runtime code, run the tests in `test_risk.py`, inspect the diff, and submit.",
+    "repo_path": "repo",
+    "install_commands": ["pip install pytest"],
+    "analysis": {
+      "showcase": "coder",
+      "difficulty": "easy",
+      "likely_fix_paths": ["risk.py"]
+    },
+    "evaluation": {
+      "baseline_checks": [
+        {
+          "name": "risk_tests_fail",
+          "command": "python -m pytest -q test_risk.py",
+          "expect_exit_code": 1,
+          "stdout_contains": ["FAILED", "assert 0.25 == 0.5"]
+        }
+      ],
+      "success_checks": [
+        {
+          "name": "risk_tests_pass",
+          "command": "python -m pytest -q test_risk.py",
+          "expect_exit_code": 0,
+          "stdout_contains": ["2 passed"],
+          "stdout_not_contains": ["FAILED"]
+        }
+      ]
+    }
+  }
+]
