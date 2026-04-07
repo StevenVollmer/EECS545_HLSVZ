@@ -144,15 +144,15 @@
     },
     {
       "turn": 6,
-      "assistant_text": "{\"tool\":\"view\",\"arguments\":{\"path\":\"app/utils/text.py\",\"start_line\":1,\"end_line\":20}}\n\n\n\n\n",
+      "assistant_text": "{\"tool\":\"view\",\"arguments\":{\"path\":\"app/presenters/recap_presenter.py\",\"start_line\":1,\"end_line\":50}}\n\n\n\n\n",
       "tool_calls": [
         {
           "id": "react-1-view",
           "name": "view",
           "arguments": {
-            "path": "app/utils/text.py",
+            "path": "app/presenters/recap_presenter.py",
             "start_line": 1,
-            "end_line": 20
+            "end_line": 50
           }
         }
       ],
@@ -160,11 +160,11 @@
         {
           "name": "view",
           "arguments": {
-            "path": "app/utils/text.py",
+            "path": "app/presenters/recap_presenter.py",
             "start_line": 1,
-            "end_line": 20
+            "end_line": 50
           },
-          "output": "Here's the result of running `cat -n` on /repo/app/utils/text.py:\n     1\tdef normalize_owner_code(name: str) -> str:\n     2\t    return \"-\".join(part.strip().upper() for part in name.split(\"-\"))\n     3\t\n     4\t\n     5\tdef format_display_owner_name(name: str) -> str:\n     6\t    tokens = []\n     7\t    for part in name.split(\"-\"):\n     8\t        stripped = part.strip()\n     9\t        if stripped.startswith(\"mc\") and len(stripped) > 2:\n    10\t            tokens.append(\"Mc\" + stripped[2:3].upper() + stripped[3:].lower())\n    11\t        else:\n    12\t            tokens.append(stripped[:1].upper() + stripped[1:].lower())\n    13\t    return \"-\".join(tokens)",
+          "output": "Here's the result of running `cat -n` on /repo/app/presenters/recap_presenter.py:\n     1\tfrom app.models.owner import OwnerRecap\n     2\tfrom app.utils.text import normalize_owner_code\n     3\t\n     4\t\n     5\tdef render_owner_preview(recap: OwnerRecap) -> str:\n     6\t    display_name = format_display_owner_name(recap.owner_name)\n     7\t    return f\"Owner: {display_name} | Projects: {recap.total_projects}\"",
           "is_error": false,
           "exit_code": 0
         }
@@ -256,13 +256,13 @@
     },
     {
       "turn": 10,
-      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"pytest -q\"}}\n\n\n\n\n\n\n",
+      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"diff <(python scripts/demo_export.py) <(git show HEAD:app/exports/csv_writer.py | python scripts/demo_export.py)\"}}\n\n\n\n\n\n\n",
       "tool_calls": [
         {
           "id": "react-1-bash",
           "name": "bash",
           "arguments": {
-            "command": "pytest -q"
+            "command": "diff <(python scripts/demo_export.py) <(git show HEAD:app/exports/csv_writer.py | python scripts/demo_export.py)"
           }
         }
       ],
@@ -270,9 +270,9 @@
         {
           "name": "bash",
           "arguments": {
-            "command": "pytest -q"
+            "command": "diff <(python scripts/demo_export.py) <(git show HEAD:app/exports/csv_writer.py | python scripts/demo_export.py)"
           },
-          "output": "......                                                                   [100%]\n6 passed in 0.01s",
+          "output": "(no output)",
           "is_error": false,
           "exit_code": 0
         }
@@ -334,20 +334,20 @@
     }
   ],
   "stats": {
-    "input_tokens": 1140,
-    "output_tokens": 898,
+    "input_tokens": 1274,
+    "output_tokens": 772,
     "turns": 12,
     "tool_calls": 12,
     "api_calls": 1
   },
   "loop_state": {
     "executable_edit_made": true,
-    "validation_passed": true,
+    "validation_passed": false,
     "validation_attempted_after_edit": true,
     "diff_checked": true,
     "successful_post_edit_commands": [
+      "diff <(python scripts/demo_export.py) <(git show HEAD:app/exports/csv_writer.py | python scripts/demo_export.py)",
       "git diff",
-      "pytest -q",
       "python scripts/demo_export.py",
       "python scripts/demo_preview.py"
     ],
@@ -370,8 +370,8 @@
   "role_model_stats": {
     "planner": {
       "model": "openai/openai/gpt-oss-120b",
-      "tokens_in": 1140,
-      "tokens_out": 898,
+      "tokens_in": 1274,
+      "tokens_out": 772,
       "api_calls": 1
     },
     "coder": {
@@ -384,55 +384,52 @@
     }
   },
   "planner_handoff": {
-    "problem_summary": "Owner names appear incorrectly formatted in the customer-facing recap preview, while export CSV must retain existing owner-code format.",
-    "root_cause_hypothesis": "The preview presenter uses a formatting helper that mishandles a specific name case (e.g., missing middle initial) and the same helper is also used by the export writer, so fixing the preview must be isolated to the presenter layer or a new preview\u2011specific helper.",
+    "problem_summary": "Owner names appear incorrectly formatted in the customer-facing recap preview, while export output must retain the existing owner-code format.",
+    "root_cause_hypothesis": "The presenter (`recap_presenter.py`) uses a generic owner formatting helper from `utils/text.py` that returns the export-style code, causing the preview to show the wrong format. Export code (`csv_writer.py`) relies on the same helper, so changing it directly would break export output.",
     "files_likely_affected": [
       "app/presenters/recap_presenter.py",
       "app/utils/text.py",
       "app/exports/csv_writer.py"
     ],
     "target_symbols": [
-      "RecapPresenter.render_header",
+      "RecapPresenter",
       "format_owner_name",
-      "CsvWriter.write_owner"
+      "CsvWriter"
     ],
     "discovery_priority": [
       "app/presenters/recap_presenter.py",
       "app/utils/text.py"
     ],
     "first_actions": [
-      "Run the preview demo script to observe the malformed owner name: `python scripts/demo_preview.py`.",
-      "Open `app/presenters/recap_presenter.py` and locate where owner names are formatted for the header.",
-      "Trace the call to the formatting helper in `app/utils/text.py` and compare its logic with the one used in `app/exports/csv_writer.py`."
+      "Inspect `app/presenters/recap_presenter.py` to identify how owner names are formatted for the preview.",
+      "Open `app/utils/text.py` to locate the owner formatting helper(s) used by the presenter and export writer.",
+      "Run the preview script to reproduce the bug: `python scripts/demo_preview.py` and note the displayed owner format."
     ],
     "safe_reproduction_steps": [
       "python scripts/demo_preview.py"
     ],
     "reproduction_notes": [
-      "The demo script prints the recap preview to stdout; manually verify the owner name format shown.",
-      "If the script accepts arguments for a specific owner, use them to target the problematic case."
+      "The preview script prints to stdout; visually verify that owner names are shown as codes (e.g., \"AB12\") instead of the expected full name format."
     ],
     "required_validations": [
       "pytest -q",
-      "python scripts/demo_export.py"
+      "python scripts/demo_export.py && diff <(python scripts/demo_export.py) <(git show HEAD:app/exports/csv_writer.py | python scripts/demo_export.py)  # ensure export output unchanged"
     ],
     "allowed_change_types": [
-      "code",
-      "docstring",
-      "comment"
+      "Modify existing functions",
+      "Add new helper functions",
+      "Update presenter logic"
     ],
     "forbidden_edits": [
-      "tests/",
-      "scripts/demo_export.py",
-      "scripts/demo_preview.py"
+      "Change CSV export formatting",
+      "Remove existing utility functions used by export"
     ],
     "escalation_conditions": [
-      "The preview still shows the wrong format after changes.",
-      "Export CSV output differs from baseline (owner codes altered).",
-      "Existing test suite fails."
+      "If the presenter does not call any utility for formatting, the bug may be hard\u2011coded; need to add a dedicated preview formatter.",
+      "If tests already cover the preview format and they pass, the issue may be data\u2011driven; consider adding a new test case."
     ]
   },
   "review_feedback": {},
   "instance_id": "owner_recap_001",
-  "duration_seconds": 126.93
+  "duration_seconds": 164.65
 }

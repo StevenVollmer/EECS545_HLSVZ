@@ -32,7 +32,7 @@
     },
     {
       "turn": 2,
-      "assistant_text": "{\"path\":\"app/utils/text.py\",\"start_line\":1,\"end_line\":200}",
+      "assistant_text": "{\"tool\":\"view\",\"arguments\":{\"path\":\"app/utils/text.py\",\"start_line\":1,\"end_line\":200}}",
       "tool_calls": [
         {
           "id": "react-1-view",
@@ -62,7 +62,7 @@
     },
     {
       "turn": 3,
-      "assistant_text": "{\"tool\":\"view\",\"arguments\":{\"path\":\"app/models/report.py\",\"start_line\":1,\"end_line\":200}}",
+      "assistant_text": "{\"tool\":\"view\",\"arguments\":{\"path\":\"app/models/report.py\",\"start_line\":1,\"end_line\":200}}\n{\"path\":\"app/models/report.py\",\"start_line\":1,\"end_line\":200}",
       "tool_calls": [
         {
           "id": "react-1-view",
@@ -88,10 +88,36 @@
         }
       ],
       "finish_reason": "stop",
-      "parse_error": null
+      "parse_error": "Returned the same action multiple times in one response; recovered the first action only."
     },
     {
       "turn": 4,
+      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"grep -R \\\"owner_name\\\" -n /repo/app | head\"}}\n",
+      "tool_calls": [
+        {
+          "id": "react-1-bash",
+          "name": "bash",
+          "arguments": {
+            "command": "grep -R \"owner_name\" -n /repo/app | head"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "grep -R \"owner_name\" -n /repo/app | head"
+          },
+          "output": "grep: /repo/app/models/report.py:6:    owner_name: str\n/repo/app/models/report.py:21:    owner_name: str\n/repo/app/models/__pycache__/report.cpython-313.pyc: binary file matches\ngrep: /repo/app/__pycache__/main.cpython-313.pyc: binary file matches\ngrep: /repo/app/services/__pycache__/report_service.cpython-313.pyc: binary file matches\n/repo/app/services/report_service.py:21:    owner_name = normalize_display_name(request.owner_name)\n/repo/app/services/report_service.py:24:    name_shape = classify_name_shape(request.owner_name)\n/repo/app/services/report_service.py:28:        f\"Owner initials: {build_initials(owner_name)}\",\n/repo/app/services/report_service.py:33:        owner_name=owner_name,\ngrep: /repo/app/presenters/__pycache__/report_presenter.cpython-313.pyc: binary file matches\n/repo/app/main.py:6:def render_digest_preview(owner_name: str, total_value: float, alert_count: int) -> str:\n/repo/app/main.py:8:        owner_name=owner_name,\n/repo/app/presenters/report_presenter.py:7:    return f\"{model.greeting}, {model.owner_name}\"",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 5,
       "assistant_text": "{\"tool\":\"view\",\"arguments\":{\"path\":\"app/services/report_service.py\",\"start_line\":1,\"end_line\":200}}",
       "tool_calls": [
         {
@@ -121,28 +147,24 @@
       "parse_error": null
     },
     {
-      "turn": 5,
-      "assistant_text": "We need bug: owner names incorrectly rendered in preview/display. Likely normalize_display_name not handling punctuation-aware capitalization correctly. Title case words uses split on space and _capitalize_word_with_joiners which currently just capitalizes whole word ignoring joiners like hyphen, apostrophe, slash. Should split on joiners and capitalize each fragment. In text utils, NAME_JOINERS defined. _capitalize_word_with_joiners should handle joiners. Currently returns just _capitalize_fragment(word). Should split on joiners and capitalize each fragment then join with same joiner? For example \"o'connor-smith\" should become \"O'Connor-Smith\". Current behavior: word = \"o'connor-smith\". _capitalize_fragment makes first char uppercase, rest lower: \"O'connor-smith\". That's wrong: after apostrophe, C should be uppercase, after hyphen S uppercase. Need to implement proper handling.\n\nImplement: iterate characters, split by joiners, capitalize each fragment, then reassemble preserving original joiners. Could use regex or simple loop.\n\nImplement in _capitalize_word_with_joiners: if any joiner in word, split preserving delimiters. Use re.split('([\\\\-\\'/])') to keep delimiters. Then capitalize each fragment that is not a joiner. Then join.\n\nAdd import re.\n\nLet's edit text.py.\n{\"tool\":\"str_replace\",\"arguments\":{\"path\":\"app/utils/text.py\",\"old_str\":\"def _capitalize_word_with_joiners(word: str) -> str:\\n    if not word:\\n        return word\\n    return _capitalize_fragment(word)\",\"new_str\":\"def _capitalize_word_with_joiners(word: str) -> str:\\n    if not word:\\n        return word\\n    # Preserve joiner characters while capitalizing each fragment\\n    import re\\n    # Split and keep delimiters (joiners)\\n    parts = re.split(r'([\\\\-\\\\'/])', word)\\n    # Capitalize non-joiner fragments\\n    capitalized_parts = [\\n        _capitalize_fragment(part) if part and part not in {\\\"-\\\", \\\"'\\\", \\\"/\\\"} else part\\n        for part in parts\\n    ]\\n    return \\\"\\\".join(capitalized_parts)\"}}",
+      "turn": 6,
+      "assistant_text": "The bug: owner names incorrectly rendered in preview/display. Likely normalize_display_name not handling punctuation like apostrophe correctly? In text utils, title_case_words uses split on space and _capitalize_word_with_joiners which currently just capitalizes whole word, ignoring joiners like hyphen, apostrophe, slash. Should handle joiners: split on joiners and capitalize each fragment then rejoin with same joiner. Currently NAME_JOINERS defined but not used. So owner \"o'connor-smith\" becomes \"O'connor-smith\"? Let's test.\n{\"tool\":\"bash\",\"arguments\":{\"command\":\"python - <<'PY'\\nfrom app.main import render_digest_preview\\nprint(render_digest_preview(\\\"o'connor-smith\\\", 12840.5, 3))\\nPY\"}}\n",
       "tool_calls": [
         {
-          "id": "react-1-str_replace",
-          "name": "str_replace",
+          "id": "react-1-bash",
+          "name": "bash",
           "arguments": {
-            "path": "app/utils/text.py",
-            "old_str": "def _capitalize_word_with_joiners(word: str) -> str:\n    if not word:\n        return word\n    return _capitalize_fragment(word)",
-            "new_str": "def _capitalize_word_with_joiners(word: str) -> str:\n    if not word:\n        return word\n    # Preserve joiner characters while capitalizing each fragment\n    import re\n    # Split and keep delimiters (joiners)\n    parts = re.split(r'([\\-\\'/])', word)\n    # Capitalize non-joiner fragments\n    capitalized_parts = [\n        _capitalize_fragment(part) if part and part not in {\"-\", \"'\", \"/\"} else part\n        for part in parts\n    ]\n    return \"\".join(capitalized_parts)"
+            "command": "python - <<'PY'\nfrom app.main import render_digest_preview\nprint(render_digest_preview(\"o'connor-smith\", 12840.5, 3))\nPY"
           }
         }
       ],
       "tool_results": [
         {
-          "name": "str_replace",
+          "name": "bash",
           "arguments": {
-            "path": "app/utils/text.py",
-            "old_str": "def _capitalize_word_with_joiners(word: str) -> str:\n    if not word:\n        return word\n    return _capitalize_fragment(word)",
-            "new_str": "def _capitalize_word_with_joiners(word: str) -> str:\n    if not word:\n        return word\n    # Preserve joiner characters while capitalizing each fragment\n    import re\n    # Split and keep delimiters (joiners)\n    parts = re.split(r'([\\-\\'/])', word)\n    # Capitalize non-joiner fragments\n    capitalized_parts = [\n        _capitalize_fragment(part) if part and part not in {\"-\", \"'\", \"/\"} else part\n        for part in parts\n    ]\n    return \"\".join(capitalized_parts)"
+            "command": "python - <<'PY'\nfrom app.main import render_digest_preview\nprint(render_digest_preview(\"o'connor-smith\", 12840.5, 3))\nPY"
           },
-          "output": "Here's the result of running `cat -n` on /repo/app/utils/text.py:\n     1\tNAME_JOINERS = {\"-\", \"'\", \"/\"}\n     2\tMIN_IDENTIFIER_LENGTH = 12\n     3\tSHORT_IDENTIFIER_HEAD = 9\n     4\t\n     5\t\n     6\tdef collapse_outer_whitespace(value: str) -> str:\n     7\t    return value.strip()\n     8\t\n     9\t\n    10\tdef normalize_spacing(value: str) -> str:\n    11\t    pieces = value.replace(\"\\t\", \" \").split()\n    12\t    return \" \".join(pieces)\n    13\t\n    14\t\n    15\tdef _capitalize_fragment(fragment: str) -> str:\n    16\t    if not fragment:\n    17\t        return fragment\n    18\t    return fragment[0].upper() + fragment[1:].lower()\n    19\t\n    20\t\n    21\tdef _capitalize_word_with_joiners(word: str) -> str:\n    22\t    if not word:\n    23\t        return word\n    24\t    # Preserve joiner characters while capitalizing each fragment\n    25\t    import re\n    26\t    # Split and keep delimiters (joiners)\n    27\t    parts = re.split(r'([\\-\\'/])', word)\n    28\t    # Capitalize non-joiner fragments\n    29\t    capitalized_parts = [\n    30\t        _capitalize_fragment(part) if part and part not in {\"-\", \"'\", \"/\"} else part\n    31\t        for part in parts\n    32\t    ]\n    33\t    return \"\".join(capitalized_parts)\n    34\t\n    35\t\n    36\tdef title_case_words(value: str) -> str:\n    37\t    words = value.split(\" \")\n    38\t    return \" \".join(_capitalize_word_with_joiners(word) for word in words)\n    39\t\n    40\t\n    41\tdef normalize_display_name(value: str) -> str:\n    42\t    cleaned = collapse_outer_whitespace(value)\n    43\t    cleaned = cleaned.replace(\"_\", \" \")\n    44\t    cleaned = normalize_spacing(cleaned)\n    45\t    return title_case_words(cleaned)\n    46\t\n    47\t\n    48\tdef summarize_identifier(value: str) -> str:\n    49\t    cleaned = collapse_outer_whitespace(value)\n    50\t    if len(cleaned) <= MIN_IDENTIFIER_LENGTH:\n    51\t        return cleaned\n    52\t    return cleaned[:SHORT_IDENTIFIER_HEAD] + \"...\"\n    53\t\n    54\t\n    55\tdef build_initials(value: str) -> str:\n    56\t    cleaned = normalize_spacing(value)\n    57\t    parts = [part for part in cleaned.split(\" \") if part]\n    58\t    return \"\".join(part[0].upper() for part in parts[:3])\n    59\t\n    60\t\n    61\tdef classify_name_shape(value: str) -> str:\n    62\t    cleaned = collapse_outer_whitespace(value)\n    63\t    if not cleaned:\n    64\t        return \"empty\"\n    65\t    if any(joiner in cleaned for joiner in NAME_JOINERS):\n    66\t        return \"compound\"\n    67\t    if \" \" in cleaned:\n    68\t        return \"multi_word\"\n    69\t    return \"simple\"",
+          "output": "Digest Preview | Portfolio Summary\n--------------------------------\nGood morning, O'connor-smith\nPortfolio value: $12.8K | 3 active alerts\nAlerts: 3\nNotes:\n- Generated for dashboard preview\n- Movement status: stable\n- Owner initials: O\n- Name shape: compound\nEnd preview",
           "is_error": false,
           "exit_code": 0
         }
@@ -151,14 +173,44 @@
       "parse_error": null
     },
     {
-      "turn": 6,
-      "assistant_text": "Run a test to see preview.\n{\"command\":\"python -c \\\"from app.main import render_digest_preview; print(render_digest_preview('o\\\\'connor-smith', 12840.5, 3))\\\"\"}",
+      "turn": 7,
+      "assistant_text": "Owner name appears \"O'connor-smith\" but expected preserve punctuation-aware capitalization: likely \"O'Connor-Smith\". So need to improve title_case_words to handle joiners. Implement _capitalize_word_with_joiners: split on each joiner? Could iterate over NAME_JOINERS and split preserving delimiter. Simpler: for each joiner, split word by joiner, capitalize each fragment, then rejoin with same joiner. But need to handle multiple joiners possibly. Could use regex: re.split('([-\\'/])', word) to keep delimiters. Implement using re. Update function in app/utils/text.py.\n{\"tool\":\"str_replace\",\"arguments\":{\"path\":\"app/utils/text.py\",\"old_str\":\"def _capitalize_word_with_joiners(word: str) -> str:\\n    if not word:\\n        return word\\n    return _capitalize_fragment(word)\",\"new_str\":\"import re\\n\\ndef _capitalize_word_with_joiners(word: str) -> str:\\n    if not word:\\n        return word\\n    # Split word preserving joiner characters\\n    parts = re.split(r'([\\\\-\\\\'/])', word)\\n    # Capitalize fragments (non-joiner parts)\\n    capitalized = [_capitalize_fragment(p) if p and p not in \\\"-'/\\\" else p for p in parts]\\n    return ''.join(capitalized)\"}}\n",
+      "tool_calls": [
+        {
+          "id": "react-1-str_replace",
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/utils/text.py",
+            "old_str": "def _capitalize_word_with_joiners(word: str) -> str:\n    if not word:\n        return word\n    return _capitalize_fragment(word)",
+            "new_str": "import re\n\ndef _capitalize_word_with_joiners(word: str) -> str:\n    if not word:\n        return word\n    # Split word preserving joiner characters\n    parts = re.split(r'([\\-\\'/])', word)\n    # Capitalize fragments (non-joiner parts)\n    capitalized = [_capitalize_fragment(p) if p and p not in \"-'/\" else p for p in parts]\n    return ''.join(capitalized)"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/utils/text.py",
+            "old_str": "def _capitalize_word_with_joiners(word: str) -> str:\n    if not word:\n        return word\n    return _capitalize_fragment(word)",
+            "new_str": "import re\n\ndef _capitalize_word_with_joiners(word: str) -> str:\n    if not word:\n        return word\n    # Split word preserving joiner characters\n    parts = re.split(r'([\\-\\'/])', word)\n    # Capitalize fragments (non-joiner parts)\n    capitalized = [_capitalize_fragment(p) if p and p not in \"-'/\" else p for p in parts]\n    return ''.join(capitalized)"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/utils/text.py:\n     1\tNAME_JOINERS = {\"-\", \"'\", \"/\"}\n     2\tMIN_IDENTIFIER_LENGTH = 12\n     3\tSHORT_IDENTIFIER_HEAD = 9\n     4\t\n     5\t\n     6\tdef collapse_outer_whitespace(value: str) -> str:\n     7\t    return value.strip()\n     8\t\n     9\t\n    10\tdef normalize_spacing(value: str) -> str:\n    11\t    pieces = value.replace(\"\\t\", \" \").split()\n    12\t    return \" \".join(pieces)\n    13\t\n    14\t\n    15\tdef _capitalize_fragment(fragment: str) -> str:\n    16\t    if not fragment:\n    17\t        return fragment\n    18\t    return fragment[0].upper() + fragment[1:].lower()\n    19\t\n    20\t\n    21\timport re\n    22\t\n    23\tdef _capitalize_word_with_joiners(word: str) -> str:\n    24\t    if not word:\n    25\t        return word\n    26\t    # Split word preserving joiner characters\n    27\t    parts = re.split(r'([\\-\\'/])', word)\n    28\t    # Capitalize fragments (non-joiner parts)\n    29\t    capitalized = [_capitalize_fragment(p) if p and p not in \"-'/\" else p for p in parts]\n    30\t    return ''.join(capitalized)\n    31\t\n    32\t\n    33\tdef title_case_words(value: str) -> str:\n    34\t    words = value.split(\" \")\n    35\t    return \" \".join(_capitalize_word_with_joiners(word) for word in words)\n    36\t\n    37\t\n    38\tdef normalize_display_name(value: str) -> str:\n    39\t    cleaned = collapse_outer_whitespace(value)\n    40\t    cleaned = cleaned.replace(\"_\", \" \")\n    41\t    cleaned = normalize_spacing(cleaned)\n    42\t    return title_case_words(cleaned)\n    43\t\n    44\t\n    45\tdef summarize_identifier(value: str) -> str:\n    46\t    cleaned = collapse_outer_whitespace(value)\n    47\t    if len(cleaned) <= MIN_IDENTIFIER_LENGTH:\n    48\t        return cleaned\n    49\t    return cleaned[:SHORT_IDENTIFIER_HEAD] + \"...\"\n    50\t\n    51\t\n    52\tdef build_initials(value: str) -> str:\n    53\t    cleaned = normalize_spacing(value)\n    54\t    parts = [part for part in cleaned.split(\" \") if part]\n    55\t    return \"\".join(part[0].upper() for part in parts[:3])\n    56\t\n    57\t\n    58\tdef classify_name_shape(value: str) -> str:\n    59\t    cleaned = collapse_outer_whitespace(value)\n    60\t    if not cleaned:\n    61\t        return \"empty\"\n    62\t    if any(joiner in cleaned for joiner in NAME_JOINERS):\n    63\t        return \"compound\"\n    64\t    if \" \" in cleaned:\n    65\t        return \"multi_word\"\n    66\t    return \"simple\"",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 8,
+      "assistant_text": "Run preview again.\n{\"tool\":\"bash\",\"arguments\":{\"command\":\"python - <<'PY'\\nfrom app.main import render_digest_preview\\nprint(render_digest_preview(\\\"o'connor-smith\\\", 12840.5, 3))\\nPY\"}}\n",
       "tool_calls": [
         {
           "id": "react-1-bash",
           "name": "bash",
           "arguments": {
-            "command": "python -c \"from app.main import render_digest_preview; print(render_digest_preview('o\\'connor-smith', 12840.5, 3))\""
+            "command": "python - <<'PY'\nfrom app.main import render_digest_preview\nprint(render_digest_preview(\"o'connor-smith\", 12840.5, 3))\nPY"
           }
         }
       ],
@@ -166,7 +218,7 @@
         {
           "name": "bash",
           "arguments": {
-            "command": "python -c \"from app.main import render_digest_preview; print(render_digest_preview('o\\'connor-smith', 12840.5, 3))\""
+            "command": "python - <<'PY'\nfrom app.main import render_digest_preview\nprint(render_digest_preview(\"o'connor-smith\", 12840.5, 3))\nPY"
           },
           "output": "Digest Preview | Portfolio Summary\n--------------------------------\nGood morning, O'Connor-Smith\nPortfolio value: $12.8K | 3 active alerts\nAlerts: 3\nNotes:\n- Generated for dashboard preview\n- Movement status: stable\n- Owner initials: O\n- Name shape: compound\nEnd preview",
           "is_error": false,
@@ -177,15 +229,15 @@
       "parse_error": null
     },
     {
-      "turn": 7,
-      "assistant_text": "Owner initials currently O, should be maybe OC? Since owner_name normalized to \"O'Connor-Smith\". build_initials uses normalize_spacing on owner_name, splits on space, takes first letters of up to 3 parts. No spaces, so only first part \"O'Connor-Smith\", first char O. Might want initials from each fragment? But issue mentions owner names incorrectly rendered, maybe initials not required. The preview shows correct capitalization now. Tests may check something else. Run tests.\n{\"command\":\"pytest -q\"], \"timeout\": 100000}",
+      "turn": 9,
+      "assistant_text": "Now run tests.\n{\"tool\":\"bash\",\"arguments\":{\"command\":\"pytest -q\"], \"timeout\": 100000}",
       "tool_calls": [],
       "tool_results": [],
       "finish_reason": "stop",
-      "parse_error": "Could not parse model action JSON. json.loads failed: Expecting value at line 1 column 1 | ast.literal_eval failed: closing parenthesis ']' does not match opening parenthesis '{' (<unknown>, line 2) | multi-object decode failed: Expecting value at column 1 Unbalanced delimiters detected: braces 1/1, brackets 0/1."
+      "parse_error": "Could not parse model action JSON. json.loads failed: Expecting value at line 1 column 1 | ast.literal_eval failed: closing parenthesis ']' does not match opening parenthesis '{' (<unknown>, line 2) | multi-object decode failed: Expecting value at column 1 Unbalanced delimiters detected: braces 2/1, brackets 0/1."
     },
     {
-      "turn": 8,
+      "turn": 10,
       "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"pytest -q\"}}",
       "tool_calls": [
         {
@@ -211,14 +263,14 @@
       "parse_error": null
     },
     {
-      "turn": 9,
-      "assistant_text": "{\"tool\":\"submit\",\"arguments\":{\"summary\":\"Implemented proper capitalization for compound owner names by handling joiner characters in title case conversion. Updated _capitalize_word_with_joiners to split on hyphens, apostrophes, and slashes, capitalizing each fragment while preserving delimiters. All tests now pass.\"}}",
+      "turn": 11,
+      "assistant_text": "{\"tool\":\"submit\",\"arguments\":{\"summary\":\"Fixed owner name capitalization for compound names by enhancing _capitalize_word_with_joiners to handle hyphens, apostrophes, and slashes.\"}}",
       "tool_calls": [
         {
           "id": "react-1-submit",
           "name": "submit",
           "arguments": {
-            "summary": "Implemented proper capitalization for compound owner names by handling joiner characters in title case conversion. Updated _capitalize_word_with_joiners to split on hyphens, apostrophes, and slashes, capitalizing each fragment while preserving delimiters. All tests now pass."
+            "summary": "Fixed owner name capitalization for compound names by enhancing _capitalize_word_with_joiners to handle hyphens, apostrophes, and slashes."
           }
         }
       ],
@@ -226,7 +278,7 @@
         {
           "name": "submit",
           "arguments": {
-            "summary": "Implemented proper capitalization for compound owner names by handling joiner characters in title case conversion. Updated _capitalize_word_with_joiners to split on hyphens, apostrophes, and slashes, capitalizing each fragment while preserving delimiters. All tests now pass."
+            "summary": "Fixed owner name capitalization for compound names by enhancing _capitalize_word_with_joiners to handle hyphens, apostrophes, and slashes."
           },
           "output": "Do not submit yet. Inspect `git diff` first.",
           "is_error": true,
@@ -237,14 +289,14 @@
       "parse_error": null
     },
     {
-      "turn": 10,
-      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"git diff --stat\"}}",
+      "turn": 12,
+      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"git diff --staged\"}}\n",
       "tool_calls": [
         {
           "id": "react-1-bash",
           "name": "bash",
           "arguments": {
-            "command": "git diff --stat"
+            "command": "git diff --staged"
           }
         }
       ],
@@ -252,9 +304,9 @@
         {
           "name": "bash",
           "arguments": {
-            "command": "git diff --stat"
+            "command": "git diff --staged"
           },
-          "output": " app/utils/text.py | 11 ++++++++++-\n 1 file changed, 10 insertions(+), 1 deletion(-)",
+          "output": "(no output)",
           "is_error": false,
           "exit_code": 0
         }
@@ -263,8 +315,8 @@
       "parse_error": null
     },
     {
-      "turn": 11,
-      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"git diff\"}}\n{\"tool\":\"bash\",\"arguments\":{\"command\":\"git diff\"}}",
+      "turn": 13,
+      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"git diff\"}}\n",
       "tool_calls": [
         {
           "id": "react-1-bash",
@@ -280,23 +332,23 @@
           "arguments": {
             "command": "git diff"
           },
-          "output": "diff --git a/app/utils/text.py b/app/utils/text.py\nindex 0addf0e..7302ba4 100644\n--- a/app/utils/text.py\n+++ b/app/utils/text.py\n@@ -21,7 +21,16 @@ def _capitalize_fragment(fragment: str) -> str:\n def _capitalize_word_with_joiners(word: str) -> str:\n     if not word:\n         return word\n-    return _capitalize_fragment(word)\n+    # Preserve joiner characters while capitalizing each fragment\n+    import re\n+    # Split and keep delimiters (joiners)\n+    parts = re.split(r'([\\-\\'/])', word)\n+    # Capitalize non-joiner fragments\n+    capitalized_parts = [\n+        _capitalize_fragment(part) if part and part not in {\"-\", \"'\", \"/\"} else part\n+        for part in parts\n+    ]\n+    return \"\".join(capitalized_parts)\n \n \n def title_case_words(value: str) -> str:",
+          "output": "diff --git a/app/utils/text.py b/app/utils/text.py\nindex 0addf0e..1d002a4 100644\n--- a/app/utils/text.py\n+++ b/app/utils/text.py\n@@ -18,10 +18,16 @@ def _capitalize_fragment(fragment: str) -> str:\n     return fragment[0].upper() + fragment[1:].lower()\n \n \n+import re\n+\n def _capitalize_word_with_joiners(word: str) -> str:\n     if not word:\n         return word\n-    return _capitalize_fragment(word)\n+    # Split word preserving joiner characters\n+    parts = re.split(r'([\\-\\'/])', word)\n+    # Capitalize fragments (non-joiner parts)\n+    capitalized = [_capitalize_fragment(p) if p and p not in \"-'/\" else p for p in parts]\n+    return ''.join(capitalized)\n \n \n def title_case_words(value: str) -> str:",
           "is_error": false,
           "exit_code": 0
         }
       ],
       "finish_reason": "stop",
-      "parse_error": "Returned the same action multiple times in one response; recovered the first action only."
+      "parse_error": null
     },
     {
-      "turn": 12,
-      "assistant_text": "{\"tool\":\"submit\",\"arguments\":{\"summary\":\"Fixed owner name capitalization in preview by enhancing _capitalize_word_with_joiners to correctly handle hyphens, apostrophes, and slashes while preserving delimiters. All tests pass.\"}}",
+      "turn": 14,
+      "assistant_text": "{\"tool\":\"submit\",\"arguments\":{\"summary\":\"Fixed owner name capitalization for compound names by enhancing _capitalize_word_with_joiners to handle hyphens, apostrophes, and slashes.\"}}",
       "tool_calls": [
         {
           "id": "react-1-submit",
           "name": "submit",
           "arguments": {
-            "summary": "Fixed owner name capitalization in preview by enhancing _capitalize_word_with_joiners to correctly handle hyphens, apostrophes, and slashes while preserving delimiters. All tests pass."
+            "summary": "Fixed owner name capitalization for compound names by enhancing _capitalize_word_with_joiners to handle hyphens, apostrophes, and slashes."
           }
         }
       ],
@@ -304,9 +356,9 @@
         {
           "name": "submit",
           "arguments": {
-            "summary": "Fixed owner name capitalization in preview by enhancing _capitalize_word_with_joiners to correctly handle hyphens, apostrophes, and slashes while preserving delimiters. All tests pass."
+            "summary": "Fixed owner name capitalization for compound names by enhancing _capitalize_word_with_joiners to handle hyphens, apostrophes, and slashes."
           },
-          "output": "Submission recorded. Summary: Fixed owner name capitalization in preview by enhancing _capitalize_word_with_joiners to correctly handle hyphens, apostrophes, and slashes while preserving delimiters. All tests pass.",
+          "output": "Submission recorded. Summary: Fixed owner name capitalization for compound names by enhancing _capitalize_word_with_joiners to handle hyphens, apostrophes, and slashes.",
           "is_error": false,
           "exit_code": 0
         }
@@ -318,8 +370,8 @@
   "stats": {
     "input_tokens": 0,
     "output_tokens": 0,
-    "turns": 12,
-    "tool_calls": 11,
+    "turns": 14,
+    "tool_calls": 13,
     "api_calls": 0
   },
   "loop_state": {
@@ -329,9 +381,9 @@
     "diff_checked": true,
     "successful_post_edit_commands": [
       "git diff",
-      "git diff --stat",
+      "git diff --staged",
       "pytest -q",
-      "python -c \"from app.main import render_digest_preview; print(render_digest_preview('o\\'connor-smith', 12840.5, 3))\""
+      "python - <<'PY'\nfrom app.main import render_digest_preview\nprint(render_digest_preview(\"o'connor-smith\", 12840.5, 3))\nPY"
     ],
     "satisfied_success_checks": [],
     "changed_files": [
@@ -340,12 +392,12 @@
   },
   "stopped_reason": "submitted",
   "submitted": true,
-  "submission_summary": "Fixed owner name capitalization in preview by enhancing _capitalize_word_with_joiners to correctly handle hyphens, apostrophes, and slashes while preserving delimiters. All tests pass.",
-  "patch": "diff --git a/app/utils/text.py b/app/utils/text.py\nindex 0addf0e..7302ba4 100644\n--- a/app/utils/text.py\n+++ b/app/utils/text.py\n@@ -21,7 +21,16 @@ def _capitalize_fragment(fragment: str) -> str:\n def _capitalize_word_with_joiners(word: str) -> str:\n     if not word:\n         return word\n-    return _capitalize_fragment(word)\n+    # Preserve joiner characters while capitalizing each fragment\n+    import re\n+    # Split and keep delimiters (joiners)\n+    parts = re.split(r'([\\-\\'/])', word)\n+    # Capitalize non-joiner fragments\n+    capitalized_parts = [\n+        _capitalize_fragment(part) if part and part not in {\"-\", \"'\", \"/\"} else part\n+        for part in parts\n+    ]\n+    return \"\".join(capitalized_parts)\n \n \n def title_case_words(value: str) -> str:\n",
+  "submission_summary": "Fixed owner name capitalization for compound names by enhancing _capitalize_word_with_joiners to handle hyphens, apostrophes, and slashes.",
+  "patch": "diff --git a/app/utils/text.py b/app/utils/text.py\nindex 0addf0e..1d002a4 100644\n--- a/app/utils/text.py\n+++ b/app/utils/text.py\n@@ -18,10 +18,16 @@ def _capitalize_fragment(fragment: str) -> str:\n     return fragment[0].upper() + fragment[1:].lower()\n \n \n+import re\n+\n def _capitalize_word_with_joiners(word: str) -> str:\n     if not word:\n         return word\n-    return _capitalize_fragment(word)\n+    # Split word preserving joiner characters\n+    parts = re.split(r'([\\-\\'/])', word)\n+    # Capitalize fragments (non-joiner parts)\n+    capitalized = [_capitalize_fragment(p) if p and p not in \"-'/\" else p for p in parts]\n+    return ''.join(capitalized)\n \n \n def title_case_words(value: str) -> str:\n",
   "info": {
-    "submission": "diff --git a/app/utils/text.py b/app/utils/text.py\nindex 0addf0e..7302ba4 100644\n--- a/app/utils/text.py\n+++ b/app/utils/text.py\n@@ -21,7 +21,16 @@ def _capitalize_fragment(fragment: str) -> str:\n def _capitalize_word_with_joiners(word: str) -> str:\n     if not word:\n         return word\n-    return _capitalize_fragment(word)\n+    # Preserve joiner characters while capitalizing each fragment\n+    import re\n+    # Split and keep delimiters (joiners)\n+    parts = re.split(r'([\\-\\'/])', word)\n+    # Capitalize non-joiner fragments\n+    capitalized_parts = [\n+        _capitalize_fragment(part) if part and part not in {\"-\", \"'\", \"/\"} else part\n+        for part in parts\n+    ]\n+    return \"\".join(capitalized_parts)\n \n \n def title_case_words(value: str) -> str:\n",
+    "submission": "diff --git a/app/utils/text.py b/app/utils/text.py\nindex 0addf0e..1d002a4 100644\n--- a/app/utils/text.py\n+++ b/app/utils/text.py\n@@ -18,10 +18,16 @@ def _capitalize_fragment(fragment: str) -> str:\n     return fragment[0].upper() + fragment[1:].lower()\n \n \n+import re\n+\n def _capitalize_word_with_joiners(word: str) -> str:\n     if not word:\n         return word\n-    return _capitalize_fragment(word)\n+    # Split word preserving joiner characters\n+    parts = re.split(r'([\\-\\'/])', word)\n+    # Capitalize fragments (non-joiner parts)\n+    capitalized = [_capitalize_fragment(p) if p and p not in \"-'/\" else p for p in parts]\n+    return ''.join(capitalized)\n \n \n def title_case_words(value: str) -> str:\n",
     "submitted": true,
-    "submission_summary": "Fixed owner name capitalization in preview by enhancing _capitalize_word_with_joiners to correctly handle hyphens, apostrophes, and slashes while preserving delimiters. All tests pass.",
+    "submission_summary": "Fixed owner name capitalization for compound names by enhancing _capitalize_word_with_joiners to handle hyphens, apostrophes, and slashes.",
     "stopped_reason": "submitted"
   },
   "agent_architecture": "single",
@@ -355,12 +407,12 @@
       "tokens_in": 0,
       "tokens_out": 0,
       "api_calls": 0,
-      "turns": 12,
-      "tool_calls": 11
+      "turns": 14,
+      "tool_calls": 13
     }
   },
   "planner_handoff": {},
   "review_feedback": {},
   "instance_id": "digest_preview_001",
-  "duration_seconds": 117.75
+  "duration_seconds": 192.7
 }

@@ -1,5 +1,5 @@
 diff --git a/app/services/rollup.py b/app/services/rollup.py
-index 5c208e7..b60aa92 100644
+index 5c208e7..5144afa 100644
 --- a/app/services/rollup.py
 +++ b/app/services/rollup.py
 @@ -7,4 +7,4 @@ def count_open_incidents(incidents: list[Incident]) -> int:
@@ -7,4 +7,17 @@ index 5c208e7..b60aa92 100644
  
  def count_urgent_incidents(incidents: list[Incident]) -> int:
 -    return sum(1 for incident in incidents if incident.state == "open" and is_urgent(incident.severity))
-+    return sum(1 for incident in incidents if incident.state == "open" and not incident.muted and is_urgent(incident.severity))
++    return sum(1 for incident in incidents if incident.state == "open" and is_urgent(incident.severity) and not incident.muted)
+diff --git a/app/utils/severity.py b/app/utils/severity.py
+index 8f5a31d..b80b6dc 100644
+--- a/app/utils/severity.py
++++ b/app/utils/severity.py
+@@ -6,7 +6,7 @@ def is_critical(severity: str) -> bool:
+ 
+ 
+ def is_urgent(severity: str) -> bool:
+-    return severity in {"critical", "warning", "low"}
++    return severity in {"critical", "warning"}
+ 
+ 
+ def should_count_as_visible_urgent(incident: Incident) -> bool:

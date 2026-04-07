@@ -1,35 +1,27 @@
 diff --git a/app/utils/text.py b/app/utils/text.py
-index 0addf0e..007bf15 100644
+index 0addf0e..e620918 100644
 --- a/app/utils/text.py
 +++ b/app/utils/text.py
-@@ -29,6 +29,30 @@ def title_case_words(value: str) -> str:
-     return " ".join(_capitalize_word_with_joiners(word) for word in words)
+@@ -21,6 +21,22 @@ def _capitalize_fragment(fragment: str) -> str:
+ def _capitalize_word_with_joiners(word: str) -> str:
+     if not word:
+         return word
++    # Preserve capitalization after joiners like apostrophes, hyphens, slashes
++    if any(j in word for j in NAME_JOINERS):
++        # Split on joiners and capitalize each segment
++        segments = []
++        current = ""
++        for char in word:
++            if char in NAME_JOINERS:
++                if current:
++                    segments.append(_capitalize_fragment(current))
++                    current = ""
++                segments.append(char)
++            else:
++                current += char
++        if current:
++            segments.append(_capitalize_fragment(current))
++        return "".join(segments)
+     return _capitalize_fragment(word)
  
  
-+def _capitalize_word_with_joiners(word: str) -> str:
-+    if not word:
-+        return word
-+    # Preserve apostrophes and hyphens in capitalization
-+    if word.startswith("'") or word.startswith("-"):
-+        return word[0] + _capitalize_fragment(word[1:])
-+    # Handle apostrophes in the middle of words
-+    if "'" in word:
-+        parts = word.split("'")
-+        if len(parts) > 1:
-+            return parts[0] + "'" + _capitalize_fragment(parts[1])
-+    # Ensure the first letter after apostrophe is capitalized
-+    if "'" in word:
-+        parts = word.split("'")
-+        if len(parts) > 1:
-+            return parts[0] + "'" + _capitalize_fragment(parts[1])
-+    # Handle uppercase letters after apostrophes
-+    if "'" in word:
-+        parts = word.split("'")
-+        if len(parts) > 1:
-+            return parts[0] + "'" + _capitalize_fragment(parts[1])
-+    return _capitalize_fragment(word)
-+
-+
- def normalize_display_name(value: str) -> str:
-     cleaned = collapse_outer_whitespace(value)
-     cleaned = cleaned.replace("_", " ")

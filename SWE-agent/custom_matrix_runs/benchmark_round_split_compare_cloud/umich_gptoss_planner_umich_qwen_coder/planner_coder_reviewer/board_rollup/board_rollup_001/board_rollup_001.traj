@@ -2,13 +2,13 @@
   "turns": [
     {
       "turn": 1,
-      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"pytest -q tests/test_board_service.py\"}}",
+      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"pytest -q tests/test_board_service.py tests/test_summary_presenter.py\"}}",
       "tool_calls": [
         {
           "id": "react-1-bash",
           "name": "bash",
           "arguments": {
-            "command": "pytest -q tests/test_board_service.py"
+            "command": "pytest -q tests/test_board_service.py tests/test_summary_presenter.py"
           }
         }
       ],
@@ -16,11 +16,11 @@
         {
           "name": "bash",
           "arguments": {
-            "command": "pytest -q tests/test_board_service.py"
+            "command": "pytest -q tests/test_board_service.py tests/test_summary_presenter.py"
           },
-          "output": "..                                                                       [100%]\n2 passed in 0.00s",
-          "is_error": false,
-          "exit_code": 0
+          "output": "F..                                                                      [100%]\n=================================== FAILURES ===================================\n_______________ test_active_alert_total_excludes_archived_cards ________________\n\n    def test_active_alert_total_excludes_archived_cards() -> None:\n        cards = [\n            BoardCard(title=\"Cache error\", owner=\"Ava\", severity=\"high\"),\n            BoardCard(title=\"Queue lag\", owner=\"Mina\", severity=\"medium\"),\n            BoardCard(title=\"Closed incident\", owner=\"Ava\", severity=\"high\", archived=True),\n        ]\n        summary = build_board_summary(cards)\n        assert summary.active_cards == 2\n>       assert summary.alert_cards == 2\nE       AssertionError: assert 3 == 2\nE        +  where 3 = BoardSummary(active_cards=2, alert_cards=3, owners=['Ava', 'Mina']).alert_cards\n\ntests/test_board_service.py:13: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_board_service.py::test_active_alert_total_excludes_archived_cards - AssertionError: assert 3 == 2\n1 failed, 2 passed in 0.03s",
+          "is_error": true,
+          "exit_code": 1
         }
       ],
       "finish_reason": "stop",
@@ -28,23 +28,27 @@
     },
     {
       "turn": 2,
-      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"pytest -q tests/test_summary_presenter.py\"}}\n",
+      "assistant_text": "{\"tool\":\"view\",\"arguments\":{\"path\":\"app/services/board_service.py\",\"start_line\":1,\"end_line\":50}}\n",
       "tool_calls": [
         {
-          "id": "react-1-bash",
-          "name": "bash",
+          "id": "react-1-view",
+          "name": "view",
           "arguments": {
-            "command": "pytest -q tests/test_summary_presenter.py"
+            "path": "app/services/board_service.py",
+            "start_line": 1,
+            "end_line": 50
           }
         }
       ],
       "tool_results": [
         {
-          "name": "bash",
+          "name": "view",
           "arguments": {
-            "command": "pytest -q tests/test_summary_presenter.py"
+            "path": "app/services/board_service.py",
+            "start_line": 1,
+            "end_line": 50
           },
-          "output": ".                                                                        [100%]\n1 passed in 0.00s",
+          "output": "Here's the result of running `cat -n` on /repo/app/services/board_service.py:\n     1\tfrom app.models.card import BoardCard\n     2\tfrom app.models.summary import BoardSummary\n     3\tfrom app.utils.owners import unique_owner_names\n     4\t\n     5\t\n     6\tdef build_board_summary(cards: list[BoardCard]) -> BoardSummary:\n     7\t    active_cards = [card for card in cards if not card.archived]\n     8\t    alert_cards = len(cards)\n     9\t    owners = unique_owner_names(active_cards)\n    10\t    return BoardSummary(\n    11\t        active_cards=len(active_cards),\n    12\t        alert_cards=alert_cards,\n    13\t        owners=owners,\n    14\t    )",
           "is_error": false,
           "exit_code": 0
         }
@@ -54,25 +58,25 @@
     },
     {
       "turn": 3,
-      "assistant_text": "{\"tool\":\"view\",\"arguments\":{\"path\":\"app/services/board_service.py\",\"start_line\":1,\"end_line\":100}}\n",
+      "assistant_text": "{\"tool\":\"str_replace\",\"arguments\":{\"path\":\"app/services/board_service.py\",\"old_str\":\"alert_cards = len(cards)\",\"new_str\":\"alert_cards = len([card for card in cards if not card.archived])\"}}\n\n",
       "tool_calls": [
         {
-          "id": "react-1-view",
-          "name": "view",
+          "id": "react-1-str_replace",
+          "name": "str_replace",
           "arguments": {
             "path": "app/services/board_service.py",
-            "start_line": 1,
-            "end_line": 100
+            "old_str": "alert_cards = len(cards)",
+            "new_str": "alert_cards = len([card for card in cards if not card.archived])"
           }
         }
       ],
       "tool_results": [
         {
-          "name": "view",
+          "name": "str_replace",
           "arguments": {
             "path": "app/services/board_service.py",
-            "start_line": 1,
-            "end_line": 100
+            "old_str": "alert_cards = len(cards)",
+            "new_str": "alert_cards = len([card for card in cards if not card.archived])"
           },
           "output": "Here's the result of running `cat -n` on /repo/app/services/board_service.py:\n     1\tfrom app.models.card import BoardCard\n     2\tfrom app.models.summary import BoardSummary\n     3\tfrom app.utils.owners import unique_owner_names\n     4\t\n     5\t\n     6\tdef build_board_summary(cards: list[BoardCard]) -> BoardSummary:\n     7\t    active_cards = [card for card in cards if not card.archived]\n     8\t    alert_cards = len([card for card in cards if not card.archived])\n     9\t    owners = unique_owner_names(active_cards)\n    10\t    return BoardSummary(\n    11\t        active_cards=len(active_cards),\n    12\t        alert_cards=alert_cards,\n    13\t        owners=owners,\n    14\t    )",
           "is_error": false,
@@ -84,27 +88,23 @@
     },
     {
       "turn": 4,
-      "assistant_text": "{\"tool\":\"str_replace\",\"arguments\":{\"path\":\"app/services/board_service.py\",\"old_str\":\"alert_cards = len([card for card in cards if not card.archived])\",\"new_str\":\"alert_cards = len([card for card in cards if not card.archived and not card.completed])\"}}\n\n",
+      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"pytest -q tests/test_board_service.py tests/test_summary_presenter.py\"}}\n\n",
       "tool_calls": [
         {
-          "id": "react-1-str_replace",
-          "name": "str_replace",
+          "id": "react-1-bash",
+          "name": "bash",
           "arguments": {
-            "path": "app/services/board_service.py",
-            "old_str": "alert_cards = len([card for card in cards if not card.archived])",
-            "new_str": "alert_cards = len([card for card in cards if not card.archived and not card.completed])"
+            "command": "pytest -q tests/test_board_service.py tests/test_summary_presenter.py"
           }
         }
       ],
       "tool_results": [
         {
-          "name": "str_replace",
+          "name": "bash",
           "arguments": {
-            "path": "app/services/board_service.py",
-            "old_str": "alert_cards = len([card for card in cards if not card.archived])",
-            "new_str": "alert_cards = len([card for card in cards if not card.archived and not card.completed])"
+            "command": "pytest -q tests/test_board_service.py tests/test_summary_presenter.py"
           },
-          "output": "Here's the result of running `cat -n` on /repo/app/services/board_service.py:\n     1\tfrom app.models.card import BoardCard\n     2\tfrom app.models.summary import BoardSummary\n     3\tfrom app.utils.owners import unique_owner_names\n     4\t\n     5\t\n     6\tdef build_board_summary(cards: list[BoardCard]) -> BoardSummary:\n     7\t    active_cards = [card for card in cards if not card.archived]\n     8\t    alert_cards = len([card for card in cards if not card.archived and not card.completed])\n     9\t    owners = unique_owner_names(active_cards)\n    10\t    return BoardSummary(\n    11\t        active_cards=len(active_cards),\n    12\t        alert_cards=alert_cards,\n    13\t        owners=owners,\n    14\t    )",
+          "output": "...                                                                      [100%]\n3 passed in 0.01s",
           "is_error": false,
           "exit_code": 0
         }
@@ -114,170 +114,6 @@
     },
     {
       "turn": 5,
-      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"pytest -q tests/test_board_service.py\"}}\n\n",
-      "tool_calls": [
-        {
-          "id": "react-1-bash",
-          "name": "bash",
-          "arguments": {
-            "command": "pytest -q tests/test_board_service.py"
-          }
-        }
-      ],
-      "tool_results": [
-        {
-          "name": "bash",
-          "arguments": {
-            "command": "pytest -q tests/test_board_service.py"
-          },
-          "output": "FF                                                                       [100%]\n=================================== FAILURES ===================================\n_______________ test_active_alert_total_excludes_archived_cards ________________\n\n    def test_active_alert_total_excludes_archived_cards() -> None:\n        cards = [\n            BoardCard(title=\"Cache error\", owner=\"Ava\", severity=\"high\"),\n            BoardCard(title=\"Queue lag\", owner=\"Mina\", severity=\"medium\"),\n            BoardCard(title=\"Closed incident\", owner=\"Ava\", severity=\"high\", archived=True),\n        ]\n>       summary = build_board_summary(cards)\n                  ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\ntests/test_board_service.py:11: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \napp/services/board_service.py:8: in build_board_summary\n    alert_cards = len([card for card in cards if not card.archived and not card.completed])\n                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\n.0 = <list_iterator object at 0xffffba52b7c0>\n\n>   alert_cards = len([card for card in cards if not card.archived and not card.completed])\n                                                                           ^^^^^^^^^^^^^^\nE   AttributeError: 'BoardCard' object has no attribute 'completed'\n\napp/services/board_service.py:8: AttributeError\n________________ test_unique_owners_only_come_from_active_cards ________________\n\n    def test_unique_owners_only_come_from_active_cards() -> None:\n        cards = [\n            BoardCard(title=\"Cache error\", owner=\"Ava\", severity=\"high\"),\n            BoardCard(title=\"Closed incident\", owner=\"Ava\", severity=\"high\", archived=True),\n        ]\n>       summary = build_board_summary(cards)\n                  ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\ntests/test_board_service.py:21: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \napp/services/board_service.py:8: in build_board_summary\n    alert_cards = len([card for card in cards if not card.archived and not card.completed])\n                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\n.0 = <list_iterator object at 0xffffba52b2e0>\n\n>   alert_cards = len([card for card in cards if not card.archived and not card.completed])\n                                                                           ^^^^^^^^^^^^^^\nE   AttributeError: 'BoardCard' object has no attribute 'completed'\n\napp/services/board_service.py:8: AttributeError\n=========================== short test summary info ============================\nFAILED tests/test_board_service.py::test_active_alert_total_excludes_archived_cards - AttributeError: 'BoardCard' object has no attribute 'completed'\nFAILED tests/test_board_service.py::test_unique_owners_only_come_from_active_cards - AttributeError: 'BoardCard' object has no attribute 'completed'\n2 failed in 0.03s",
-          "is_error": true,
-          "exit_code": 1
-        }
-      ],
-      "finish_reason": "stop",
-      "parse_error": null
-    },
-    {
-      "turn": 6,
-      "assistant_text": "{\"tool\":\"view\",\"arguments\":{\"path\":\"app/models/card.py\",\"start_line\":1,\"end_line\":50}}\n\n",
-      "tool_calls": [
-        {
-          "id": "react-1-view",
-          "name": "view",
-          "arguments": {
-            "path": "app/models/card.py",
-            "start_line": 1,
-            "end_line": 50
-          }
-        }
-      ],
-      "tool_results": [
-        {
-          "name": "view",
-          "arguments": {
-            "path": "app/models/card.py",
-            "start_line": 1,
-            "end_line": 50
-          },
-          "output": "Here's the result of running `cat -n` on /repo/app/models/card.py:\n     1\tfrom dataclasses import dataclass\n     2\t\n     3\t\n     4\t@dataclass\n     5\tclass BoardCard:\n     6\t    title: str\n     7\t    owner: str\n     8\t    severity: str\n     9\t    archived: bool = False",
-          "is_error": false,
-          "exit_code": 0
-        }
-      ],
-      "finish_reason": "stop",
-      "parse_error": null
-    },
-    {
-      "turn": 7,
-      "assistant_text": "{\"tool\":\"str_replace\",\"arguments\":{\"path\":\"app/services/board_service.py\",\"old_str\":\"alert_cards = len([card for card in cards if not card.archived and not card.completed])\",\"new_str\":\"alert_cards = len([card for card in cards if not card.archived])\"}}\n\n\n",
-      "tool_calls": [
-        {
-          "id": "react-1-str_replace",
-          "name": "str_replace",
-          "arguments": {
-            "path": "app/services/board_service.py",
-            "old_str": "alert_cards = len([card for card in cards if not card.archived and not card.completed])",
-            "new_str": "alert_cards = len([card for card in cards if not card.archived])"
-          }
-        }
-      ],
-      "tool_results": [
-        {
-          "name": "str_replace",
-          "arguments": {
-            "path": "app/services/board_service.py",
-            "old_str": "alert_cards = len([card for card in cards if not card.archived and not card.completed])",
-            "new_str": "alert_cards = len([card for card in cards if not card.archived])"
-          },
-          "output": "Here's the result of running `cat -n` on /repo/app/services/board_service.py:\n     1\tfrom app.models.card import BoardCard\n     2\tfrom app.models.summary import BoardSummary\n     3\tfrom app.utils.owners import unique_owner_names\n     4\t\n     5\t\n     6\tdef build_board_summary(cards: list[BoardCard]) -> BoardSummary:\n     7\t    active_cards = [card for card in cards if not card.archived]\n     8\t    alert_cards = len([card for card in cards if not card.archived])\n     9\t    owners = unique_owner_names(active_cards)\n    10\t    return BoardSummary(\n    11\t        active_cards=len(active_cards),\n    12\t        alert_cards=alert_cards,\n    13\t        owners=owners,\n    14\t    )",
-          "is_error": false,
-          "exit_code": 0
-        }
-      ],
-      "finish_reason": "stop",
-      "parse_error": null
-    },
-    {
-      "turn": 8,
-      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"pytest -q tests/test_board_service.py\"}}\n\n\n",
-      "tool_calls": [
-        {
-          "id": "react-1-bash",
-          "name": "bash",
-          "arguments": {
-            "command": "pytest -q tests/test_board_service.py"
-          }
-        }
-      ],
-      "tool_results": [
-        {
-          "name": "bash",
-          "arguments": {
-            "command": "pytest -q tests/test_board_service.py"
-          },
-          "output": "..                                                                       [100%]\n2 passed in 0.00s",
-          "is_error": false,
-          "exit_code": 0
-        }
-      ],
-      "finish_reason": "stop",
-      "parse_error": null
-    },
-    {
-      "turn": 9,
-      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"pytest -q tests/test_summary_presenter.py\"}}\n\n\n\n",
-      "tool_calls": [
-        {
-          "id": "react-1-bash",
-          "name": "bash",
-          "arguments": {
-            "command": "pytest -q tests/test_summary_presenter.py"
-          }
-        }
-      ],
-      "tool_results": [
-        {
-          "name": "bash",
-          "arguments": {
-            "command": "pytest -q tests/test_summary_presenter.py"
-          },
-          "output": ".                                                                        [100%]\n1 passed in 0.00s",
-          "is_error": false,
-          "exit_code": 0
-        }
-      ],
-      "finish_reason": "stop",
-      "parse_error": null
-    },
-    {
-      "turn": 10,
-      "assistant_text": "{\"tool\":\"submit\",\"arguments\":{\"summary\":\"Fixed alert count to exclude archived cards by filtering on 'archived' field only, ensuring only active cards are counted.\"}}",
-      "tool_calls": [
-        {
-          "id": "react-1-submit",
-          "name": "submit",
-          "arguments": {
-            "summary": "Fixed alert count to exclude archived cards by filtering on 'archived' field only, ensuring only active cards are counted."
-          }
-        }
-      ],
-      "tool_results": [
-        {
-          "name": "submit",
-          "arguments": {
-            "summary": "Fixed alert count to exclude archived cards by filtering on 'archived' field only, ensuring only active cards are counted."
-          },
-          "output": "Do not submit yet. Inspect `git diff` first.",
-          "is_error": true,
-          "exit_code": null
-        }
-      ],
-      "finish_reason": "stop",
-      "parse_error": null
-    },
-    {
-      "turn": 11,
       "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"git diff\"}}\n\n\n",
       "tool_calls": [
         {
@@ -303,100 +139,14 @@
       "parse_error": null
     },
     {
-      "turn": 12,
-      "assistant_text": "{\"tool\":\"str_replace\",\"arguments\":{\"path\":\"app/services/board_service.py\",\"old_str\":\"alert_cards = len(cards)\",\"new_str\":\"alert_cards = len([card for card in cards if not card.archived])\"}}\n\n\n",
-      "tool_calls": [
-        {
-          "id": "react-1-str_replace",
-          "name": "str_replace",
-          "arguments": {
-            "path": "app/services/board_service.py",
-            "old_str": "alert_cards = len(cards)",
-            "new_str": "alert_cards = len([card for card in cards if not card.archived])"
-          }
-        }
-      ],
-      "tool_results": [
-        {
-          "name": "str_replace",
-          "arguments": {
-            "path": "app/services/board_service.py",
-            "old_str": "alert_cards = len(cards)",
-            "new_str": "alert_cards = len([card for card in cards if not card.archived])"
-          },
-          "output": "No replacement was performed, old_str `alert_cards = len(cards)` did not appear verbatim in /repo/app/services/board_service.py.",
-          "is_error": true,
-          "exit_code": 0
-        }
-      ],
-      "finish_reason": "stop",
-      "parse_error": null
-    },
-    {
-      "turn": 13,
-      "assistant_text": "{\"tool\":\"view\",\"arguments\":{\"path\":\"app/services/board_service.py\",\"start_line\":1,\"end_line\":100}}\n\n\n\n",
-      "tool_calls": [
-        {
-          "id": "react-1-view",
-          "name": "view",
-          "arguments": {
-            "path": "app/services/board_service.py",
-            "start_line": 1,
-            "end_line": 100
-          }
-        }
-      ],
-      "tool_results": [
-        {
-          "name": "view",
-          "arguments": {
-            "path": "app/services/board_service.py",
-            "start_line": 1,
-            "end_line": 100
-          },
-          "output": "Here's the result of running `cat -n` on /repo/app/services/board_service.py:\n     1\tfrom app.models.card import BoardCard\n     2\tfrom app.models.summary import BoardSummary\n     3\tfrom app.utils.owners import unique_owner_names\n     4\t\n     5\t\n     6\tdef build_board_summary(cards: list[BoardCard]) -> BoardSummary:\n     7\t    active_cards = [card for card in cards if not card.archived]\n     8\t    alert_cards = len([card for card in cards if not card.archived])\n     9\t    owners = unique_owner_names(active_cards)\n    10\t    return BoardSummary(\n    11\t        active_cards=len(active_cards),\n    12\t        alert_cards=alert_cards,\n    13\t        owners=owners,\n    14\t    )",
-          "is_error": false,
-          "exit_code": 0
-        }
-      ],
-      "finish_reason": "stop",
-      "parse_error": null
-    },
-    {
-      "turn": 14,
-      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"git diff\"}}\n\n\n\n\n",
-      "tool_calls": [
-        {
-          "id": "react-1-bash",
-          "name": "bash",
-          "arguments": {
-            "command": "git diff"
-          }
-        }
-      ],
-      "tool_results": [
-        {
-          "name": "bash",
-          "arguments": {
-            "command": "git diff"
-          },
-          "output": "diff --git a/app/services/board_service.py b/app/services/board_service.py\nindex a9c656f..c0de7ba 100644\n--- a/app/services/board_service.py\n+++ b/app/services/board_service.py\n@@ -5,7 +5,7 @@ from app.utils.owners import unique_owner_names\n \n def build_board_summary(cards: list[BoardCard]) -> BoardSummary:\n     active_cards = [card for card in cards if not card.archived]\n-    alert_cards = len(cards)\n+    alert_cards = len([card for card in cards if not card.archived])\n     owners = unique_owner_names(active_cards)\n     return BoardSummary(\n         active_cards=len(active_cards),",
-          "is_error": false,
-          "exit_code": 0
-        }
-      ],
-      "finish_reason": "stop",
-      "parse_error": null
-    },
-    {
-      "turn": 15,
-      "assistant_text": "{\"tool\":\"submit\",\"arguments\":{\"summary\":\"Fixed alert count to exclude archived cards by filtering on 'archived' field only, ensuring only active cards are counted.\"}}\n",
+      "turn": 6,
+      "assistant_text": "{\"tool\":\"submit\",\"arguments\":{\"summary\":\"Fixed alert count to exclude archived cards by filtering the card list before counting.\"}}",
       "tool_calls": [
         {
           "id": "react-1-submit",
           "name": "submit",
           "arguments": {
-            "summary": "Fixed alert count to exclude archived cards by filtering on 'archived' field only, ensuring only active cards are counted."
+            "summary": "Fixed alert count to exclude archived cards by filtering the card list before counting."
           }
         }
       ],
@@ -404,9 +154,9 @@
         {
           "name": "submit",
           "arguments": {
-            "summary": "Fixed alert count to exclude archived cards by filtering on 'archived' field only, ensuring only active cards are counted."
+            "summary": "Fixed alert count to exclude archived cards by filtering the card list before counting."
           },
-          "output": "Submission recorded. Summary: Fixed alert count to exclude archived cards by filtering on 'archived' field only, ensuring only active cards are counted.",
+          "output": "Submission recorded. Summary: Fixed alert count to exclude archived cards by filtering the card list before counting.",
           "is_error": false,
           "exit_code": 0
         }
@@ -416,11 +166,11 @@
     }
   ],
   "stats": {
-    "input_tokens": 5294,
-    "output_tokens": 1607,
-    "turns": 15,
-    "tool_calls": 15,
-    "api_calls": 3
+    "input_tokens": 3353,
+    "output_tokens": 1073,
+    "turns": 6,
+    "tool_calls": 6,
+    "api_calls": 2
   },
   "loop_state": {
     "executable_edit_made": true,
@@ -429,8 +179,7 @@
     "diff_checked": true,
     "successful_post_edit_commands": [
       "git diff",
-      "pytest -q tests/test_board_service.py",
-      "pytest -q tests/test_summary_presenter.py"
+      "pytest -q tests/test_board_service.py tests/test_summary_presenter.py"
     ],
     "satisfied_success_checks": [],
     "changed_files": [
@@ -439,70 +188,68 @@
   },
   "stopped_reason": "submitted",
   "submitted": true,
-  "submission_summary": "Fixed alert count to exclude archived cards by filtering on 'archived' field only, ensuring only active cards are counted.",
+  "submission_summary": "Fixed alert count to exclude archived cards by filtering the card list before counting.",
   "patch": "diff --git a/app/services/board_service.py b/app/services/board_service.py\nindex a9c656f..c0de7ba 100644\n--- a/app/services/board_service.py\n+++ b/app/services/board_service.py\n@@ -5,7 +5,7 @@ from app.utils.owners import unique_owner_names\n \n def build_board_summary(cards: list[BoardCard]) -> BoardSummary:\n     active_cards = [card for card in cards if not card.archived]\n-    alert_cards = len(cards)\n+    alert_cards = len([card for card in cards if not card.archived])\n     owners = unique_owner_names(active_cards)\n     return BoardSummary(\n         active_cards=len(active_cards),\n",
   "info": {
     "submission": "diff --git a/app/services/board_service.py b/app/services/board_service.py\nindex a9c656f..c0de7ba 100644\n--- a/app/services/board_service.py\n+++ b/app/services/board_service.py\n@@ -5,7 +5,7 @@ from app.utils.owners import unique_owner_names\n \n def build_board_summary(cards: list[BoardCard]) -> BoardSummary:\n     active_cards = [card for card in cards if not card.archived]\n-    alert_cards = len(cards)\n+    alert_cards = len([card for card in cards if not card.archived])\n     owners = unique_owner_names(active_cards)\n     return BoardSummary(\n         active_cards=len(active_cards),\n",
     "submitted": true,
-    "submission_summary": "Fixed alert count to exclude archived cards by filtering on 'archived' field only, ensuring only active cards are counted.",
+    "submission_summary": "Fixed alert count to exclude archived cards by filtering the card list before counting.",
     "stopped_reason": "submitted"
   },
   "agent_architecture": "planner_coder_reviewer",
   "role_model_stats": {
     "planner": {
       "model": "openai/openai/gpt-oss-120b",
-      "tokens_in": 1037,
-      "tokens_out": 679,
+      "tokens_in": 1171,
+      "tokens_out": 850,
       "api_calls": 1
     },
     "reviewer": {
       "model": "openai/openai/gpt-oss-120b",
-      "tokens_in": 4257,
-      "tokens_out": 928,
-      "api_calls": 2
+      "tokens_in": 2182,
+      "tokens_out": 223,
+      "api_calls": 1
     },
     "coder": {
       "model": "openai/Qwen/Qwen3-VL-30B-A3B-Instruct",
       "tokens_in": 0,
       "tokens_out": 0,
       "api_calls": 0,
-      "turns": 21,
-      "tool_calls": 21
+      "turns": 6,
+      "tool_calls": 6
     }
   },
   "planner_handoff": {
-    "problem_summary": "Alert count displayed on team board includes inactive cards, inflating the visible number.",
-    "root_cause_hypothesis": "BoardService (or related presenter) aggregates alerts from the raw card list without filtering out cards that are completed/archived, so the count reflects all cards instead of only active ones needing attention.",
+    "problem_summary": "Alert count on board displays all cards instead of only active cards needing attention.",
+    "root_cause_hypothesis": "BoardService (or SummaryPresenter) aggregates alerts from the raw card list without filtering out inactive/closed cards, causing the visible count to be inflated.",
     "files_likely_affected": [
       "app/services/board_service.py",
       "app/presenters/summary_presenter.py",
       "app/models/card.py"
     ],
     "target_symbols": [
-      "BoardService",
-      "BoardService.get_alerts",
-      "SummaryPresenter",
-      "Card"
+      "BoardService.get_board_summary",
+      "SummaryPresenter.present",
+      "Card.is_active"
     ],
     "discovery_priority": [
       "app/services/board_service.py",
-      "app/presenters/summary_presenter.py",
-      "app/models/card.py"
+      "app/presenters/summary_presenter.py"
     ],
     "first_actions": [
-      "Open app/services/board_service.py and locate the method that computes the board's alert count (e.g., get_alerts or similar).",
-      "Inspect how Card objects are filtered (or not) before counting; check for status fields like 'active', 'archived', or 'completed'.",
-      "Run the failing test suite to reproduce the issue: `pytest -q tests/test_board_service.py`."
+      "Run the existing test suite to confirm current behavior: `pytest -q tests/test_board_service.py tests/test_summary_presenter.py`.",
+      "Open `app/services/board_service.py` and locate the method that builds the board summary or returns the list of cards; check if it filters by card status.",
+      "Open `app/presenters/summary_presenter.py` and see how the alert count is derived from the data supplied by the service."
     ],
     "safe_reproduction_steps": [
       "pytest -q tests/test_board_service.py"
     ],
     "reproduction_notes": [
-      "If the test suite passes but the bug is still observed, add a temporary print in BoardService.get_alerts to view the raw list length versus filtered length."
+      "If the tests all pass, manually create a small script (or use an interactive Python session) to instantiate a board with a mix of active and inactive Card objects and observe the alert count returned by the service/presenter."
     ],
     "required_validations": [
-      "pytest -q tests/test_board_service.py",
-      "pytest -q tests/test_summary_presenter.py"
+      "Re\u2011run the same pytest command to ensure the alert count now matches the number of active cards only.",
+      "Add a quick ad\u2011hoc check (e.g., `python - <<'PY' ... PY`) that prints the alert count for a board containing both active and closed cards, confirming the count excludes closed ones."
     ],
     "allowed_change_types": [
       "code",
@@ -512,19 +259,20 @@
       "tests"
     ],
     "escalation_conditions": [
-      "If no alert-count method is found in BoardService, the logic may be in SummaryPresenter; inspect and adjust there.",
-      "If Card model lacks a clear 'active' flag, consider adding one or using an existing field that indicates completion."
+      "If no filtering logic exists in BoardService, a new helper to filter active cards may be required.",
+      "If Card lacks an `is_active` attribute, determine the correct field representing activity (e.g., status) and add a property or method.",
+      "If the presenter performs its own aggregation, ensure it respects the filtered list from the service rather than recomputing from raw data."
     ]
   },
   "review_feedback": {
     "decision": "accept",
-    "summary": "Patch correctly filters archived cards when computing alert count and all required tests pass.",
+    "summary": "Fixed alert count to exclude archived cards; all tests now pass.",
     "required_changes": [],
     "files_to_revisit": [],
     "validations_to_rerun": [],
-    "plan_adherence": "Followed planner; modified only code, no test edits.",
-    "risk_assessment": "Low risk; change is localized and validated by existing tests."
+    "plan_adherence": "followed",
+    "risk_assessment": "low"
   },
   "instance_id": "board_rollup_001",
-  "duration_seconds": 210.5
+  "duration_seconds": 106.83
 }

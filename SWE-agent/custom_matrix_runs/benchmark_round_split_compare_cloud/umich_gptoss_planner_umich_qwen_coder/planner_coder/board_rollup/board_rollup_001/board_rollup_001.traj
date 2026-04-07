@@ -140,13 +140,13 @@
     },
     {
       "turn": 6,
-      "assistant_text": "{\"tool\":\"submit\",\"arguments\":{\"summary\":\"Fixed alert count to exclude archived cards by filtering on active cards only in board service.\"}}",
+      "assistant_text": "{\"tool\":\"submit\",\"arguments\":{\"summary\":\"Fixed alert count to exclude archived cards by filtering in build_board_summary.\"}}",
       "tool_calls": [
         {
           "id": "react-1-submit",
           "name": "submit",
           "arguments": {
-            "summary": "Fixed alert count to exclude archived cards by filtering on active cards only in board service."
+            "summary": "Fixed alert count to exclude archived cards by filtering in build_board_summary."
           }
         }
       ],
@@ -154,9 +154,9 @@
         {
           "name": "submit",
           "arguments": {
-            "summary": "Fixed alert count to exclude archived cards by filtering on active cards only in board service."
+            "summary": "Fixed alert count to exclude archived cards by filtering in build_board_summary."
           },
-          "output": "Submission recorded. Summary: Fixed alert count to exclude archived cards by filtering on active cards only in board service.",
+          "output": "Submission recorded. Summary: Fixed alert count to exclude archived cards by filtering in build_board_summary.",
           "is_error": false,
           "exit_code": 0
         }
@@ -166,8 +166,8 @@
     }
   ],
   "stats": {
-    "input_tokens": 1037,
-    "output_tokens": 924,
+    "input_tokens": 1171,
+    "output_tokens": 832,
     "turns": 6,
     "tool_calls": 6,
     "api_calls": 1
@@ -188,20 +188,20 @@
   },
   "stopped_reason": "submitted",
   "submitted": true,
-  "submission_summary": "Fixed alert count to exclude archived cards by filtering on active cards only in board service.",
+  "submission_summary": "Fixed alert count to exclude archived cards by filtering in build_board_summary.",
   "patch": "diff --git a/app/services/board_service.py b/app/services/board_service.py\nindex a9c656f..c0de7ba 100644\n--- a/app/services/board_service.py\n+++ b/app/services/board_service.py\n@@ -5,7 +5,7 @@ from app.utils.owners import unique_owner_names\n \n def build_board_summary(cards: list[BoardCard]) -> BoardSummary:\n     active_cards = [card for card in cards if not card.archived]\n-    alert_cards = len(cards)\n+    alert_cards = len([card for card in cards if not card.archived])\n     owners = unique_owner_names(active_cards)\n     return BoardSummary(\n         active_cards=len(active_cards),\n",
   "info": {
     "submission": "diff --git a/app/services/board_service.py b/app/services/board_service.py\nindex a9c656f..c0de7ba 100644\n--- a/app/services/board_service.py\n+++ b/app/services/board_service.py\n@@ -5,7 +5,7 @@ from app.utils.owners import unique_owner_names\n \n def build_board_summary(cards: list[BoardCard]) -> BoardSummary:\n     active_cards = [card for card in cards if not card.archived]\n-    alert_cards = len(cards)\n+    alert_cards = len([card for card in cards if not card.archived])\n     owners = unique_owner_names(active_cards)\n     return BoardSummary(\n         active_cards=len(active_cards),\n",
     "submitted": true,
-    "submission_summary": "Fixed alert count to exclude archived cards by filtering on active cards only in board service.",
+    "submission_summary": "Fixed alert count to exclude archived cards by filtering in build_board_summary.",
     "stopped_reason": "submitted"
   },
   "agent_architecture": "planner_coder",
   "role_model_stats": {
     "planner": {
       "model": "openai/openai/gpt-oss-120b",
-      "tokens_in": 1037,
-      "tokens_out": 924,
+      "tokens_in": 1171,
+      "tokens_out": 832,
       "api_calls": 1
     },
     "coder": {
@@ -214,37 +214,36 @@
     }
   },
   "planner_handoff": {
-    "problem_summary": "Alert count displayed on team boards includes inactive cards, inflating the visible number.",
-    "root_cause_hypothesis": "BoardService (or SummaryPresenter) aggregates alerts from the full card list without filtering for active/needs\u2011attention cards.",
+    "problem_summary": "Alert count on board displays all cards instead of only active cards needing attention.",
+    "root_cause_hypothesis": "BoardService (or SummaryPresenter) aggregates alerts without filtering out inactive/closed cards, leading to an inflated count.",
     "files_likely_affected": [
       "app/services/board_service.py",
       "app/presenters/summary_presenter.py",
       "app/models/card.py"
     ],
     "target_symbols": [
-      "BoardService.get_alerts",
-      "SummaryPresenter.render_alerts",
-      "Card.is_active"
+      "BoardService",
+      "SummaryPresenter",
+      "Card"
     ],
     "discovery_priority": [
       "app/services/board_service.py",
-      "app/presenters/summary_presenter.py",
-      "app/models/card.py"
+      "app/presenters/summary_presenter.py"
     ],
     "first_actions": [
-      "Run the board service test suite to confirm current behavior: `pytest -q tests/test_board_service.py`.",
-      "Open `app/services/board_service.py` and locate the method that computes the alert count; note any use of raw card collections.",
-      "Inspect `app/models/card.py` for an attribute or method that indicates whether a card is active or requires attention."
+      "Run the existing board service tests to confirm current behavior: `pytest -q tests/test_board_service.py`.",
+      "Open `app/services/board_service.py` and locate the method that computes the alert count or builds the board summary.",
+      "Check whether the method filters cards by an \"active\" or \"needs_attention\" flag; if not, note where the raw card list is used."
     ],
-    "safe_reproduction_steps": [],
+    "safe_reproduction_steps": [
+      "pytest -q tests/test_board_service.py"
+    ],
     "reproduction_notes": [
-      "The inline Python snippet avoids complex shell quoting; ensure the Card constructor accepts a `status` argument as used in the codebase.",
-      "If the service requires a different initialization signature, adjust the snippet accordingly.",
-      "Planner suggested only brittle reproduction commands; prefer an equivalent script, pytest command, or direct file inspection first."
+      "If the tests pass but the bug persists, manually create a board with a mix of active and closed cards in an interactive Python session to observe the count."
     ],
     "required_validations": [
-      "Re\u2011run `pytest -q tests/test_board_service.py` to ensure existing tests still pass after the change.",
-      "Execute the inline script again and verify that the printed alert count equals the number of cards whose `is_active` (or equivalent) flag is true."
+      "Re\u2011run the board service tests after the fix to ensure they still pass.",
+      "Add a quick sanity check (e.g., via a small script or REPL) that a board containing both active and inactive cards reports only the active count."
     ],
     "allowed_change_types": [
       "code",
@@ -254,11 +253,11 @@
       "tests"
     ],
     "escalation_conditions": [
-      "If BoardService does not contain a direct alert\u2011count method, the logic may be in SummaryPresenter; inspect that path next.",
-      "If Card lacks an explicit active flag, the definition of \u201cneeds attention\u201d may be elsewhere (e.g., labels or owners); request clarification."
+      "If no filtering logic is found in BoardService, the issue may lie in SummaryPresenter's rendering of the count.",
+      "If Card model lacks a clear status field, the data model may need to be extended to support active/inactive distinction."
     ]
   },
   "review_feedback": {},
   "instance_id": "board_rollup_001",
-  "duration_seconds": 77.42
+  "duration_seconds": 90.96
 }

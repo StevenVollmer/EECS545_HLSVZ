@@ -1,40 +1,27 @@
-diff --git a/app/presenters/report_presenter.py b/app/presenters/report_presenter.py
-index fbcc26d..c716b66 100644
---- a/app/presenters/report_presenter.py
-+++ b/app/presenters/report_presenter.py
-@@ -4,7 +4,8 @@ from app.views.cli import join_lines
- 
- 
- def _headline(model: DigestViewModel) -> str:
--    return f"{model.greeting}, {model.owner_name}"
-+    from app.utils.text import title_case_words_with_joiners
-+    return f"{model.greeting}, {title_case_words_with_joiners(model.owner_name)}"
- 
- 
- def _subheadline(model: DigestViewModel) -> str:
 diff --git a/app/utils/text.py b/app/utils/text.py
-index 0addf0e..7be6f92 100644
+index 0addf0e..29518d0 100644
 --- a/app/utils/text.py
 +++ b/app/utils/text.py
-@@ -21,6 +21,9 @@ def _capitalize_fragment(fragment: str) -> str:
+@@ -21,6 +21,22 @@ def _capitalize_fragment(fragment: str) -> str:
  def _capitalize_word_with_joiners(word: str) -> str:
      if not word:
          return word
-+    # Preserve punctuation-aware capitalization
-+    if word.startswith("'") or word.startswith("-") or word.startswith("/"):
-+        return word[0] + _capitalize_fragment(word[1:])
++    # Preserve punctuation-aware capitalization for compound names
++    if any(c in word for c in "'-/"):
++        # Split on joiners and capitalize each segment
++        segments = []
++        current = ""
++        for c in word:
++            if c in "'-/":
++                if current:
++                    segments.append(_capitalize_fragment(current))
++                    current = ""
++                segments.append(c)
++            else:
++                current += c
++        if current:
++            segments.append(_capitalize_fragment(current))
++        return "".join(segments)
      return _capitalize_fragment(word)
  
  
-@@ -29,6 +32,11 @@ def title_case_words(value: str) -> str:
-     return " ".join(_capitalize_word_with_joiners(word) for word in words)
- 
- 
-+def title_case_words_with_joiners(value: str) -> str:
-+    words = value.split(" ")
-+    return " ".join(_capitalize_word_with_joiners(word) for word in words)
-+
-+
- def normalize_display_name(value: str) -> str:
-     cleaned = collapse_outer_whitespace(value)
-     cleaned = cleaned.replace("_", " ")

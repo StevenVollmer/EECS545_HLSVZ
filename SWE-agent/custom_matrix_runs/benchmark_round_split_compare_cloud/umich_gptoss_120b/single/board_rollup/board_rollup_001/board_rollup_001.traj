@@ -26,7 +26,7 @@
           "arguments": {
             "command": "pytest -q"
           },
-          "output": "F..                                                                      [100%]\n=================================== FAILURES ===================================\n_______________ test_active_alert_total_excludes_archived_cards ________________\n\n    def test_active_alert_total_excludes_archived_cards() -> None:\n        cards = [\n            BoardCard(title=\"Cache error\", owner=\"Ava\", severity=\"high\"),\n            BoardCard(title=\"Queue lag\", owner=\"Mina\", severity=\"medium\"),\n            BoardCard(title=\"Closed incident\", owner=\"Ava\", severity=\"high\", archived=True),\n        ]\n        summary = build_board_summary(cards)\n        assert summary.active_cards == 2\n>       assert summary.alert_cards == 2\nE       AssertionError: assert 3 == 2\nE        +  where 3 = BoardSummary(active_cards=2, alert_cards=3, owners=['Ava', 'Mina']).alert_cards\n\ntests/test_board_service.py:13: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_board_service.py::test_active_alert_total_excludes_archived_cards - AssertionError: assert 3 == 2\n1 failed, 2 passed in 0.04s",
+          "output": "F..                                                                      [100%]\n=================================== FAILURES ===================================\n_______________ test_active_alert_total_excludes_archived_cards ________________\n\n    def test_active_alert_total_excludes_archived_cards() -> None:\n        cards = [\n            BoardCard(title=\"Cache error\", owner=\"Ava\", severity=\"high\"),\n            BoardCard(title=\"Queue lag\", owner=\"Mina\", severity=\"medium\"),\n            BoardCard(title=\"Closed incident\", owner=\"Ava\", severity=\"high\", archived=True),\n        ]\n        summary = build_board_summary(cards)\n        assert summary.active_cards == 2\n>       assert summary.alert_cards == 2\nE       AssertionError: assert 3 == 2\nE        +  where 3 = BoardSummary(active_cards=2, alert_cards=3, owners=['Ava', 'Mina']).alert_cards\n\ntests/test_board_service.py:13: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_board_service.py::test_active_alert_total_excludes_archived_cards - AssertionError: assert 3 == 2\n1 failed, 2 passed in 0.03s",
           "is_error": true,
           "exit_code": 1
         }
@@ -122,13 +122,13 @@
     },
     {
       "turn": 6,
-      "assistant_text": "{\"tool\":\"submit\",\"arguments\":{\"summary\":\"Fixed alert count to exclude archived cards\"}}",
+      "assistant_text": "{\"tool\":\"submit\",\"arguments\":{\"summary\":\"Fixed alert count to exclude archived cards by using active_cards length\"}}",
       "tool_calls": [
         {
           "id": "react-1-submit",
           "name": "submit",
           "arguments": {
-            "summary": "Fixed alert count to exclude archived cards"
+            "summary": "Fixed alert count to exclude archived cards by using active_cards length"
           }
         }
       ],
@@ -136,7 +136,7 @@
         {
           "name": "submit",
           "arguments": {
-            "summary": "Fixed alert count to exclude archived cards"
+            "summary": "Fixed alert count to exclude archived cards by using active_cards length"
           },
           "output": "Do not submit yet. Inspect `git diff` first.",
           "is_error": true,
@@ -174,13 +174,13 @@
     },
     {
       "turn": 8,
-      "assistant_text": "{\"tool\":\"submit\",\"arguments\":{\"summary\":\"Implemented correct alert count logic for board summary\"}}\n{\"tool\":\"submit\",\"arguments\":{\"summary\":\"Implemented correct alert count logic for board summary\"}}",
+      "assistant_text": "{\"tool\":\"submit\",\"arguments\":{\"summary\":\"Implemented fix to count only active cards for alerts\"}}\n{\"tool\":\"submit\",\"arguments\":{\"summary\":\"Implemented fix to count only active cards for alerts\"}}",
       "tool_calls": [
         {
           "id": "react-1-submit",
           "name": "submit",
           "arguments": {
-            "summary": "Implemented correct alert count logic for board summary"
+            "summary": "Implemented fix to count only active cards for alerts"
           }
         }
       ],
@@ -188,9 +188,9 @@
         {
           "name": "submit",
           "arguments": {
-            "summary": "Implemented correct alert count logic for board summary"
+            "summary": "Implemented fix to count only active cards for alerts"
           },
-          "output": "Submission recorded. Summary: Implemented correct alert count logic for board summary",
+          "output": "Submission recorded. Summary: Implemented fix to count only active cards for alerts",
           "is_error": false,
           "exit_code": 0
         }
@@ -222,12 +222,12 @@
   },
   "stopped_reason": "submitted",
   "submitted": true,
-  "submission_summary": "Implemented correct alert count logic for board summary",
+  "submission_summary": "Implemented fix to count only active cards for alerts",
   "patch": "diff --git a/app/services/board_service.py b/app/services/board_service.py\nindex a9c656f..654e1af 100644\n--- a/app/services/board_service.py\n+++ b/app/services/board_service.py\n@@ -5,7 +5,7 @@ from app.utils.owners import unique_owner_names\n \n def build_board_summary(cards: list[BoardCard]) -> BoardSummary:\n     active_cards = [card for card in cards if not card.archived]\n-    alert_cards = len(cards)\n+    alert_cards = len(active_cards)\n     owners = unique_owner_names(active_cards)\n     return BoardSummary(\n         active_cards=len(active_cards),\n",
   "info": {
     "submission": "diff --git a/app/services/board_service.py b/app/services/board_service.py\nindex a9c656f..654e1af 100644\n--- a/app/services/board_service.py\n+++ b/app/services/board_service.py\n@@ -5,7 +5,7 @@ from app.utils.owners import unique_owner_names\n \n def build_board_summary(cards: list[BoardCard]) -> BoardSummary:\n     active_cards = [card for card in cards if not card.archived]\n-    alert_cards = len(cards)\n+    alert_cards = len(active_cards)\n     owners = unique_owner_names(active_cards)\n     return BoardSummary(\n         active_cards=len(active_cards),\n",
     "submitted": true,
-    "submission_summary": "Implemented correct alert count logic for board summary",
+    "submission_summary": "Implemented fix to count only active cards for alerts",
     "stopped_reason": "submitted"
   },
   "agent_architecture": "single",
@@ -244,5 +244,5 @@
   "planner_handoff": {},
   "review_feedback": {},
   "instance_id": "board_rollup_001",
-  "duration_seconds": 64.47
+  "duration_seconds": 121.41
 }

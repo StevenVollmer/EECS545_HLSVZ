@@ -1,5 +1,5 @@
 {
   "model_name_or_path": "umich_qwen__planner_coder_reviewer__digest_preview",
   "instance_id": "digest_preview_001",
-  "model_patch": "diff --git a/app/utils/text.py b/app/utils/text.py\nindex 0addf0e..8063970 100644\n--- a/app/utils/text.py\n+++ b/app/utils/text.py\n@@ -21,7 +21,8 @@ def _capitalize_fragment(fragment: str) -> str:\n def _capitalize_word_with_joiners(word: str) -> str:\n     if not word:\n         return word\n-    return _capitalize_fragment(word)\n+    # Capitalize first letter, preserve internal punctuation\n+    return word[0].upper() + word[1:].lower() if word[1:] else word[0].upper()\n \n \n def title_case_words(value: str) -> str:\n"
+  "model_patch": "diff --git a/app/utils/text.py b/app/utils/text.py\nindex 0addf0e..aea2699 100644\n--- a/app/utils/text.py\n+++ b/app/utils/text.py\n@@ -21,6 +21,9 @@ def _capitalize_fragment(fragment: str) -> str:\n def _capitalize_word_with_joiners(word: str) -> str:\n     if not word:\n         return word\n+    # Preserve capitalization after joiners like apostrophes\n+    if word[0].islower() and any(c in word[1:] for c in \"'-/\"):\n+        return word\n     return _capitalize_fragment(word)\n \n \n"
 }

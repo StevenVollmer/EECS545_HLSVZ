@@ -1,21 +1,24 @@
 diff --git a/app/utils/text.py b/app/utils/text.py
-index 0addf0e..c4eb6bc 100644
+index 0addf0e..809c662 100644
 --- a/app/utils/text.py
 +++ b/app/utils/text.py
-@@ -21,6 +21,16 @@ def _capitalize_fragment(fragment: str) -> str:
- def _capitalize_word_with_joiners(word: str) -> str:
-     if not word:
-         return word
-+    # Preserve capitalization after joiners like apostrophes and hyphens
-+    parts = word.split("'")
-+    if len(parts) > 1:
-+        return "'".join(_capitalize_fragment(part) for part in parts)
-+    parts = word.split("-")
-+    if len(parts) > 1:
-+        return "-".join(_capitalize_fragment(part) for part in parts)
-+    parts = word.split("/")
-+    if len(parts) > 1:
-+        return "/".join(_capitalize_fragment(part) for part in parts)
-     return _capitalize_fragment(word)
+@@ -29,6 +29,19 @@ def title_case_words(value: str) -> str:
+     return " ".join(_capitalize_word_with_joiners(word) for word in words)
  
  
++def _capitalize_word_with_joiners(word: str) -> str:
++    if not word:
++        return word
++    # Preserve capitalization after joiners (e.g., apostrophes, hyphens)
++    result = []
++    for i, char in enumerate(word):
++        if i == 0 or word[i-1] in NAME_JOINERS:
++            result.append(char.upper())
++        else:
++            result.append(char.lower())
++    return ''.join(result)
++
++
+ def normalize_display_name(value: str) -> str:
+     cleaned = collapse_outer_whitespace(value)
+     cleaned = cleaned.replace("_", " ")

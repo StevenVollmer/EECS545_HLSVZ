@@ -1,13 +1,35 @@
+diff --git a/app/models/workspace.py b/app/models/workspace.py
+index c83aa12..76c7e1d 100644
+--- a/app/models/workspace.py
++++ b/app/models/workspace.py
+@@ -21,3 +21,4 @@ class WorkspaceDigest:
+     visible_alert_count: int
+     open_alert_count: int
+     critical_alert_count: int
++    attention_count: int
+diff --git a/app/presenters/dashboard_presenter.py b/app/presenters/dashboard_presenter.py
+index a62945a..b837a29 100644
+--- a/app/presenters/dashboard_presenter.py
++++ b/app/presenters/dashboard_presenter.py
+@@ -4,6 +4,6 @@ from app.models.workspace import WorkspaceDigest
+ def render_dashboard(digest: WorkspaceDigest) -> str:
+     return (
+         f"Workspace {digest.name}: "
+-        f"{digest.visible_alert_count} items need attention "
++        f"{digest.attention_count} items need attention "
+         f"({digest.critical_alert_count} critical, {digest.open_alert_count} open)"
+     )
 diff --git a/app/services/digest_builder.py b/app/services/digest_builder.py
-index 4a2d373..be12555 100644
+index 4a2d373..3bf7e80 100644
 --- a/app/services/digest_builder.py
 +++ b/app/services/digest_builder.py
-@@ -8,7 +8,7 @@ def build_workspace_digest(workspace: Workspace) -> WorkspaceDigest:
+@@ -8,7 +8,8 @@ def build_workspace_digest(workspace: Workspace) -> WorkspaceDigest:
      actionable = actionable_alerts(workspace.alerts)
      return WorkspaceDigest(
          name=workspace.name,
 -        visible_alert_count=len(workspace.alerts),
-+        visible_alert_count=len(actionable_alerts(workspace.alerts)),
++        visible_alert_count=len(actionable),
          open_alert_count=rollup["open"],
          critical_alert_count=len([alert for alert in actionable if alert.severity == "critical"]),
++        attention_count=len(actionable),
      )

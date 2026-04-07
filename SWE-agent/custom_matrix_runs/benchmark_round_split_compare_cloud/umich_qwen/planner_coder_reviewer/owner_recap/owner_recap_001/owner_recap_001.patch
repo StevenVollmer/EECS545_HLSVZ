@@ -1,26 +1,24 @@
 diff --git a/app/presenters/recap_presenter.py b/app/presenters/recap_presenter.py
-index 4649e1c..7aca588 100644
+index 4649e1c..359d2ef 100644
 --- a/app/presenters/recap_presenter.py
 +++ b/app/presenters/recap_presenter.py
-@@ -1,7 +1,7 @@
- from app.models.owner import OwnerRecap
--from app.utils.text import normalize_owner_code
-+from app.utils.text import format_display_owner_name
+@@ -3,5 +3,5 @@ from app.utils.text import normalize_owner_code
  
  
  def render_owner_preview(recap: OwnerRecap) -> str:
 -    display_name = normalize_owner_code(recap.owner_name)
-+    display_name = format_display_owner_name(recap.owner_name)
++    display_name = normalize_owner_code(recap.owner_name) if recap.owner_name else ''
      return f"Owner: {display_name} | Projects: {recap.total_projects}"
 diff --git a/app/utils/text.py b/app/utils/text.py
-index c12d0f4..6fab751 100644
+index c12d0f4..d6e6590 100644
 --- a/app/utils/text.py
 +++ b/app/utils/text.py
-@@ -11,3 +11,7 @@ def format_display_owner_name(name: str) -> str:
-         else:
-             tokens.append(stripped[:1].upper() + stripped[1:].lower())
-     return "-".join(tokens)
-+
-+
-+def format_owner_for_export(name: str) -> str:
-+    return normalize_owner_code(name)
+@@ -3,6 +3,8 @@ def normalize_owner_code(name: str) -> str:
+ 
+ 
+ def format_display_owner_name(name: str) -> str:
++    if not name:
++        return ''
+     tokens = []
+     for part in name.split("-"):
+         stripped = part.strip()

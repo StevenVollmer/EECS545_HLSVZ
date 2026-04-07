@@ -1,17 +1,33 @@
+diff --git a/app/services/snapshot_service.py b/app/services/snapshot_service.py
+index 7d93368..9436212 100644
+--- a/app/services/snapshot_service.py
++++ b/app/services/snapshot_service.py
+@@ -1,12 +1,12 @@
+ from app.models.snapshot import SnapshotMetrics, SnapshotRequest, SnapshotViewModel
+ from app.services.note_service import build_notes
+-from app.utils.currency import abbreviate_currency
++from app.utils.currency import abbreviate_currency, format_currency
+ from app.utils.variance import variance_label
+ 
+ 
+ def build_snapshot(request: SnapshotRequest) -> SnapshotViewModel:
+     metrics = SnapshotMetrics(
+-        total_spend_label=abbreviate_currency(request.total_spend),
++        total_spend_label=format_currency(request.total_spend),
+         variance_label=variance_label(request.variance),
+         note_count=request.note_count,
+     )
 diff --git a/app/utils/currency.py b/app/utils/currency.py
-index 6c2af37..e5ab9f0 100644
+index 6c2af37..c3b4b9c 100644
 --- a/app/utils/currency.py
 +++ b/app/utils/currency.py
-@@ -1,6 +1,11 @@
- def abbreviate_currency(amount: float) -> str:
+@@ -2,5 +2,8 @@ def abbreviate_currency(amount: float) -> str:
      if amount >= 1_000_000:
          return f"${amount / 1_000_000:.1f}M"
--    if amount >= 1_000:
-+    # Use millions for amounts very close to a million to avoid displaying
-+    # an awkward "1000.0K" label. If the amount is within 500 of a million,
-+    # treat it as a million value.
-+    if amount >= 999_500:
-+        return f"${amount / 1_000_000:.1f}M"
-+    if amount >= 10_000:
-         return f"${round(amount / 1_000, 1):.1f}K"
+     if amount >= 1_000:
+-        return f"${round(amount / 1_000, 1):.1f}K"
++        return f"${amount/1_000:.1f}K"
      return f"${amount:.0f}"
++
++def format_currency(amount: float) -> str:
++    return f"${amount:,.0f}"
