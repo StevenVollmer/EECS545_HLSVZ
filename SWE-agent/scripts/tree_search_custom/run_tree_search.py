@@ -363,12 +363,20 @@ def _load_custom_file_instances_local(path: Path, filter_regex: str, slice_spec:
 # ---------------------------------------------------------------------------
 
 UCB_C = 1.414          # exploration constant (√2)
-EXPANSION_CANDIDATES = 2  # actions sampled per expansion
-EXPLORE_TEMPERATURE = 0.7  # temperature for candidate sampling
-EXPLOIT_TEMPERATURE = 0.1  # temperature for the "greedy" candidate
+EXPANSION_CANDIDATES = 2  # branch candidates at edit-intent turns
+EXPLORE_TEMPERATURE = 0.7  # temperature for explore candidate
+EXPLOIT_TEMPERATURE = 0.1  # temperature for greedy / linear turns
 MAX_ITERATIONS = 20     # total MCTS iterations (tree expansions)
 MAX_NODE_DEPTH = 20     # max turns per branch before treating as terminal
 MAX_TOKENS_REACT = 384  # token limit for react_json mode (small models)
+
+# Improvement 1/3: selective branching + majority vote
+EDIT_VOTE_SAMPLES = 5   # majority-vote samples when an edit action is detected
+EDIT_VOTE_TEMPERATURE = 0.4  # temperature used for vote samples
+
+# Improvement 2: context compression
+COMPRESS_AFTER_TURNS = 8    # start truncating old tool outputs beyond this depth
+COMPRESS_OUTPUT_CHARS = 300  # max chars kept per old tool output
 
 # ---------------------------------------------------------------------------
 # Value constants
@@ -430,6 +438,10 @@ class SearchNode:
     turn_records: list[TurnRecord] = field(default_factory=list)
     parse_errors: int = 0
 
+    # MCTS improvement metadata
+    is_branch_point: bool = False          # True when this node was created at an edit branch
+    vote_counts: dict[str, int] = field(default_factory=dict)  # majority-vote tallies for edit nodes
+
     @property
     def is_terminal(self) -> bool:
         return self.submitted or self.stopped_reason != "" or self.depth >= MAX_NODE_DEPTH
@@ -486,6 +498,7 @@ class MCTSAgentLoop:
         case_policy: dict[str, Any] | None = None,
         extra_user_prompts: list[str] | None = None,
         log_fn: Callable[[str], None] | None = None,
+        edit_vote_samples: int = EDIT_VOTE_SAMPLES,
     ):
         self.model = model
         self.api_base = api_base
@@ -507,6 +520,7 @@ class MCTSAgentLoop:
         self.case_policy = dict(case_policy or {})
         self.extra_user_prompts = extra_user_prompts or []
         self.log_fn = log_fn or (lambda _: None)
+        self.edit_vote_samples = max(1, edit_vote_samples)
         self._global_stats = RunStats()
         self._turn_counter = 0  # used to generate unique tool call IDs
 
@@ -603,6 +617,124 @@ class MCTSAgentLoop:
             msgs.append({"role": "user", "content": p})
         msgs.append({"role": "user", "content": _build_react_json_prompt()})
         return msgs
+
+    # ------------------------------------------------------------------
+    # Improvement helpers
+    # ------------------------------------------------------------------
+
+    def _is_edit_action(self, action: dict[str, Any]) -> bool:
+        """Return True when the action will modify a file."""
+        return action.get("name") in {"str_replace", "insert"}
+
+    def _compress_messages(self, messages: list[dict[str, Any]], node_depth: int) -> list[dict[str, Any]]:
+        """Truncate old tool outputs once history grows beyond COMPRESS_AFTER_TURNS.
+
+        Keeps the full action sequence (assistant role messages) intact so the
+        model still sees what was tried; only clips the verbose tool result text
+        for turns that are far back in history.
+        """
+        if node_depth < COMPRESS_AFTER_TURNS:
+            return messages
+
+        # Count tool-result messages (role == "tool") and clip the older ones.
+        tool_msg_indices = [i for i, m in enumerate(messages) if m.get("role") == "tool"]
+        # Keep the most recent COMPRESS_AFTER_TURNS tool results unclipped
+        clip_up_to = len(tool_msg_indices) - COMPRESS_AFTER_TURNS
+        clip_indices = set(tool_msg_indices[:max(0, clip_up_to)])
+
+        compressed: list[dict[str, Any]] = []
+        for i, msg in enumerate(messages):
+            if i in clip_indices:
+                content = str(msg.get("content", ""))
+                if len(content) > COMPRESS_OUTPUT_CHARS:
+                    content = content[:COMPRESS_OUTPUT_CHARS] + "…[truncated]"
+                compressed.append({**msg, "content": content})
+            else:
+                compressed.append(msg)
+        return compressed
+
+    def _majority_vote_edit(
+        self, messages: list[dict[str, Any]], n_samples: int
+    ) -> tuple[dict[str, Any] | None, dict[str, int]]:
+        """Sample n_samples times and return the most-voted edit action.
+
+        Returns (winner_call, vote_counts) where vote_counts maps action-hash
+        → vote count.  Returns (None, {}) if no parseable edit was produced.
+        """
+        from collections import Counter
+        votes: Counter[str] = Counter()
+        hash_to_call: dict[str, dict[str, Any]] = {}
+
+        for _ in range(n_samples):
+            try:
+                content, tok_in, tok_out = self._call_model(messages, EDIT_VOTE_TEMPERATURE)
+            except Exception:
+                continue
+            self._global_stats.input_tokens += tok_in
+            self._global_stats.output_tokens += tok_out
+            outcome = self._parse_action(content)
+            if not outcome.tool_calls:
+                continue
+            call = outcome.tool_calls[0]
+            if not self._is_edit_action(call):
+                continue
+            h = self._hash_action(call["name"], call.get("arguments", {}))
+            votes[h] += 1
+            hash_to_call.setdefault(h, call)
+
+        if not votes:
+            return None, {}
+
+        winner_hash = votes.most_common(1)[0][0]
+        return hash_to_call[winner_hash], dict(votes)
+
+    def _serialize_tree(self, root: SearchNode, result_node: SearchNode) -> dict[str, Any]:
+        """Walk the full tree and produce a JSON-serialisable dict for the traj.
+
+        Marks the root→result_node path with ``on_result_path=True``.
+        """
+        # Build the result path set for quick lookup
+        result_path: set[int] = set()
+        cur: SearchNode | None = result_node
+        while cur is not None:
+            result_path.add(id(cur))
+            cur = cur.parent
+
+        nodes: list[dict[str, Any]] = []
+        id_map: dict[int, str] = {}
+
+        def walk(n: SearchNode, label: str, parent_label: str | None) -> None:
+            id_map[id(n)] = label
+            args = n.action.get("arguments", {}) if n.action else {}
+            args_preview = json.dumps(args)[:80] if args else ""
+            nodes.append({
+                "id": label,
+                "parent_id": parent_label,
+                "depth": n.depth,
+                "action_name": n.action["name"] if n.action else None,
+                "action_args_preview": args_preview,
+                "visits": n.visits,
+                "mean_value": round(n.mean_value, 2),
+                "submitted": n.submitted,
+                "is_branch_point": n.is_branch_point,
+                "edit_made": n.loop_state.executable_edit_made,
+                "success_checks": len(n.loop_state.satisfied_success_checks),
+                "stopped_reason": n.stopped_reason,
+                "vote_counts": n.vote_counts,
+                "on_result_path": id(n) in result_path,
+            })
+            for i, child in enumerate(n.children):
+                walk(child, f"{label}.{i}", label)
+
+        walk(root, "0", None)
+        return {
+            "nodes": nodes,
+            "result_node_id": id_map.get(id(result_node), "0"),
+        }
+
+    # ------------------------------------------------------------------
+    # Model call
+    # ------------------------------------------------------------------
 
     def _call_model(self, messages: list[dict], temperature: float) -> tuple[str, int, int]:
         """Call the model and return (content, tokens_in, tokens_out)."""
@@ -743,75 +875,121 @@ class MCTSAgentLoop:
         return child
 
     def _expand(self, node: SearchNode, tool_runtime: ToolRuntime) -> list[SearchNode]:
-        """Sample EXPANSION_CANDIDATES actions and execute each to produce children."""
+        """Expand a node using selective branching.
+
+        Strategy:
+        - Apply context compression to the message history before calling the model.
+        - Call the model once at EXPLOIT_TEMPERATURE to determine intent.
+        - If the intended action is NOT an edit (bash, view, submit, …): execute
+          linearly — one child, no branching.  This preserves the search budget.
+        - If the intended action IS an edit (str_replace / insert): run majority
+          vote across EDIT_VOTE_SAMPLES samples, then execute the top
+          EXPANSION_CANDIDATES unique edits as separate children.
+        """
         self._log(f"[mcts] expanding depth={node.depth} visits={node.visits}")
 
-        # Build messages for this node
-        messages = self._base_messages() if not node.messages else list(node.messages)
-        # If parent had a parse error, add a corrective hint
+        # Apply context compression to avoid context-length degradation
+        raw_messages = self._base_messages() if not node.messages else list(node.messages)
         if node.parse_errors > 0:
-            messages.append({
+            raw_messages.append({
                 "role": "user",
                 "content": (
                     "Your previous response could not be parsed. "
                     "Respond with exactly one JSON action object and nothing else."
                 ),
             })
+        messages = self._compress_messages(raw_messages, node.depth)
 
-        # Sample candidates at different temperatures for diversity
-        temperatures = [EXPLOIT_TEMPERATURE] + [EXPLORE_TEMPERATURE] * (EXPANSION_CANDIDATES - 1)
-        candidates: list[dict[str, Any]] = []
-        seen_hashes: set[str] = set()
-
-        for temp in temperatures:
-            try:
-                content, tok_in, tok_out = self._call_model(messages, temperature=temp)
-            except Exception as exc:
-                self._log(f"[mcts] model call failed: {exc}")
-                continue
-            self._global_stats.input_tokens += tok_in
-            self._global_stats.output_tokens += tok_out
-            self._global_stats.tool_calls += 1
-
-            outcome = self._parse_action(content)
-            if not outcome.tool_calls:
-                self._log(f"[mcts] parse failed temp={temp}: {outcome.error}")
-                continue
-            call = outcome.tool_calls[0]
-            h = self._hash_action(call["name"], call.get("arguments", {}))
-            if h in seen_hashes:
-                continue
-            seen_hashes.add(h)
-            candidates.append(call)
-
-        if not candidates:
-            # Fallback: push a no-op node that signals parse failure
+        # ------------------------------------------------------------------
+        # 1. Probe with one exploit-temperature call to detect intent
+        # ------------------------------------------------------------------
+        try:
+            probe_content, tok_in, tok_out = self._call_model(messages, EXPLOIT_TEMPERATURE)
+        except Exception as exc:
+            self._log(f"[mcts] probe call failed: {exc}")
             child = SearchNode(
-                parent=node,
-                depth=node.depth + 1,
-                git_diff=node.git_diff,
-                loop_state=copy.deepcopy(node.loop_state),
-                messages=list(node.messages),
-                action=None,
-                observation="(no parseable action produced)",
-                stopped_reason="parse_failure",
+                parent=node, depth=node.depth + 1, git_diff=node.git_diff,
+                loop_state=copy.deepcopy(node.loop_state), messages=messages,
+                action=None, observation="(model call failed)", stopped_reason="model_error",
                 parse_errors=node.parse_errors + 1,
             )
             node.children.append(child)
             return [child]
 
+        self._global_stats.input_tokens += tok_in
+        self._global_stats.output_tokens += tok_out
+        self._global_stats.tool_calls += 1
+
+        probe_outcome = self._parse_action(probe_content)
+        probe_call = probe_outcome.tool_calls[0] if probe_outcome.tool_calls else None
+
+        if probe_call is None:
+            self._log(f"[mcts] parse failed: {probe_outcome.error}")
+            child = SearchNode(
+                parent=node, depth=node.depth + 1, git_diff=node.git_diff,
+                loop_state=copy.deepcopy(node.loop_state), messages=messages,
+                action=None, observation="(no parseable action produced)",
+                stopped_reason="parse_failure", parse_errors=node.parse_errors + 1,
+            )
+            node.children.append(child)
+            return [child]
+
+        # ------------------------------------------------------------------
+        # 2a. Non-edit action → linear execution (single child, no branching)
+        # ------------------------------------------------------------------
+        if not self._is_edit_action(probe_call):
+            self._restore_state(node)
+            tr = ToolRuntime(self.env, self.repo_root)
+            child = self._execute_action(node, probe_call, "linear", tr)
+            node.children.append(child)
+            self._log(
+                f"[mcts] linear  tool={probe_call['name']} "
+                f"depth={child.depth} submitted={tr.submitted}"
+            )
+            return [child]
+
+        # ------------------------------------------------------------------
+        # 2b. Edit action → majority vote, then execute top-K unique edits
+        # ------------------------------------------------------------------
+        self._log(f"[mcts] edit detected — running majority vote (n={self.edit_vote_samples})")
+        winner, vote_counts = self._majority_vote_edit(messages, self.edit_vote_samples)
+        # Always include the probe result; if majority vote found a different
+        # winner, the probe call was already counted, so we just use winner.
+        if winner is None:
+            winner = probe_call
+
+        # Build candidate list: winner first, then top runner-up (if EXPANSION_CANDIDATES > 1)
+        # winner is first; add a runner-up explore sample if EXPANSION_CANDIDATES > 1
+        candidates: list[dict[str, Any]] = [winner]
+        seen_hashes: set[str] = {self._hash_action(winner["name"], winner.get("arguments", {}))}
+        if EXPANSION_CANDIDATES > 1:
+            try:
+                explore_content, et_in, et_out = self._call_model(messages, EXPLORE_TEMPERATURE)
+                self._global_stats.input_tokens += et_in
+                self._global_stats.output_tokens += et_out
+                explore_outcome = self._parse_action(explore_content)
+                if explore_outcome.tool_calls:
+                    ec = explore_outcome.tool_calls[0]
+                    eh = self._hash_action(ec["name"], ec.get("arguments", {}))
+                    if eh not in seen_hashes and self._is_edit_action(ec):
+                        candidates.append(ec)
+                        seen_hashes.add(eh)
+            except Exception:
+                pass
+
         children: list[SearchNode] = []
         for call in candidates:
-            # Restore state to parent before executing each candidate
             self._restore_state(node)
-            # Fresh ToolRuntime for this candidate
             tr = ToolRuntime(self.env, self.repo_root)
-            child = self._execute_action(node, call, "candidate", tr)
+            child = self._execute_action(node, call, "edit_branch", tr)
+            child.is_branch_point = True
+            child.vote_counts = vote_counts if call is winner else {}
             node.children.append(child)
             children.append(child)
+            vote_info = f" votes={vote_counts.get(self._hash_action(call['name'], call.get('arguments', {})), '?')}/{self.edit_vote_samples}" if call is winner else ""
             self._log(
-                f"[mcts] candidate tool={call['name']} "
-                f"depth={child.depth} submitted={tr.submitted}"
+                f"[mcts] edit    tool={call['name']} "
+                f"depth={child.depth} submitted={tr.submitted}{vote_info}"
             )
 
         return children
@@ -992,6 +1170,24 @@ class MCTSAgentLoop:
         # Build flattened turn list across the result path
         all_turns = [asdict(t) for t in result_node.turn_records]
 
+        # vote_summary: one entry per edit branch point on the result path
+        vote_summary = []
+        cur: SearchNode | None = result_node
+        path_nodes: list[SearchNode] = []
+        while cur is not None:
+            path_nodes.append(cur)
+            cur = cur.parent
+        path_nodes.reverse()
+        for pn in path_nodes:
+            if pn.is_branch_point and pn.vote_counts:
+                vote_summary.append({
+                    "depth": pn.depth,
+                    "action": pn.action["name"] if pn.action else None,
+                    "winner_votes": max(pn.vote_counts.values()),
+                    "total_samples": self.edit_vote_samples,
+                    "unique_candidates": len(pn.vote_counts),
+                })
+
         return {
             "turns": all_turns,
             "stats": {
@@ -1024,9 +1220,12 @@ class MCTSAgentLoop:
                 "model": self.model,
                 "iterations": MAX_ITERATIONS,
                 "expansion_candidates": EXPANSION_CANDIDATES,
+                "edit_vote_samples": self.edit_vote_samples,
                 "ucb_c": UCB_C,
                 "root_visits": root.visits,
             },
+            "vote_summary": vote_summary,
+            "mcts_tree": self._serialize_tree(root, result_node),
         }
 
     def _count_nodes(self, node: SearchNode) -> int:
@@ -1038,7 +1237,7 @@ class MCTSAgentLoop:
 # ---------------------------------------------------------------------------
 
 def parse_args() -> argparse.Namespace:
-    global MAX_ITERATIONS, EXPANSION_CANDIDATES, EXPLORE_TEMPERATURE, UCB_C, MAX_NODE_DEPTH
+    global MAX_ITERATIONS, EXPANSION_CANDIDATES, EXPLORE_TEMPERATURE, UCB_C, MAX_NODE_DEPTH, EDIT_VOTE_SAMPLES
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1060,13 +1259,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--iterations", type=int, default=MAX_ITERATIONS,
                         help="Total MCTS iterations (tree expansions)")
     parser.add_argument("--expansion-candidates", type=int, default=EXPANSION_CANDIDATES,
-                        help="Candidate actions sampled per expansion")
+                        help="Branch candidates at edit-intent turns")
     parser.add_argument("--explore-temperature", type=float, default=EXPLORE_TEMPERATURE,
                         help="Temperature for exploration candidates")
     parser.add_argument("--ucb-c", type=float, default=UCB_C,
                         help="UCB1 exploration constant")
     parser.add_argument("--max-node-depth", type=int, default=MAX_NODE_DEPTH,
                         help="Max turns per branch before treating as terminal")
+    parser.add_argument("--edit-vote-samples", type=int, default=EDIT_VOTE_SAMPLES,
+                        help="Majority-vote samples per edit action (0 to disable)")
 
     # Architecture
     parser.add_argument("--agent-architecture",
@@ -1099,6 +1300,7 @@ def parse_args() -> argparse.Namespace:
     EXPLORE_TEMPERATURE = args.explore_temperature
     UCB_C = args.ucb_c
     MAX_NODE_DEPTH = args.max_node_depth
+    EDIT_VOTE_SAMPLES = args.edit_vote_samples
 
     if args.reviewer_model is None:
         args.reviewer_model = args.planner_model
@@ -1288,6 +1490,7 @@ def main() -> None:
                     case_policy=case_policy,
                     extra_user_prompts=round_extra,
                     log_fn=log_line,
+                    edit_vote_samples=args.edit_vote_samples,
                 )
                 coder_result = mcts.run()
                 role_model_stats["coder"] = {"model": model, **coder_result.get("stats", {})}
@@ -1337,11 +1540,22 @@ def main() -> None:
                 result["stopped_reason"] = "reviewer_rejected"
 
             result["agent_architecture"] = args.agent_architecture
+            # "architecture" alias required by analyze_custom_runs.py
+            result["architecture"] = args.agent_architecture
             result["role_model_stats"] = role_model_stats
             result["planner_handoff"] = planner_handoff or {}
             result["review_feedback"] = review_feedback or {}
             result["instance_id"] = instance_id
             result["duration_seconds"] = round(time.time() - start, 2)
+
+            # Sum planner + reviewer tokens into top-level stats so
+            # analyze_custom_runs.py sees the true total token spend
+            planner_in = int((role_model_stats.get("planner") or {}).get("tokens_in", 0))
+            planner_out = int((role_model_stats.get("planner") or {}).get("tokens_out", 0))
+            reviewer_in = int((role_model_stats.get("reviewer") or {}).get("tokens_in", 0))
+            reviewer_out = int((role_model_stats.get("reviewer") or {}).get("tokens_out", 0))
+            result["stats"]["input_tokens"] += planner_in + reviewer_in
+            result["stats"]["output_tokens"] += planner_out + reviewer_out
 
             _dump_json(instance_dir / f"{instance_id}.traj", result)
             (instance_dir / f"{instance_id}.patch").write_text(result["patch"])
