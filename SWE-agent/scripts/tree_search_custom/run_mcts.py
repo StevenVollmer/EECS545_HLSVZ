@@ -6,9 +6,9 @@ and add any overrides; the effective configuration is printed before the run
 starts so it is always transparent.
 
 Usage:
-  python run_mcts.py --preset standard \\
-      --instances-type file \\
-      --instances-path SWE-agent/custom_cases/simple_mean_bug \\
+  python run_mcts.py --preset standard \
+      --instances-type file \
+      --instances-path SWE-agent/custom_cases/simple_mean_bug \
       --output-dir SWE-agent/tree_search_runs/my_run
 
   python run_mcts.py --preset quick --model deepseek-r1:7b \\
@@ -56,7 +56,8 @@ PRESETS: dict[str, dict[str, Any]] = {
         "expansion_candidates": 2,
         "edit_vote_samples": 5,
         "max_node_depth": 20,
-        "agent_architecture": "planner_coder",
+        "agent_architecture": "planner_coder_reviewer",
+        "reviewer_rounds": 1,
     },
     "thorough": {
         "model": "qwen3.5:9b",
@@ -65,7 +66,8 @@ PRESETS: dict[str, dict[str, Any]] = {
         "expansion_candidates": 3,
         "edit_vote_samples": 7,
         "max_node_depth": 25,
-        "agent_architecture": "planner_coder",
+        "agent_architecture": "planner_coder_reviewer",
+        "reviewer_rounds": 2,
     },
     "debug": {
         "model": "qwen2.5-coder:7b-instruct",

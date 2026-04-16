@@ -654,9 +654,17 @@ class MCTSAgentLoop:
         return compressed
 
     def _majority_vote_edit(
-        self, messages: list[dict[str, Any]], n_samples: int
+        self, messages: list[dict[str, Any]], n_samples: int,
+        seed_call: dict[str, Any] | None = None,
     ) -> tuple[dict[str, Any] | None, dict[str, int]]:
-        """Sample n_samples times and return the most-voted edit action.
+        """Sample up to n_samples times (with early-exit) and return the most-voted edit.
+
+        If *seed_call* is provided it is counted as the first vote without an
+        extra model call (it was already the probe at EXPLOIT_TEMPERATURE).
+        Sampling then stops as soon as all votes agree **and** at least 2
+        samples have been counted — so a confident model costs 2 calls total
+        (probe + 1 confirmation) while a genuinely inconsistent model uses up
+        to n_samples calls.
 
         Returns (winner_call, vote_counts) where vote_counts maps action-hash
         → vote count.  Returns (None, {}) if no parseable edit was produced.
@@ -665,7 +673,14 @@ class MCTSAgentLoop:
         votes: Counter[str] = Counter()
         hash_to_call: dict[str, dict[str, Any]] = {}
 
-        for _ in range(n_samples):
+        # Seed with probe result — counts as first vote, no extra model call
+        if seed_call is not None and self._is_edit_action(seed_call):
+            h = self._hash_action(seed_call["name"], seed_call.get("arguments", {}))
+            votes[h] += 1
+            hash_to_call[h] = seed_call
+
+        remaining = (n_samples - 1) if seed_call is not None else n_samples
+        for _ in range(remaining):
             try:
                 content, tok_in, tok_out = self._call_model(messages, EDIT_VOTE_TEMPERATURE)
             except Exception:
@@ -681,6 +696,9 @@ class MCTSAgentLoop:
             h = self._hash_action(call["name"], call.get("arguments", {}))
             votes[h] += 1
             hash_to_call.setdefault(h, call)
+            # Early exit: unanimous after at least 2 samples
+            if sum(votes.values()) >= 2 and len(votes) == 1:
+                break
 
         if not votes:
             return None, {}
@@ -951,10 +969,10 @@ class MCTSAgentLoop:
         # ------------------------------------------------------------------
         # 2b. Edit action → majority vote, then execute top-K unique edits
         # ------------------------------------------------------------------
-        self._log(f"[mcts] edit detected — running majority vote (n={self.edit_vote_samples})")
-        winner, vote_counts = self._majority_vote_edit(messages, self.edit_vote_samples)
-        # Always include the probe result; if majority vote found a different
-        # winner, the probe call was already counted, so we just use winner.
+        self._log(f"[mcts] edit detected — running majority vote (max={self.edit_vote_samples})")
+        winner, vote_counts = self._majority_vote_edit(
+            messages, self.edit_vote_samples, seed_call=probe_call
+        )
         if winner is None:
             winner = probe_call
 
@@ -986,7 +1004,9 @@ class MCTSAgentLoop:
             child.vote_counts = vote_counts if call is winner else {}
             node.children.append(child)
             children.append(child)
-            vote_info = f" votes={vote_counts.get(self._hash_action(call['name'], call.get('arguments', {})), '?')}/{self.edit_vote_samples}" if call is winner else ""
+            total_samples = sum(vote_counts.values())
+            winner_votes = vote_counts.get(self._hash_action(call["name"], call.get("arguments", {})), "?")
+            vote_info = f" votes={winner_votes}/{total_samples}" if call is winner else ""
             self._log(
                 f"[mcts] edit    tool={call['name']} "
                 f"depth={child.depth} submitted={tr.submitted}{vote_info}"
