@@ -102,6 +102,59 @@ def _tool_args_summary(name: str, arguments: dict[str, Any]) -> str:
     return ", ".join(parts[:4])
 
 
+def _emit_turns(
+    turns: list[dict[str, Any]],
+    vote_by_depth: dict[int, dict],
+    show_tool_output: bool,
+    emit: Any,
+) -> None:
+    """Render a list of coder turns into emit() lines (shared by single/multi-round paths)."""
+    for turn in turns:
+        t = turn.get("turn", "?")
+        tool_calls = turn.get("tool_calls", [])
+        tool_results = turn.get("tool_results", [])
+        assistant_text = (turn.get("assistant_text") or "").strip()
+        parse_error = turn.get("parse_error")
+
+        if tool_calls:
+            call = tool_calls[0]
+            name = call.get("name", "?")
+            args = call.get("arguments") or {}
+            args_summary = _tool_args_summary(name, args)
+
+            vote_str = ""
+            vote_entry = vote_by_depth.get(t)
+            if vote_entry:
+                w = vote_entry.get("winner_votes", 0)
+                tot = vote_entry.get("total_samples", 0)
+                u = vote_entry.get("unique_candidates", 1)
+                vote_str = f"  ★ majority-vote {w}/{tot} samples"
+                if u > 1:
+                    vote_str += f", {u} unique candidates"
+
+            is_edit = name in ("str_replace", "insert", "replace")
+            edit_marker = " [EDIT]" if is_edit else ""
+            emit(f"  │  Turn {t:>2}  {name}{edit_marker}{vote_str}")
+            for ln in args_summary.splitlines():
+                emit(f"  │          {ln}")
+        elif assistant_text:
+            emit(f"  │  Turn {t:>2}  (no tool call)")
+
+        if assistant_text:
+            emit(f"  │          [reasoning] {assistant_text[:ASSISTANT_TEXT_MAX]}")
+        if parse_error:
+            emit(f"  │          ⚠ parse error: {parse_error}")
+        if tool_results and show_tool_output:
+            res = tool_results[0]
+            output = str(res.get("output", ""))
+            is_error = res.get("is_error", False)
+            err_tag = " [ERROR]" if is_error else ""
+            emit(f"  │          ── output{err_tag} ──")
+            emit(_wrap(output, "  │          ", max_chars=TOOL_OUTPUT_MAX))
+
+        emit("  │")
+
+
 def _format_traj(traj: dict[str, Any], show_tool_output: bool) -> str:
     lines: list[str] = []
 
@@ -143,79 +196,46 @@ def _format_traj(traj: dict[str, Any], show_tool_output: bool) -> str:
         emit("  └───────────────────────────────────────────────────────────────────────")
         emit()
 
-    # ── Coder turns (result path) ────────────────────────────────────────────
-    turns = traj.get("turns", [])
-    if not turns:
-        emit("  (no turns recorded)")
-    else:
-        total = len(turns)
-        emit(f"  ┌─ CODER — {total} turn(s) on result path ──────────────────────────────────")
-        emit("  │")
-
-        # Build vote lookup: depth → vote_summary entry
-        vote_by_depth: dict[int, dict] = {}
-        for vs in traj.get("vote_summary", []):
-            vote_by_depth[vs.get("depth", -1)] = vs
-
-        for turn in turns:
-            t = turn.get("turn", "?")
-            tool_calls = turn.get("tool_calls", [])
-            tool_results = turn.get("tool_results", [])
-            assistant_text = (turn.get("assistant_text") or "").strip()
-            parse_error = turn.get("parse_error")
-
-            # Tool call header
-            if tool_calls:
-                call = tool_calls[0]
-                name = call.get("name", "?")
-                args = call.get("arguments") or {}
-                args_summary = _tool_args_summary(name, args)
-
-                # Vote info if this depth had a majority vote
-                vote_str = ""
-                vote_entry = vote_by_depth.get(t)
-                if vote_entry:
-                    w = vote_entry.get("winner_votes", 0)
-                    tot = vote_entry.get("total_samples", 0)
-                    u = vote_entry.get("unique_candidates", 1)
-                    vote_str = f"  ★ majority-vote {w}/{tot} samples"
-                    if u > 1:
-                        vote_str += f", {u} unique candidates"
-
-                is_edit = name in ("str_replace", "insert", "replace")
-                edit_marker = " [EDIT]" if is_edit else ""
-                emit(f"  │  Turn {t:>2}  {name}{edit_marker}{vote_str}")
-                # Indent multi-line args summary
-                for ln in args_summary.splitlines():
-                    emit(f"  │          {ln}")
-            elif assistant_text:
-                emit(f"  │  Turn {t:>2}  (no tool call)")
-
-            # Assistant reasoning text (if any)
-            if assistant_text:
-                emit(f"  │          [reasoning] {assistant_text[:ASSISTANT_TEXT_MAX]}")
-
-            # Parse error
-            if parse_error:
-                emit(f"  │          ⚠ parse error: {parse_error}")
-
-            # Tool result output
-            if tool_results and show_tool_output:
-                res = tool_results[0]
-                output = str(res.get("output", ""))
-                is_error = res.get("is_error", False)
-                err_tag = " [ERROR]" if is_error else ""
-                emit(f"  │          ── output{err_tag} ──")
-                emit(_wrap(output, "  │          ", max_chars=TOOL_OUTPUT_MAX))
-
+    # ── Coder rounds ─────────────────────────────────────────────────────────
+    coder_rounds = traj.get("coder_rounds", [])
+    if coder_rounds:
+        # Multi-round trajectory: show each round with its reviewer verdict
+        for rnd in coder_rounds:
+            rnd_num = rnd.get("round", "?")
+            rnd_turns = rnd.get("turns", [])
+            rnd_vote_summary = rnd.get("vote_summary", [])
+            rnd_review = rnd.get("review_feedback") or {}
+            rnd_decision = str(rnd_review.get("decision", "")).lower()
+            decision_marker = "✓ accept" if rnd_decision == "accept" else ("✗ revise" if rnd_decision == "revise" else "?")
+            emit(f"  ┌─ CODER ROUND {rnd_num} — {len(rnd_turns)} turn(s)  reviewer→{decision_marker} ───────────────────")
             emit("  │")
+            vote_by_depth: dict[int, dict] = {vs.get("depth", -1): vs for vs in rnd_vote_summary}
+            _emit_turns(rnd_turns, vote_by_depth, show_tool_output, emit)
+            emit("  └───────────────────────────────────────────────────────────────────────")
+            # Inline reviewer verdict for this round
+            if rnd_review and any(rnd_review.values()):
+                summary = rnd_review.get("summary") or rnd_review.get("primary_reason", "")
+                required = rnd_review.get("required_changes", [])
+                emit(f"  │reviewer│ {decision_marker.upper()}  {summary[:80]}")
+                for req in required[:2]:
+                    emit(f"  │        │   • {req[:90]}")
+            emit()
+    else:
+        # Single-round (legacy) trajectory
+        turns = traj.get("turns", [])
+        if not turns:
+            emit("  (no turns recorded)")
+        else:
+            emit(f"  ┌─ CODER — {len(turns)} turn(s) on result path ──────────────────────────────────")
+            emit("  │")
+            vote_by_depth = {vs.get("depth", -1): vs for vs in traj.get("vote_summary", [])}
+            _emit_turns(turns, vote_by_depth, show_tool_output, emit)
+            emit("  └───────────────────────────────────────────────────────────────────────")
+            emit()
 
-        emit("  └───────────────────────────────────────────────────────────────────────")
-        emit()
-
-    # ── Reviewer feedback ────────────────────────────────────────────────────
+    # ── Reviewer feedback (final, for single-round trajs) ────────────────────
     review = traj.get("review_feedback")
-    if review and isinstance(review, dict) and any(review.values()):
+    if not coder_rounds and review and isinstance(review, dict) and any(review.values()):
         emit("  ┌─ REVIEWER ────────────────────────────────────────────────────────────")
         for k, v in review.items():
             if v:

@@ -257,12 +257,12 @@ def _print_vote_summary(traj: dict[str, Any]) -> None:
 # ---------------------------------------------------------------------------
 
 def _build_dot(traj: dict[str, Any]) -> str:
-    """Generate a Graphviz DOT source string from the mcts_tree in a traj."""
-    mcts_tree = traj.get("mcts_tree")
-    if not mcts_tree:
-        raise ValueError("No mcts_tree in traj")
+    """Generate a Graphviz DOT source string.
 
-    nodes = mcts_tree["nodes"]
+    For single-round trajs: renders the mcts_tree directly.
+    For multi-round trajs (coder_rounds present): renders each round's tree as
+    a named subgraph, connected by reviewer decision nodes between rounds.
+    """
     instance_id = traj.get("instance_id", "?")
     model = traj.get("mcts_meta", {}).get("model", "?")
 
@@ -275,17 +275,68 @@ def _build_dot(traj: dict[str, Any]) -> str:
         '  edge [arrowsize=0.7];',
     ]
 
-    for n in nodes:
-        nid = "n" + n["id"].replace(".", "_")
-        label = _dot_label(n)
-        color = _dot_fillcolor(n)
-        lines.append(f'  {nid} [label="{label}" style=filled fillcolor="{color}"];')
+    coder_rounds = traj.get("coder_rounds", [])
 
-    for n in nodes:
-        if n["parent_id"] is not None:
-            parent = "n" + n["parent_id"].replace(".", "_")
-            child = "n" + n["id"].replace(".", "_")
-            lines.append(f"  {parent} -> {child};")
+    def _emit_tree_nodes(nodes: list[dict], prefix: str) -> None:
+        for n in nodes:
+            nid = prefix + n["id"].replace(".", "_")
+            label = _dot_label(n)
+            color = _dot_fillcolor(n)
+            lines.append(f'  {nid} [label="{label}" style=filled fillcolor="{color}"];')
+        for n in nodes:
+            if n["parent_id"] is not None:
+                parent = prefix + n["parent_id"].replace(".", "_")
+                child = prefix + n["id"].replace(".", "_")
+                lines.append(f"  {parent} -> {child};")
+
+    def _find_result_leaf(nodes: list[dict]) -> str | None:
+        """Return the node ID of the result-path leaf (deepest on_result_path node)."""
+        on_path = [n for n in nodes if n.get("on_result_path")]
+        if not on_path:
+            return None
+        return max(on_path, key=lambda n: n["depth"])["id"]
+
+    if len(coder_rounds) > 1:
+        prev_leaf_nid: str | None = None
+        for rnd in coder_rounds:
+            rnd_num = rnd.get("round", "?")
+            prefix = f"r{rnd_num}_"
+            tree = rnd.get("mcts_tree", {})
+            nodes = tree.get("nodes", [])
+            review = rnd.get("review_feedback") or {}
+            decision = str(review.get("decision", "")).lower()
+            summary = str(review.get("summary") or review.get("primary_reason", ""))[:50]
+
+            lines.append(f"  subgraph cluster_round_{rnd_num} {{")
+            lines.append(f'    label="Round {rnd_num}";')
+            lines.append('    style=rounded; color="#aaaaaa";')
+            _emit_tree_nodes(nodes, prefix)
+            lines.append("  }")
+
+            # Connect previous round's leaf → reviewer node → this round's root
+            leaf_id = _find_result_leaf(nodes)
+            leaf_nid = prefix + leaf_id.replace(".", "_") if leaf_id else None
+
+            if prev_leaf_nid and leaf_nid:
+                rev_nid = f"reviewer_{rnd_num}"
+                rev_color = "#2ecc71" if decision == "accept" else "#e67e22"
+                rev_label = f"REVIEWER\\n{decision.upper()}\\n{summary}"
+                lines.append(
+                    f'  {rev_nid} [label="{rev_label}" shape=diamond '
+                    f'style=filled fillcolor="{rev_color}" fontsize=8];'
+                )
+                lines.append(f"  {prev_leaf_nid} -> {rev_nid};")
+                # Connect to next round's root (node "0" with prefix)
+                next_root = prefix + "0"
+                lines.append(f"  {rev_nid} -> {next_root};")
+
+            prev_leaf_nid = leaf_nid
+    else:
+        # Single-round: use top-level mcts_tree
+        mcts_tree = traj.get("mcts_tree")
+        if not mcts_tree:
+            raise ValueError("No mcts_tree in traj")
+        _emit_tree_nodes(mcts_tree["nodes"], "n")
 
     lines.append("}")
     return "\n".join(lines)

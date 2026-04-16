@@ -8,16 +8,16 @@ starts so it is always transparent.
 Usage — custom cases
 ---------------------
   # Single case
-  python run_mcts.py --preset standard \
+  python SWE-agent/scripts/tree_search_custom/run_mcts.py --preset standard \
       --instances-type file \
       --instances-path SWE-agent/custom_cases/simple_mean_bug \
       --output-dir SWE-agent/tree_search_runs/my_run
 
   # All 20 custom cases (pass the parent directory)
-  python run_mcts.py --preset standard \
+  python SWE-agent/scripts/tree_search_custom/run_mcts.py --preset standard \
       --instances-type file \
       --instances-path SWE-agent/custom_cases \
-      --output-dir SWE-agent/tree_search_runs/all_custom_run
+      --output-dir SWE-agent/tree_search_runs/all_custom_run_v5
 
 Usage — SWE-bench subset
 -------------------------
@@ -78,7 +78,7 @@ PRESETS: dict[str, dict[str, Any]] = {
         "edit_vote_samples": 5,
         "max_node_depth": 15,   # equal to iterations: depth is the binding constraint
         "agent_architecture": "planner_coder_reviewer",
-        "reviewer_rounds": 1,
+        "reviewer_rounds": 2,   # one retry after reviewer revise feedback
     },
     "thorough": {
         "model": "qwen3.5:9b",

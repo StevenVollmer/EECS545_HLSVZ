@@ -27,6 +27,26 @@ from pathlib import Path
 from typing import Any
 
 
+def _is_infra_error_text(text: str) -> bool:
+    lowered = text.lower()
+    return any(
+        needle in lowered
+        for needle in (
+            "ports are not available",
+            "container process terminated",
+            "docker: error response from daemon",
+            "failed to create endpoint",
+            "cannot connect to the docker daemon",
+            "address already in use",
+            "network is unreachable",
+        )
+    )
+
+
+def _role_tokens(role_stats: dict[str, Any]) -> int:
+    return int(role_stats.get("tokens_in", role_stats.get("input_tokens", 0)) or 0)
+
+
 # ---------------------------------------------------------------------------
 # Traj loading
 # ---------------------------------------------------------------------------
@@ -68,9 +88,9 @@ def _extract(traj: dict[str, Any], path: Path) -> dict[str, Any]:
 
     # Per-role token breakdown
     rms = traj.get("role_model_stats") or {}
-    planner_in  = int((rms.get("planner")  or {}).get("tokens_in", 0))
-    coder_in    = int((rms.get("coder")    or {}).get("tokens_in", 0))
-    reviewer_in = int((rms.get("reviewer") or {}).get("tokens_in", 0))
+    planner_in = _role_tokens(rms.get("planner") or {})
+    coder_in = _role_tokens(rms.get("coder") or {})
+    reviewer_in = _role_tokens(rms.get("reviewer") or {})
 
     # MCTS tree stats
     tree_nodes   = len((traj.get("mcts_tree") or {}).get("nodes", []))
@@ -80,6 +100,11 @@ def _extract(traj: dict[str, Any], path: Path) -> dict[str, Any]:
     vote_summary = traj.get("vote_summary") or []
     vote_total_used = sum(v.get("total_samples", 0) for v in vote_summary)
     vote_edits      = len(vote_summary)
+    vote_max = int(meta.get("edit_vote_samples", 0) or 0)
+    vote_savings = max(0, vote_max * vote_edits - vote_total_used) if vote_max > 0 else 0
+    error_kind = str(traj.get("error_kind", "")).strip().lower()
+    if error and not error_kind:
+        error_kind = "infra" if _is_infra_error_text(error) else "agent"
 
     # Success checks
     checks_passed = list(traj.get("loop_state", {}).get("satisfied_success_checks", []))
@@ -122,11 +147,13 @@ def _extract(traj: dict[str, Any], path: Path) -> dict[str, Any]:
         "branch_ratio":  branch_ratio,
         "vote_edits":    vote_edits,
         "vote_samples":  vote_total_used,
+        "vote_savings":  vote_savings,
         "checks_passed": len(checks_passed),
         "loop_count":    loop_count,
         "parse_errors":  parse_errors,
         "patch_lines":   patch_lines,
         "error":         error,
+        "error_kind":    error_kind,
     }
 
 
@@ -142,7 +169,7 @@ def _hr(c: str = "─") -> str:
 
 def _status(m: dict) -> str:
     if m["error"]:
-        return "ERROR"
+        return "INFRA_ERR" if m.get("error_kind") == "infra" else "ERROR"
     if m["submitted"]:
         return "SUBMIT"
     return m["stopped"][:12] if m["stopped"] else "?"
@@ -185,13 +212,17 @@ def _fmt_aggregate(metrics: list[dict], run_dir: Path) -> list[str]:
 
     n_submit  = sum(1 for m in metrics if m["submitted"])
     n_error   = sum(1 for m in metrics if m["error"])
+    n_infra   = sum(1 for m in metrics if m.get("error_kind") == "infra")
     total_tok = sum(m["tok_in"] + m["tok_out"] for m in metrics)
     avg_turns = sum(m["turns"] for m in metrics) / n
     avg_time  = sum(m["duration"] for m in metrics) / n
     avg_tok   = sum(m["tok_in"] for m in metrics) / n
 
     lines.append(f"  Run dir : {run_dir}")
-    lines.append(f"  Cases   : {n}   submitted={n_submit} ({100*n_submit/n:.0f}%)   errors={n_error}")
+    lines.append(
+        f"  Cases   : {n}   submitted={n_submit} ({100*n_submit/n:.0f}%)   "
+        f"errors={n_error} (infra={n_infra}, agent={max(0, n_error - n_infra)})"
+    )
     lines.append(f"  Avg     : {avg_turns:.1f} turns   {avg_time:.0f}s   {avg_tok:,.0f} tokens-in")
     lines.append(f"  Total tokens (in+out): {total_tok:,}")
 
@@ -206,9 +237,10 @@ def _fmt_aggregate(metrics: list[dict], run_dir: Path) -> list[str]:
     if vote_metrics:
         total_used = sum(m["vote_samples"] for m in vote_metrics)
         total_edits = sum(m["vote_edits"] for m in vote_metrics)
+        total_saved = sum(m["vote_savings"] for m in vote_metrics)
         avg_per_edit = total_used / total_edits if total_edits else 0
         lines.append(f"  Votes   : {total_edits} edit decisions, avg {avg_per_edit:.1f} samples/edit "
-                     f"(early-exit saves vs max-5 = {max(0, 5*total_edits - total_used)} calls)")
+                     f"(early-exit saved {total_saved} model calls)")
 
     # Loop stats
     total_loops = sum(m["loop_count"] for m in metrics)

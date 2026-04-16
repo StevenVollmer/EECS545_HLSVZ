@@ -551,33 +551,24 @@ Constraints:
 def _build_reviewer_system_prompt(repo_root: str) -> str:
     return f"""You are the reviewer for a software repair task.
 
-You do not edit files directly. You review the planner contract, the coder's patch, and the observed validations.
+You do not edit files directly. You review the patch and validation evidence.
 
-Rules:
-- Do not think out loud.
-- Output JSON only.
-- Do not include markdown fences.
-- Decide whether the current patch is ready or should go back to the coder.
-- Use the latest post-edit validation evidence as the primary review signal.
-- Be conservative about rejection. Do not reject for style, naming preference, or hypothetical cleanup.
-- Accept if the observed fix is behaviorally correct, validations are sufficient for the case, and the patch is reasonably focused.
-- Reject only when there is concrete evidence of a remaining bug, missing required validation, wrong-file fix, or regression risk.
-- If case-defined success checks exist, do not accept unless those checks were actually run after the final edit and their observed results support the fix.
-- If a required success check failed, treat that as the primary rejection reason.
-- If the patch looks good and all required success checks passed after the final edit, accept even if there were earlier parse or tool errors.
-- Treat edits to tests as a rejection reason unless the case explicitly allows test edits or a targeted regression test accompanies a real runtime fix.
-- If the issue is behavioral and existing checks are weak, consider requiring one targeted test or one stronger regression check before acceptance.
-- When rejecting, name one primary failure reason, give at most 2 required changes, at most 2 files to revisit, and at most 2 validations to rerun.
-- Tie every rejection to observed evidence from the patch, the latest failing validation output, or missing success checks.
+Do not think out loud. Output JSON only. Do not include markdown fences.
 
-Return a JSON object with these keys:
-- decision: `accept` or `revise`
-- summary: short string
-- required_changes: array of strings
-- files_to_revisit: array of file paths
-- validations_to_rerun: array of commands or checks
-- plan_adherence: short string
-- risk_assessment: short string
+Work through these gates in order. Stop at the first "no":
+1. Non-empty patch that does NOT modify test files? (no → revise)
+2. All required success checks were run after the final edit? (no → revise)
+3. All required success checks passed? (no → revise, cite which failed)
+4. Patch addresses the stated root cause without hardcoding? (no → revise)
+All yes → accept.
+
+When rejecting: one primary_reason, at most 2 required_changes, at most 2 validations_to_rerun.
+
+Return a JSON object with exactly these keys:
+- decision: "accept" or "revise"
+- primary_reason: short string (one sentence)
+- required_changes: array of at most 2 strings
+- validations_to_rerun: array of at most 2 command strings
 
 The repository root is `{repo_root}`.
 """
@@ -729,50 +720,51 @@ def _build_reviewer_task_prompt(
     patch_text: str,
     case_evaluation: dict[str, Any] | None,
     case_policy: dict[str, Any] | None,
+    live_check_results: dict[str, dict] | None = None,
 ) -> str:
-    stats = coder_result.get("stats", {}) if isinstance(coder_result.get("stats"), dict) else {}
-    success_checks = []
+    success_checks: list[dict[str, Any]] = []
     if isinstance(case_evaluation, dict):
         success_checks = [dict(item) for item in case_evaluation.get("success_checks", []) if isinstance(item, dict)]
     validation_report = _summarize_validation_events(coder_result.get("turns", []), success_checks)
     loop_state = coder_result.get("loop_state", {}) if isinstance(coder_result.get("loop_state"), dict) else {}
     changed_files = [str(path) for path in loop_state.get("changed_files", []) if str(path).strip()]
-    satisfied_checks = list(loop_state.get("satisfied_success_checks", []))
-    condensed_turns = [
-        {
-            "turn": turn.get("turn"),
-            "parse_error": turn.get("parse_error"),
-            "tool_calls": [call.get("name") for call in turn.get("tool_calls", []) if isinstance(call, dict)],
-        }
-        for turn in coder_result.get("turns", [])[:20]
-    ]
-    return json.dumps(
-        {
-            "planner_handoff": planner_handoff or {},
-            "case_evaluation": case_evaluation or {},
-            "case_policy": case_policy or {},
-            "review_focus": [
-                "Reject solutions that modify tests to hide a behavior bug unless the case explicitly allows test edits.",
-                "If baseline tests and required success checks disagree, trust the required success checks and the problem statement.",
-                "Use the latest failing validation output and the actual patch as the primary evidence for rejection.",
-                "Prefer one primary failure reason and at most two concrete next steps."
-            ],
-            "coder_summary": {
-                "submitted": coder_result.get("submitted", False),
-                "submission_summary": coder_result.get("submission_summary", ""),
-                "stopped_reason": coder_result.get("stopped_reason", ""),
-                "stats": stats,
-                "changed_files": changed_files,
-                "condensed_turns": condensed_turns,
-                "satisfied_success_checks": satisfied_checks,
-                "missing_success_check_names": [item.get("name", "") for item in validation_report.get("missing_success_checks", [])],
-                "failed_success_check_names": [item.get("name", "") for item in validation_report.get("failing_success_checks", [])],
-            },
-            "validation_report": validation_report,
-            "patch": patch_text,
+
+    # Only keep latest result per check (not full history) to reduce prompt size
+    compact_validation = {
+        "passing_success_checks": [
+            {"name": c.get("name", ""), "command": c.get("command", ""), "turn": c.get("turn")}
+            for c in validation_report.get("passing_success_checks", [])
+        ],
+        "failing_success_checks": [
+            {"name": c.get("name", ""), "command": c.get("command", ""),
+             "turn": c.get("turn"), "output": str(c.get("output", ""))[:400]}
+            for c in validation_report.get("failing_success_checks", [])
+        ],
+        "missing_success_checks": [
+            {"name": c.get("name", ""), "command": c.get("command", "")}
+            for c in validation_report.get("missing_success_checks", [])
+        ],
+        "recent_failing_validations": [
+            {"turn": e.get("turn"), "command": e.get("command"), "output": str(e.get("output", ""))[:300]}
+            for e in validation_report.get("failing_validations", [])[-3:]
+        ],
+    }
+
+    payload: dict[str, Any] = {
+        "root_cause_hypothesis": (planner_handoff or {}).get("root_cause_hypothesis", ""),
+        "required_success_checks": [c.get("name", c.get("command", "")) for c in success_checks],
+        "coder_summary": {
+            "submitted": coder_result.get("submitted", False),
+            "stopped_reason": coder_result.get("stopped_reason", ""),
+            "changed_files": changed_files,
         },
-        indent=2,
-    )
+        "validation_report": compact_validation,
+        "patch": patch_text,
+    }
+    if live_check_results:
+        payload["live_check_results"] = live_check_results
+
+    return json.dumps(payload, indent=2)
 
 
 def _build_planner_handoff_prompt(planner_handoff: dict[str, Any]) -> str:
@@ -961,14 +953,11 @@ def _normalize_planner_handoff(raw: dict[str, Any]) -> dict[str, Any]:
 def _default_reviewer_feedback() -> dict[str, Any]:
     return {
         "decision": "revise",
-        "summary": "Reviewer output could not be parsed cleanly. Continue with focused reproduction, inspection, and validation.",
+        "primary_reason": "Reviewer output could not be parsed cleanly. Continue with reproduction, inspection, and validation.",
         "required_changes": [
             "Use one concrete next action tied to reproduction, inspection, editing, or validation.",
         ],
-        "files_to_revisit": [],
         "validations_to_rerun": [],
-        "plan_adherence": "Unable to assess due to malformed reviewer output.",
-        "risk_assessment": "Proceed cautiously and validate before submit.",
     }
 
 

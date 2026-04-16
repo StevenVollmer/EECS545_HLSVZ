@@ -124,6 +124,73 @@ def _strip_think_tags(text: str) -> str:
     return _THINK_RE.sub("", text).strip()
 
 
+def _is_infra_error_text(text: str) -> bool:
+    lowered = text.lower()
+    return any(
+        needle in lowered
+        for needle in (
+            "ports are not available",
+            "container process terminated",
+            "docker: error response from daemon",
+            "failed to create endpoint",
+            "cannot connect to the docker daemon",
+            "address already in use",
+            "network is unreachable",
+        )
+    )
+
+
+def _build_reviewer_constraints_prompt(review_feedback: dict[str, Any]) -> str:
+    required_changes = [
+        str(item).strip() for item in review_feedback.get("required_changes", []) if str(item).strip()
+    ]
+    files_to_revisit = [
+        str(item).strip() for item in review_feedback.get("files_to_revisit", []) if str(item).strip()
+    ]
+    validations_to_rerun = [
+        str(item).strip() for item in review_feedback.get("validations_to_rerun", []) if str(item).strip()
+    ]
+    lines = [
+        "Reviewer hard constraints for this round (must satisfy before submit):",
+    ]
+    if required_changes:
+        lines.append("- Required changes:")
+        lines.extend(f"  - {item}" for item in required_changes[:6])
+    if files_to_revisit:
+        lines.append("- Allowed files to revisit (unless new evidence requires expansion):")
+        lines.extend(f"  - {item}" for item in files_to_revisit[:8])
+    if validations_to_rerun:
+        lines.append("- Required validations to rerun (exact commands):")
+        lines.extend(f"  - {cmd}" for cmd in validations_to_rerun[:8])
+    lines.append("- Do not submit until the above constraints are satisfied.")
+    return "\n".join(lines)
+
+
+def _start_env_with_retries(env, log_fn: Callable[[str], None], max_attempts: int = 3) -> None:
+    last_exc: Exception | None = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            env.start()
+            return
+        except Exception as exc:  # pragma: no cover - daemon/network dependent
+            last_exc = exc
+            transient = _is_infra_error_text(str(exc))
+            if not transient or attempt >= max_attempts:
+                raise
+            wait_seconds = min(2 ** attempt, 8)
+            log_fn(
+                f"[env] transient start failure attempt {attempt}/{max_attempts}: "
+                f"{str(exc)[:180]} — retrying in {wait_seconds}s"
+            )
+            try:
+                env.close()
+            except Exception:
+                pass
+            time.sleep(wait_seconds)
+    if last_exc is not None:
+        raise last_exc
+
+
 def _call_json_role_local(
     *,
     model: str,
@@ -216,6 +283,7 @@ Rules:
 Required JSON keys:
   "root_cause_hypothesis" : one sentence naming the likely bug and its location
   "files_likely_affected"  : array of 1-4 file paths, most likely first
+  "first_edit_target"      : one sentence — file, approximate line, and what expression to change
   "first_actions"          : array of 1-3 concrete steps (read, reproduce, inspect)
   "required_validations"   : array of 1-2 commands that must pass for the fix to be correct
   "forbidden_edits"        : array of things the coder must NOT do
@@ -224,6 +292,7 @@ Example (do NOT copy this literally — fill in real values from the issue):
 {
   "root_cause_hypothesis": "mean() divides total by len(values)-1 instead of len(values)",
   "files_likely_affected": ["calculator.py"],
+  "first_edit_target": "calculator.py line ~12: denominator expression len(values)-1 should be len(values)",
   "first_actions": ["Read calculator.py lines around mean()", "Run pytest test_calculator.py to reproduce the failure"],
   "required_validations": ["python -m pytest test_calculator.py"],
   "forbidden_edits": ["do not modify test files"]
@@ -408,6 +477,7 @@ VALUE_DIFF_CHECKED = 3.0
 VALUE_EDIT_MADE = 3.0
 PENALTY_PARSE_ERROR = -1.5
 PENALTY_TOOL_ERROR = -1.0
+PENALTY_NO_EDIT_DEEP_TURN = -1.2
 DEPTH_DISCOUNT = 0.97   # per-depth multiplier; prefers shallower solutions
 
 
@@ -460,6 +530,8 @@ class SearchNode:
     # MCTS improvement metadata
     is_branch_point: bool = False          # True when this node was created at an edit branch
     vote_counts: dict[str, int] = field(default_factory=dict)  # majority-vote tallies for edit nodes
+    vote_total_samples: int = 0
+    auto_finalized: bool = False
 
     @property
     def is_terminal(self) -> bool:
@@ -605,6 +677,10 @@ class MCTSAgentLoop:
             v += VALUE_DIFF_CHECKED
         if ls.executable_edit_made:
             v += VALUE_EDIT_MADE
+        if not ls.executable_edit_made and node.depth >= 6:
+            v += PENALTY_NO_EDIT_DEEP_TURN * (node.depth - 5)
+        if node.parse_errors >= 2:
+            return float("-inf")  # permanently abandon high-parse-error branches
         v += PENALTY_PARSE_ERROR * node.parse_errors
         failure_total = sum(node.consecutive_failure_counts.values())
         v += PENALTY_TOOL_ERROR * failure_total
@@ -682,7 +758,7 @@ class MCTSAgentLoop:
     def _majority_vote_edit(
         self, messages: list[dict[str, Any]], n_samples: int,
         seed_call: dict[str, Any] | None = None,
-    ) -> tuple[dict[str, Any] | None, dict[str, int]]:
+    ) -> tuple[dict[str, Any] | None, dict[str, int], int]:
         """Sample up to n_samples times (with early-exit) and return the most-voted edit.
 
         If *seed_call* is provided it is counted as the first vote without an
@@ -692,8 +768,9 @@ class MCTSAgentLoop:
         (probe + 1 confirmation) while a genuinely inconsistent model uses up
         to n_samples calls.
 
-        Returns (winner_call, vote_counts) where vote_counts maps action-hash
-        → vote count.  Returns (None, {}) if no parseable edit was produced.
+        Returns (winner_call, vote_counts, used_samples) where vote_counts maps
+        action-hash → vote count. Returns (None, {}, 0) if no parseable edit was
+        produced.
         """
         from collections import Counter
         votes: Counter[str] = Counter()
@@ -727,10 +804,27 @@ class MCTSAgentLoop:
                 break
 
         if not votes:
-            return None, {}
+            return None, {}, 0
 
         winner_hash = votes.most_common(1)[0][0]
-        return hash_to_call[winner_hash], dict(votes)
+        used_samples = sum(votes.values())
+        return hash_to_call[winner_hash], dict(votes), used_samples
+
+    def _is_ready_for_finalization(self, node: SearchNode) -> bool:
+        if not node.loop_state.executable_edit_made:
+            return False
+        if not node.loop_state.validation_attempted_after_edit:
+            return False
+        required = len(self.success_validation_checks)
+        if required > 0 and len(node.loop_state.satisfied_success_checks) < required:
+            return False
+        # Don't auto-finalize if the patch touches test files (policy violation)
+        if any(
+            ln.startswith("+++ b/") and ("test" in ln.lower() or "/spec/" in ln)
+            for ln in node.git_diff.splitlines()
+        ):
+            return False
+        return True
 
     def _serialize_tree(self, root: SearchNode, result_node: SearchNode) -> dict[str, Any]:
         """Walk the full tree and produce a JSON-serialisable dict for the traj.
@@ -929,7 +1023,7 @@ class MCTSAgentLoop:
                 else:
                     break
             if name == "bash":
-                cmd_preview = str(arguments.get("cmd", ""))[:80]
+                cmd_preview = str(arguments.get("command", arguments.get("cmd", "")))[:80]
                 loop_warn = (
                     f"STOP: You have run `{cmd_preview}` {total_repeat} times in a row "
                     f"and the output is identical every time. Running it again will not help. "
@@ -974,6 +1068,19 @@ class MCTSAgentLoop:
         })
         if loop_warn:
             new_messages.append({"role": "user", "content": loop_warn})
+        elif (
+            not new_ls.executable_edit_made
+            and (parent.depth + 1) >= 6
+            and name in {"view", "bash"}
+        ):
+            new_messages.append({
+                "role": "user",
+                "content": (
+                    "STOP: You have spent several turns on discovery without making an edit. "
+                    "Based on current evidence, propose and apply one concrete code edit now, "
+                    "then run the required success validation command."
+                ),
+            })
 
         # Verbose: show tool execution result
         if self.verbose:
@@ -1114,7 +1221,7 @@ class MCTSAgentLoop:
         # 2b. Edit action → majority vote, then execute top-K unique edits
         # ------------------------------------------------------------------
         self._log(f"[mcts] edit detected — running majority vote (max={self.edit_vote_samples})")
-        winner, vote_counts = self._majority_vote_edit(
+        winner, vote_counts, vote_used_samples = self._majority_vote_edit(
             messages, self.edit_vote_samples, seed_call=probe_call
         )
         if winner is None:
@@ -1146,9 +1253,10 @@ class MCTSAgentLoop:
             child = self._execute_action(node, call, "edit_branch", tr)
             child.is_branch_point = True
             child.vote_counts = vote_counts if call is winner else {}
+            child.vote_total_samples = vote_used_samples if call is winner else 0
             node.children.append(child)
             children.append(child)
-            total_samples = sum(vote_counts.values())
+            total_samples = vote_used_samples
             winner_votes = vote_counts.get(self._hash_action(call["name"], call.get("arguments", {})), "?")
             vote_info = f" votes={winner_votes}/{total_samples}" if call is winner else ""
             self._log(
@@ -1289,6 +1397,7 @@ class MCTSAgentLoop:
         self._log(f"[mcts] starting model={self.model} iterations={MAX_ITERATIONS} k={EXPANSION_CANDIDATES}")
         start = time.time()
         best_submitted: SearchNode | None = None
+        best_ready: SearchNode | None = None
 
         for iteration in range(MAX_ITERATIONS):
             self._log(f"[mcts] iteration {iteration + 1}/{MAX_ITERATIONS}")
@@ -1322,17 +1431,27 @@ class MCTSAgentLoop:
                     or self._estimate_value(child) > self._estimate_value(best_submitted)
                 ):
                     best_submitted = child
+                if self._is_ready_for_finalization(child) and (
+                    best_ready is None
+                    or self._estimate_value(child) > self._estimate_value(best_ready)
+                ):
+                    best_ready = child
 
             # Early exit if we found a fully-passing submission
             if best_submitted and len(best_submitted.loop_state.satisfied_success_checks) >= len(self.success_validation_checks):
                 self._log(f"[mcts] all success checks satisfied at iteration {iteration + 1}; stopping early")
+                break
+            if best_ready is not None:
+                self._log(
+                    f"[mcts] all success checks satisfied without explicit submit at iteration {iteration + 1}; stopping early"
+                )
                 break
 
         elapsed = round(time.time() - start, 2)
         self._log(f"[mcts] search finished in {elapsed}s")
 
         # Choose the result node
-        result_node = best_submitted or self._best_terminal(root) or self._deepest_with_edit(root)
+        result_node = best_submitted or best_ready or self._best_terminal(root) or self._deepest_with_edit(root)
         if result_node is root:
             result_node.stopped_reason = "no_progress"
 
@@ -1343,6 +1462,18 @@ class MCTSAgentLoop:
             timeout=30,
             check="ignore",
         ) or ""
+        if (
+            not result_node.submitted
+            and self._is_ready_for_finalization(result_node)
+            and patch.strip()
+        ):
+            result_node.submitted = True
+            result_node.auto_finalized = True
+            result_node.submit_summary = (
+                "Auto-finalized: required success checks were satisfied with a non-empty patch."
+            )
+            result_node.stopped_reason = "auto_finalized"
+            self._log("[mcts] auto-finalized solved branch without explicit submit")
 
         # Build flattened turn list across the result path
         all_turns = [asdict(t) for t in result_node.turn_records]
@@ -1361,7 +1492,7 @@ class MCTSAgentLoop:
                     "depth": pn.depth,
                     "action": pn.action["name"] if pn.action else None,
                     "winner_votes": max(pn.vote_counts.values()),
-                    "total_samples": self.edit_vote_samples,
+                    "total_samples": pn.vote_total_samples or sum(pn.vote_counts.values()),
                     "unique_candidates": len(pn.vote_counts),
                 })
 
@@ -1393,6 +1524,7 @@ class MCTSAgentLoop:
                 "submission_summary": result_node.submit_summary,
                 "stopped_reason": result_node.stopped_reason or "max_iterations",
             },
+            "auto_finalized": result_node.auto_finalized,
             "mcts_meta": {
                 "model": self.model,
                 "iterations": MAX_ITERATIONS,
@@ -1560,7 +1692,7 @@ def main() -> None:
 
         try:
             log_line("[env] starting")
-            env.start()
+            _start_env_with_retries(env, log_line)
             repo_root = _instance_repo_root(instance)
             env.communicate(f"cd {shlex.quote(repo_root)}", check="ignore", timeout=10)
             # Ensure git repo exists inside container
@@ -1645,11 +1777,22 @@ def main() -> None:
             coder_result: dict[str, Any] | None = None
             review_feedback: dict[str, Any] | None = None
             reviewer_rounds = args.reviewer_rounds if args.agent_architecture == "planner_coder_reviewer" else 1
+            coder_rounds: list[dict[str, Any]] = []
 
             for rnd in range(reviewer_rounds):
+                # Reset repo to HEAD before each retry so the second coder round
+                # starts from a clean state, not on top of the rejected edits.
+                if rnd > 0:
+                    log_line(f"[mcts] resetting repo to HEAD for coder round {rnd + 1}")
+                    env.communicate(
+                        f"cd {shlex.quote(repo_root)}\ngit reset --hard HEAD\ngit clean -fdq",
+                        check="ignore", timeout=30,
+                    )
+
                 round_extra = list(extra_prompts)
                 if review_feedback:
                     round_extra.append(_build_reviewer_feedback_prompt(review_feedback))
+                    round_extra.append(_build_reviewer_constraints_prompt(review_feedback))
 
                 log_line(f"[mcts] coder round={rnd + 1} model={model}")
                 mcts = MCTSAgentLoop(
@@ -1680,6 +1823,65 @@ def main() -> None:
 
                 assert coder_result is not None
                 patch_text = str(coder_result.get("patch", ""))
+
+                # --- Pre-run reviewer verification ----------------------------
+                # Run success checks deterministically in the live container.
+                # If all pass + patch is non-empty + patch doesn't touch test
+                # files → skip the model reviewer call entirely.
+                patch_touches_tests = any(
+                    ln.startswith("+++ b/") and ("test" in ln.lower() or "/spec/" in ln)
+                    for ln in patch_text.splitlines()
+                )
+                live_check_results: dict[str, dict] = {}
+                if success_checks and patch_text.strip() and not patch_touches_tests:
+                    for chk in success_checks:
+                        chk_cmd = str(chk.get("command", "")).strip()
+                        if not chk_cmd:
+                            continue
+                        chk_out = env.communicate(
+                            f"cd {shlex.quote(repo_root)}\n{chk_cmd}",
+                            check="ignore", timeout=60,
+                        )
+                        chk_exit_raw = env.communicate("echo $?", check="ignore", timeout=5).strip()
+                        chk_exit = int(chk_exit_raw) if chk_exit_raw.isdigit() else 1
+                        passed = _command_output_satisfies_check(chk, exit_code=chk_exit, output=chk_out)
+                        live_check_results[str(chk.get("name", chk_cmd[:40]))] = {
+                            "passed": passed,
+                            "output": chk_out[:400],
+                        }
+                if (
+                    live_check_results
+                    and all(v["passed"] for v in live_check_results.values())
+                    and patch_text.strip()
+                    and not patch_touches_tests
+                ):
+                    review_feedback = {
+                        "decision": "accept",
+                        "primary_reason": "All success checks verified (pre-run); skipping model reviewer.",
+                        "required_changes": [],
+                        "validations_to_rerun": [],
+                    }
+                    log_line("[reviewer] auto-accept: all success checks passed pre-run")
+                    coder_rounds.append({
+                        "round": rnd + 1,
+                        "turns": coder_result.get("turns", []),
+                        "patch": coder_result.get("patch", ""),
+                        "submitted": coder_result.get("submitted", False),
+                        "stopped_reason": coder_result.get("stopped_reason", ""),
+                        "stats": coder_result.get("stats", {}),
+                        "mcts_tree": coder_result.get("mcts_tree", {}),
+                        "vote_summary": coder_result.get("vote_summary", []),
+                        "review_feedback": review_feedback,
+                    })
+                    if not coder_result.get("submitted", False):
+                        coder_result["submitted"] = True
+                        coder_result["stopped_reason"] = "reviewer_accepted_finalized"
+                        coder_result["submission_summary"] = (
+                            "Pre-run success checks all passed; reviewer auto-accepted."
+                        )
+                    break
+                # --------------------------------------------------------------
+
                 log_line(f"[reviewer] model={reviewer_model} round={rnd + 1}")
                 review_feedback, rev_stats, _ = _call_json_role_local(
                     model=reviewer_model,
@@ -1695,6 +1897,7 @@ def main() -> None:
                         patch_text=patch_text,
                         case_evaluation=case_evaluation,
                         case_policy=case_policy,
+                        live_check_results=live_check_results or None,
                     ),
                     fallback_payload=_default_reviewer_feedback(),
                 )
@@ -1706,7 +1909,25 @@ def main() -> None:
                     "api_calls": int(prior.get("api_calls", 0)) + rev_stats["api_calls"],
                 }
                 log_line(f"[reviewer] decision={review_feedback.get('decision', 'unknown')}")
+                # Record this round's full history before potentially overwriting coder_result
+                coder_rounds.append({
+                    "round": rnd + 1,
+                    "turns": coder_result.get("turns", []),
+                    "patch": coder_result.get("patch", ""),
+                    "submitted": coder_result.get("submitted", False),
+                    "stopped_reason": coder_result.get("stopped_reason", ""),
+                    "stats": coder_result.get("stats", {}),
+                    "mcts_tree": coder_result.get("mcts_tree", {}),
+                    "vote_summary": coder_result.get("vote_summary", []),
+                    "review_feedback": review_feedback,
+                })
                 if str(review_feedback.get("decision", "")).lower() == "accept":
+                    if not coder_result.get("submitted", False) and str(coder_result.get("patch", "")).strip():
+                        coder_result["submitted"] = True
+                        coder_result["stopped_reason"] = "reviewer_accepted_finalized"
+                        coder_result["submission_summary"] = (
+                            "Reviewer accepted patch; finalized without explicit submit."
+                        )
                     break
                 log_line("[reviewer] revise — returning to MCTS coder")
 
@@ -1725,6 +1946,7 @@ def main() -> None:
             result["role_model_stats"] = role_model_stats
             result["planner_handoff"] = planner_handoff or {}
             result["review_feedback"] = review_feedback or {}
+            result["coder_rounds"] = coder_rounds  # full per-round history
             result["instance_id"] = instance_id
             result["duration_seconds"] = round(time.time() - start, 2)
 
@@ -1757,6 +1979,7 @@ def main() -> None:
                 failure = {
                     "instance_id": instance_id,
                     "error": f"{type(exc).__name__}: {exc}",
+                    "error_kind": "infra" if _is_infra_error_text(f"{exc}\n{tb_str}") else "agent",
                     "traceback": tb_str,
                     "duration_seconds": round(time.time() - start, 2),
                     "info": {"submission": "", "submitted": False, "stopped_reason": "error"},
