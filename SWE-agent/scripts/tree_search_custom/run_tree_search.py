@@ -39,6 +39,7 @@ import math
 import shlex
 import sys
 import time
+import traceback
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
@@ -271,7 +272,7 @@ def _load_custom_file_instances_local(path: Path, filter_regex: str, slice_spec:
     from sweagent.agent.problem_statement import TextProblemStatement
     import re as _re
 
-    def _resolve(p: Path) -> Path:
+    def _resolve(p: Path) -> Path | None:
         for name in ("case.json", "case.yaml", "case.yml"):
             if (p / name).exists():
                 return p / name
@@ -279,21 +280,39 @@ def _load_custom_file_instances_local(path: Path, filter_regex: str, slice_spec:
         matches = _g.glob(str(p / "*.json")) + _g.glob(str(p / "*.yaml")) + _g.glob(str(p / "*.yml"))
         if matches:
             return Path(matches[0])
-        raise FileNotFoundError(f"No case file found under {p}")
+        return None
 
-    case_file = _resolve(path)
-    raw_items = yaml.safe_load(case_file.read_text())
-    if isinstance(raw_items, dict):
-        raw_items = [raw_items]
-    if not isinstance(raw_items, list):
-        raise ValueError("Custom instance file must contain a list of instances (or a single dict)")
+    # Support passing a parent directory that contains one case-dir per subdirectory.
+    # If path itself has no case file, scan immediate subdirectories for case files.
+    case_files: list[Path] = []
+    direct = _resolve(path)
+    if direct is not None:
+        case_files = [direct]
+    else:
+        for sub in sorted(path.iterdir()):
+            if sub.is_dir():
+                cf = _resolve(sub)
+                if cf is not None:
+                    case_files.append(cf)
+        if not case_files:
+            raise FileNotFoundError(f"No case files found under {path} or its subdirectories")
+
+    # Build (item, source_case_file) pairs so repo resolution stays correct
+    # even when items came from different subdirectory case files.
+    item_pairs: list[tuple[Any, Path]] = []
+    for case_file in case_files:
+        loaded = yaml.safe_load(case_file.read_text())
+        if isinstance(loaded, dict):
+            loaded = [loaded]
+        if isinstance(loaded, list):
+            for entry in loaded:
+                if isinstance(entry, dict):
+                    item_pairs.append((entry, case_file))
 
     _filter = _re.compile(filter_regex or ".*")
     instances: list[Any] = []
 
-    for item in raw_items:
-        if not isinstance(item, dict):
-            continue
+    for item, case_file in item_pairs:
         instance_id = str(item["instance_id"])
         if not _filter.search(instance_id):
             continue
@@ -375,8 +394,8 @@ EDIT_VOTE_SAMPLES = 5   # majority-vote samples when an edit action is detected
 EDIT_VOTE_TEMPERATURE = 0.4  # temperature used for vote samples
 
 # Improvement 2: context compression
-COMPRESS_AFTER_TURNS = 8    # start truncating old tool outputs beyond this depth
-COMPRESS_OUTPUT_CHARS = 300  # max chars kept per old tool output
+COMPRESS_AFTER_TURNS = 5    # start truncating old tool outputs beyond this depth
+COMPRESS_OUTPUT_CHARS = 200  # max chars kept per old tool output
 
 # ---------------------------------------------------------------------------
 # Value constants
@@ -499,6 +518,7 @@ class MCTSAgentLoop:
         extra_user_prompts: list[str] | None = None,
         log_fn: Callable[[str], None] | None = None,
         edit_vote_samples: int = EDIT_VOTE_SAMPLES,
+        verbose: bool = False,
     ):
         self.model = model
         self.api_base = api_base
@@ -521,11 +541,17 @@ class MCTSAgentLoop:
         self.extra_user_prompts = extra_user_prompts or []
         self.log_fn = log_fn or (lambda _: None)
         self.edit_vote_samples = max(1, edit_vote_samples)
+        self.verbose = verbose
         self._global_stats = RunStats()
         self._turn_counter = 0  # used to generate unique tool call IDs
 
     def _log(self, msg: str) -> None:
         self.log_fn(msg)
+
+    def _vlog(self, msg: str) -> None:
+        """Log only when verbose mode is enabled."""
+        if self.verbose:
+            self.log_fn(msg)
 
     # ------------------------------------------------------------------
     # Environment state helpers
@@ -754,6 +780,27 @@ class MCTSAgentLoop:
     # Model call
     # ------------------------------------------------------------------
 
+    def _format_messages_verbose(self, messages: list[dict], last_n: int = 4) -> str:
+        """Format the tail of a message list for verbose output."""
+        lines = [f"  [context tail: last {min(last_n, len(messages))} of {len(messages)} messages]"]
+        for msg in messages[-last_n:]:
+            role = msg.get("role", "?")
+            if role == "assistant":
+                calls = msg.get("tool_calls", [])
+                if calls:
+                    fn = calls[0].get("function", {})
+                    lines.append(f"  assistant → tool_call: {fn.get('name','?')}({fn.get('arguments','')[:120]})")
+                else:
+                    lines.append(f"  assistant: {(msg.get('content') or '')[:200]}")
+            elif role == "tool":
+                out = str(msg.get("content", ""))
+                lines.append(f"  tool({msg.get('name','?')}): {out[:300]}{'…' if len(out) > 300 else ''}")
+            elif role == "user":
+                lines.append(f"  user: {str(msg.get('content',''))[:200]}")
+            elif role == "system":
+                lines.append(f"  system: <{len(str(msg.get('content','')))} chars>")
+        return "\n".join(lines)
+
     def _call_model(self, messages: list[dict], temperature: float) -> tuple[str, int, int]:
         """Call the model and return (content, tokens_in, tokens_out)."""
         import litellm
@@ -807,7 +854,38 @@ class MCTSAgentLoop:
 
         # Submit pre-check (mirror of CustomAgentLoop._submit_precheck)
         if name == "submit":
-            block = self._submit_precheck(parent.loop_state, tool_runtime)
+            # Auto-run any unsatisfied success checks before the precheck.
+            # The agent may have run an equivalent command (e.g. pytest on one
+            # file) that passed, but not the exact command string the check
+            # requires for credit.  Running the check commands here means the
+            # agent is never stuck in a "tests pass but submit blocked" loop.
+            probe_ls = copy.deepcopy(parent.loop_state)
+            for check in self.success_validation_checks:
+                check_name = str(check.get("name", check.get("command", "")))
+                if check_name in probe_ls.satisfied_success_checks:
+                    continue
+                cmd = str(check.get("command", "")).strip()
+                if not cmd:
+                    continue
+                try:
+                    chk_out = self.env.communicate(
+                        input=f"cd {shlex.quote(self.repo_root)}\n{cmd}",
+                        check="ignore",
+                        timeout=60,
+                    )
+                    exit_raw = self.env.communicate(
+                        input="echo $?", check="ignore", timeout=5
+                    ).strip()
+                    chk_exit = int(exit_raw) if exit_raw.isdigit() else 1
+                except Exception:
+                    continue
+                if _command_output_satisfies_check(check, exit_code=chk_exit, output=chk_out):
+                    probe_ls.satisfied_success_checks.add(check_name)
+                    self._log(f"[mcts] auto-check '{check_name}' passed")
+                else:
+                    self._log(f"[mcts] auto-check '{check_name}' FAILED (exit={chk_exit})")
+
+            block = self._submit_precheck(probe_ls, tool_runtime)
             if block:
                 result = ToolExecutionRecord(
                     name="submit", arguments=arguments, output=block, is_error=True
@@ -815,16 +893,64 @@ class MCTSAgentLoop:
             else:
                 result = tool_runtime.execute(name, arguments)
         else:
-            result = tool_runtime.execute(name, arguments)
+            probe_ls = parent.loop_state
+            # Detect no-op str_replace before executing: old_str == new_str means
+            # the model generated identical content and the file will not change.
+            # Return a synthetic error immediately so the model is forced to
+            # reconsider, and so executable_edit_made is NOT set True.
+            if name in ("str_replace", "replace"):
+                old_s = str(arguments.get("old_str") or arguments.get("old_string", "")).strip()
+                new_s = str(arguments.get("new_str") or arguments.get("new_string", "")).strip()
+                if old_s and old_s == new_s:
+                    result = ToolExecutionRecord(
+                        name=name, arguments=arguments, is_error=True,
+                        output=(
+                            "ERROR: No-op edit — new_str is identical to old_str. "
+                            "The file was NOT changed. You must provide different content "
+                            "in new_str to actually fix the bug. "
+                            "Re-read the file, identify the exact line(s) to change, "
+                            "and write a new_str that differs from old_str."
+                        ),
+                    )
+                else:
+                    result = tool_runtime.execute(name, arguments)
+            else:
+                result = tool_runtime.execute(name, arguments)
 
         # Loop warning
         recent = new_repeat_hashes[-4:]
         loop_warn: str | None = None
         if len(recent) == 4 and len(set(recent)) == 1:
-            loop_warn = "You are repeating the same tool call. Try a different approach."
+            # Count how many consecutive times this exact action has been repeated
+            total_repeat = 0
+            for h in reversed(new_repeat_hashes):
+                if h == recent[0]:
+                    total_repeat += 1
+                else:
+                    break
+            if name == "bash":
+                cmd_preview = str(arguments.get("cmd", ""))[:80]
+                loop_warn = (
+                    f"STOP: You have run `{cmd_preview}` {total_repeat} times in a row "
+                    f"and the output is identical every time. Running it again will not help. "
+                    f"You must take a different action: read another file, make an edit, "
+                    f"or run a different command."
+                )
+            elif name in ("str_replace", "insert", "replace"):
+                loop_warn = (
+                    f"STOP: You have attempted the same edit {total_repeat} times. "
+                    f"Your edits are not changing the file or not fixing the issue. "
+                    f"Re-read the file carefully and identify what specific line must change."
+                )
+            else:
+                loop_warn = (
+                    f"STOP: You have called `{name}` {total_repeat} times in a row "
+                    f"with the same arguments. The result will not change. "
+                    f"Try something completely different."
+                )
 
-        # Update loop state
-        new_ls = copy.deepcopy(parent.loop_state)
+        # Update loop state — start from probe_ls so auto-credited checks persist
+        new_ls = copy.deepcopy(probe_ls)
         self._update_loop_state(new_ls, result)
 
         # Build new message history
@@ -848,6 +974,16 @@ class MCTSAgentLoop:
         })
         if loop_warn:
             new_messages.append({"role": "user", "content": loop_warn})
+
+        # Verbose: show tool execution result
+        if self.verbose:
+            args_preview = json.dumps(arguments)[:200]
+            out_preview = result.output[:500] + ("…" if len(result.output) > 500 else "")
+            err_tag = " [ERROR]" if result.is_error else ""
+            self._vlog(
+                f"[verbose] TOOL CALL: {name}({args_preview}){err_tag}\n"
+                f"[verbose] TOOL RESULT:\n{out_preview}"
+            )
 
         # Capture git state after edit
         git_diff = self._capture_git_diff()
@@ -921,6 +1057,11 @@ class MCTSAgentLoop:
         # ------------------------------------------------------------------
         # 1. Probe with one exploit-temperature call to detect intent
         # ------------------------------------------------------------------
+        if self.verbose:
+            self._vlog(
+                f"[verbose] PROMPT (depth={node.depth}, temp={EXPLOIT_TEMPERATURE}):\n"
+                + self._format_messages_verbose(messages)
+            )
         try:
             probe_content, tok_in, tok_out = self._call_model(messages, EXPLOIT_TEMPERATURE)
         except Exception as exc:
@@ -937,6 +1078,9 @@ class MCTSAgentLoop:
         self._global_stats.input_tokens += tok_in
         self._global_stats.output_tokens += tok_out
         self._global_stats.tool_calls += 1
+
+        if self.verbose:
+            self._vlog(f"[verbose] RESPONSE:\n{probe_content[:600]}{'…' if len(probe_content) > 600 else ''}")
 
         probe_outcome = self._parse_action(probe_content)
         probe_call = probe_outcome.tool_calls[0] if probe_outcome.tool_calls else None
@@ -1037,7 +1181,20 @@ class MCTSAgentLoop:
                 if str(c.get("name", c.get("command", ""))) not in ls.satisfied_success_checks
             ]
             if missing:
-                return f"Do not submit yet. Required success checks not yet passed: {'; '.join(missing[:2])}"
+                # Include the exact command(s) the agent must run so it is
+                # never stuck wondering how to satisfy the check.
+                missing_set = set(missing)
+                cmds = [
+                    str(c.get("command", "")).strip()
+                    for c in self.success_validation_checks
+                    if str(c.get("name", c.get("command", ""))) in missing_set
+                    and c.get("command", "").strip()
+                ]
+                hint = f" — run: {'; '.join(cmds)}" if cmds else ""
+                return (
+                    f"Do not submit yet. Required success checks not yet passed: "
+                    f"{'; '.join(missing[:2])}{hint}"
+                )
         if not ls.diff_checked:
             return "Do not submit yet. Inspect `git diff` first."
         return None
@@ -1311,6 +1468,8 @@ def parse_args() -> argparse.Namespace:
     # Output
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--run-name", default="mcts_ollama")
+    parser.add_argument("--verbose", action="store_true",
+                        help="Print model prompts and responses to stdout during execution")
 
     args = parser.parse_args()
 
@@ -1511,6 +1670,7 @@ def main() -> None:
                     extra_user_prompts=round_extra,
                     log_fn=log_line,
                     edit_vote_samples=args.edit_vote_samples,
+                    verbose=args.verbose,
                 )
                 coder_result = mcts.run()
                 role_model_stats["coder"] = {"model": model, **coder_result.get("stats", {})}
@@ -1584,21 +1744,39 @@ def main() -> None:
             pred = _save_pred(instance_dir, instance_id, args.run_name, result["info"]["submission"])
             all_preds[instance_id] = pred
 
-        except Exception as exc:
-            log_line(f"[error] {type(exc).__name__}: {exc}")
-            failure = {
-                "instance_id": instance_id,
-                "error": str(exc),
-                "duration_seconds": round(time.time() - start, 2),
-                "info": {"submission": "", "submitted": False, "stopped_reason": "error"},
-            }
-            _dump_json(instance_dir / f"{instance_id}.traj", failure)
-            (instance_dir / f"{instance_id}.patch").write_text("")
-            pred = _save_pred(instance_dir, instance_id, args.run_name, "")
-            all_preds[instance_id] = pred
+        except BaseException as exc:
+            tb_str = traceback.format_exc()
+            try:
+                log_line(f"[error] {type(exc).__name__}: {exc}\n{tb_str}")
+            except Exception:
+                pass  # log_line itself failed; traceback already printed to stderr below
+            # Print to stderr so the crash is always visible in terminal output
+            print(f"\n[run_tree_search ERROR] {instance_id}: {type(exc).__name__}: {exc}\n{tb_str}",
+                  file=sys.stderr, flush=True)
+            try:
+                failure = {
+                    "instance_id": instance_id,
+                    "error": f"{type(exc).__name__}: {exc}",
+                    "traceback": tb_str,
+                    "duration_seconds": round(time.time() - start, 2),
+                    "info": {"submission": "", "submitted": False, "stopped_reason": "error"},
+                }
+                _dump_json(instance_dir / f"{instance_id}.traj", failure)
+                (instance_dir / f"{instance_id}.patch").write_text("")
+                pred = _save_pred(instance_dir, instance_id, args.run_name, "")
+                all_preds[instance_id] = pred
+            except Exception:
+                pass  # best-effort; don't let secondary failure hide the original crash
+            # Re-raise non-Exception BaseExceptions (KeyboardInterrupt, SystemExit)
+            # so the outer process can terminate cleanly.
+            if not isinstance(exc, Exception):
+                raise
         finally:
             log_line("[env] shutting down")
-            env.close()
+            try:
+                env.close()
+            except Exception:
+                pass  # prevent env.close() errors from masking the original exception
 
     _dump_json(output_dir / "preds.json", all_preds)
 

@@ -5,16 +5,37 @@ Eliminates the need to type multi-line CLI config each time.  Choose a preset
 and add any overrides; the effective configuration is printed before the run
 starts so it is always transparent.
 
-Usage:
+Usage — custom cases
+---------------------
+  # Single case
   python run_mcts.py --preset standard \
       --instances-type file \
       --instances-path SWE-agent/custom_cases/simple_mean_bug \
       --output-dir SWE-agent/tree_search_runs/my_run
 
-  python run_mcts.py --preset quick --model deepseek-r1:7b \\
-      --instances-type file \\
-      --instances-path SWE-agent/custom_cases/simple_mean_bug \\
-      --output-dir SWE-agent/tree_search_runs/my_run
+  # All 20 custom cases (pass the parent directory)
+  python run_mcts.py --preset standard \
+      --instances-type file \
+      --instances-path SWE-agent/custom_cases \
+      --output-dir SWE-agent/tree_search_runs/all_custom_run
+
+Usage — SWE-bench subset
+-------------------------
+  # 3 SWE-bench Lite dev cases
+  python run_mcts.py --preset standard \
+      --instances-type swe_bench --subset lite --split dev --slice 0:3 \
+      --output-dir SWE-agent/tree_search_runs/swelite_run
+
+  # Specific instance by filter regex
+  python run_mcts.py --preset standard \
+      --instances-type swe_bench --subset lite --filter pylint-dev__astroid-1866 \
+      --output-dir SWE-agent/tree_search_runs/astroid_run
+
+  # Verbose: show model prompts/responses during execution
+  python run_mcts.py --preset debug --verbose \
+      --instances-type file \
+      --instances-path SWE-agent/custom_cases/simple_mean_bug \
+      --output-dir SWE-agent/tree_search_runs/debug_run
 
   # List available presets
   python run_mcts.py --list-presets
@@ -22,8 +43,8 @@ Usage:
 Presets
 -------
 quick     : Fast smoke-test.  7b coder, 10 iterations, 3 vote samples.
-standard  : Default balanced run.  9b model, 20 iterations, 5 vote samples.  [DEFAULT]
-thorough  : High-coverage run.  9b model, 40 iterations, 7 vote samples, 3 edit candidates.
+standard  : Default balanced run.  9b model, 20 iterations, 5 vote samples, reviewer.  [DEFAULT]
+thorough  : High-coverage run.  9b model, 40 iterations, 7 vote samples, 2 reviewer rounds.
 debug     : Minimal run for quick iteration/debugging.  5 iterations, 1 vote sample, no planner.
 """
 
@@ -46,36 +67,36 @@ PRESETS: dict[str, dict[str, Any]] = {
         "iterations": 10,
         "expansion_candidates": 2,
         "edit_vote_samples": 3,
-        "max_node_depth": 12,
+        "max_node_depth": 10,   # equal to iterations
         "agent_architecture": "planner_coder",
     },
     "standard": {
         "model": "qwen3.5:9b",
         "planner_model": "qwen3.5:9b",
-        "iterations": 20,
+        "iterations": 15,       # max turns on a linear path; branching spends budget across paths
         "expansion_candidates": 2,
         "edit_vote_samples": 5,
-        "max_node_depth": 20,
+        "max_node_depth": 15,   # equal to iterations: depth is the binding constraint
         "agent_architecture": "planner_coder_reviewer",
         "reviewer_rounds": 1,
     },
     "thorough": {
         "model": "qwen3.5:9b",
         "planner_model": "qwen3.5:9b",
-        "iterations": 40,
+        "iterations": 40,       # extra budget forces branching once any path hits depth 20
         "expansion_candidates": 3,
         "edit_vote_samples": 7,
-        "max_node_depth": 25,
+        "max_node_depth": 20,   # < iterations: encourages broad search over deep grinding
         "agent_architecture": "planner_coder_reviewer",
         "reviewer_rounds": 2,
     },
     "debug": {
         "model": "qwen2.5-coder:7b-instruct",
         "planner_model": "qwen3.5:9b",
-        "iterations": 5,
+        "iterations": 8,
         "expansion_candidates": 1,
         "edit_vote_samples": 1,
-        "max_node_depth": 10,
+        "max_node_depth": 8,
         "agent_architecture": "single",
     },
 }
@@ -126,6 +147,8 @@ def _parse_args() -> tuple[str, dict[str, Any]]:
     parser.add_argument("--post-startup-command", action="append", default=None)
     parser.add_argument("--subset", default=None)
     parser.add_argument("--split", default=None)
+    parser.add_argument("--verbose", action="store_true", default=False,
+                        help="Print model prompts/responses to stdout during execution")
 
     args = parser.parse_args()
 
@@ -164,6 +187,7 @@ def _parse_args() -> tuple[str, dict[str, Any]]:
         "instances_type": args.instances_type,
         "instances_path": args.instances_path,
         "output_dir": args.output_dir,
+        "verbose": args.verbose if args.verbose else None,
     }
     for k, v in override_map.items():
         if v is not None:
@@ -196,7 +220,7 @@ def _cfg_to_argv(cfg: dict[str, Any]) -> list[str]:
     """Convert an effective config dict into a sys.argv list for run_tree_search.py."""
     argv = ["run_tree_search.py"]
 
-    bool_flags = {"shuffle"}
+    bool_flags = {"shuffle", "verbose"}
     list_flags = {"post_startup_command"}
     path_flags = {"instances_path", "output_dir"}
 
