@@ -1,0 +1,15 @@
+diff --git a/app/utils/currency.py b/app/utils/currency.py
+index 6c2af37..75da935 100644
+--- a/app/utils/currency.py
++++ b/app/utils/currency.py
+@@ -2,5 +2,9 @@ def abbreviate_currency(amount: float) -> str:
+     if amount >= 1_000_000:
+         return f"${amount / 1_000_000:.1f}M"
+     if amount >= 1_000:
+-        return f"${round(amount / 1_000, 1):.1f}K"
++        raw = amount / 1_000
++        rounded = round(raw, 1)
++        if raw >= rounded and raw < rounded + 0.05:
++            rounded = round(raw, 1) - 0.1
++        return f"${rounded:.1f}K"
+     return f"${amount:.0f}"

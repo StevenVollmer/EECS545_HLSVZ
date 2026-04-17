@@ -481,6 +481,7 @@ COMPRESS_OUTPUT_CHARS = 200  # max chars kept per old tool output
 # ---------------------------------------------------------------------------
 
 VALUE_SUCCESS_CHECK_EACH = 20.0  # per satisfied case success check
+VALUE_NEW_CHECK_PROGRESS = 10.0  # incremental reward when a step satisfies new checks
 VALUE_SUBMITTED = 25.0
 VALUE_VALIDATION_PASSED_AFTER_EDIT = 12.0
 VALUE_DIFF_CHECKED = 3.0
@@ -488,6 +489,8 @@ VALUE_EDIT_MADE = 3.0
 PENALTY_PARSE_ERROR = -1.5
 PENALTY_TOOL_ERROR = -1.0
 PENALTY_NO_EDIT_DEEP_TURN = -1.2
+PENALTY_POST_EDIT_STAGNATION = -2.0
+PENALTY_EMPTY_PATCH_ENDPOINT = -8.0
 DEPTH_DISCOUNT = 0.97   # per-depth multiplier; prefers shallower solutions
 
 
@@ -542,6 +545,9 @@ class SearchNode:
     vote_counts: dict[str, int] = field(default_factory=dict)  # majority-vote tallies for edit nodes
     vote_total_samples: int = 0
     auto_finalized: bool = False
+    check_progress_gain: int = 0
+    post_edit_no_progress_turns: int = 0
+    has_nonempty_patch: bool = False
 
     @property
     def is_terminal(self) -> bool:
@@ -600,6 +606,7 @@ class MCTSAgentLoop:
         extra_user_prompts: list[str] | None = None,
         log_fn: Callable[[str], None] | None = None,
         edit_vote_samples: int = EDIT_VOTE_SAMPLES,
+        adaptive_branching: bool = True,
         verbose: bool = False,
     ):
         self.model = model
@@ -623,6 +630,7 @@ class MCTSAgentLoop:
         self.extra_user_prompts = extra_user_prompts or []
         self.log_fn = log_fn or (lambda _: None)
         self.edit_vote_samples = max(1, edit_vote_samples)
+        self.adaptive_branching = adaptive_branching
         self.verbose = verbose
         self._global_stats = RunStats()
         self._turn_counter = 0  # used to generate unique tool call IDs
@@ -679,6 +687,7 @@ class MCTSAgentLoop:
         ls = node.loop_state
         total_checks = len(self.success_validation_checks) or 1
         v += VALUE_SUCCESS_CHECK_EACH * len(ls.satisfied_success_checks) / total_checks
+        v += VALUE_NEW_CHECK_PROGRESS * node.check_progress_gain
         if node.submitted:
             v += VALUE_SUBMITTED
         if ls.validation_passed and ls.executable_edit_made:
@@ -689,6 +698,10 @@ class MCTSAgentLoop:
             v += VALUE_EDIT_MADE
         if not ls.executable_edit_made and node.depth >= 6:
             v += PENALTY_NO_EDIT_DEEP_TURN * (node.depth - 5)
+        if node.post_edit_no_progress_turns >= 3:
+            v += PENALTY_POST_EDIT_STAGNATION * (node.post_edit_no_progress_turns - 2)
+        if node.depth >= 8 and ls.executable_edit_made and not node.has_nonempty_patch:
+            v += PENALTY_EMPTY_PATCH_ENDPOINT
         if node.parse_errors >= 2:
             return float("-inf")  # permanently abandon high-parse-error branches
         v += PENALTY_PARSE_ERROR * node.parse_errors
@@ -871,6 +884,25 @@ class MCTSAgentLoop:
             return False
         return True
 
+    def _adaptive_edit_policy(self, node: SearchNode) -> tuple[int, int]:
+        """Return (vote_samples, candidate_limit) for the current node.
+
+        During post-edit stagnation, increase exploration to diversify edits.
+        """
+        vote_samples = self.edit_vote_samples
+        candidate_limit = EXPANSION_CANDIDATES
+        if not self.adaptive_branching:
+            return vote_samples, candidate_limit
+
+        stagnating = (
+            node.loop_state.executable_edit_made
+            and node.post_edit_no_progress_turns >= 2
+        )
+        if stagnating:
+            vote_samples = min(max(self.edit_vote_samples + 2, 3), 9)
+            candidate_limit = max(EXPANSION_CANDIDATES, 2)
+        return vote_samples, candidate_limit
+
     def _serialize_tree(self, root: SearchNode, result_node: SearchNode) -> dict[str, Any]:
         """Walk the full tree and produce a JSON-serialisable dict for the traj.
 
@@ -902,6 +934,9 @@ class MCTSAgentLoop:
                 "is_branch_point": n.is_branch_point,
                 "edit_made": n.loop_state.executable_edit_made,
                 "success_checks": len(n.loop_state.satisfied_success_checks),
+                "check_progress_gain": n.check_progress_gain,
+                "post_edit_no_progress_turns": n.post_edit_no_progress_turns,
+                "has_nonempty_patch": n.has_nonempty_patch,
                 "stopped_reason": n.stopped_reason,
                 "vote_counts": n.vote_counts,
                 "on_result_path": id(n) in result_path,
@@ -1024,13 +1059,28 @@ class MCTSAgentLoop:
                 else:
                     self._log(f"[mcts] auto-check '{check_name}' FAILED (exit={chk_exit})")
 
-            block = self._submit_precheck(probe_ls, tool_runtime)
-            if block:
+            if (
+                parent.action
+                and parent.action.get("name") == "submit"
+                and len(probe_ls.satisfied_success_checks) <= len(parent.loop_state.satisfied_success_checks)
+            ):
                 result = ToolExecutionRecord(
-                    name="submit", arguments=arguments, output=block, is_error=True
+                    name="submit",
+                    arguments=arguments,
+                    output=(
+                        "ERROR: Repeated submit with no additional success-check progress. "
+                        "Do not submit again yet; make a substantive fix and rerun required validations."
+                    ),
+                    is_error=True,
                 )
             else:
-                result = tool_runtime.execute(name, arguments)
+                block = self._submit_precheck(probe_ls, tool_runtime)
+                if block:
+                    result = ToolExecutionRecord(
+                        name="submit", arguments=arguments, output=block, is_error=True
+                    )
+                else:
+                    result = tool_runtime.execute(name, arguments)
         else:
             probe_ls = parent.loop_state
             # Detect no-op str_replace before executing: old_str == new_str means
@@ -1159,6 +1209,21 @@ class MCTSAgentLoop:
 
         # Capture git state after edit
         git_diff = self._capture_git_diff()
+        patch_line_count = sum(
+            1
+            for ln in git_diff.splitlines()
+            if ln.startswith(("+", "-")) and not ln.startswith(("+++", "---"))
+        )
+        check_progress_gain = max(
+            0,
+            len(new_ls.satisfied_success_checks) - len(parent.loop_state.satisfied_success_checks),
+        )
+        post_edit_no_progress_turns = parent.post_edit_no_progress_turns
+        if new_ls.executable_edit_made:
+            if check_progress_gain > 0:
+                post_edit_no_progress_turns = 0
+            else:
+                post_edit_no_progress_turns = parent.post_edit_no_progress_turns + 1
 
         # Update failure counters
         new_fail = dict(parent.consecutive_failure_counts)
@@ -1197,6 +1262,9 @@ class MCTSAgentLoop:
             repeat_hashes=new_repeat_hashes,
             turn_records=list(parent.turn_records) + [turn_rec],
             parse_errors=parent.parse_errors,
+            check_progress_gain=check_progress_gain,
+            post_edit_no_progress_turns=post_edit_no_progress_turns,
+            has_nonempty_patch=patch_line_count > 0,
         )
         return child
 
@@ -1312,9 +1380,13 @@ class MCTSAgentLoop:
         # ------------------------------------------------------------------
         # 2b. Edit action → majority vote, then execute top-K unique edits
         # ------------------------------------------------------------------
-        self._log(f"[mcts] edit detected — running majority vote (max={self.edit_vote_samples})")
+        vote_samples, candidate_limit = self._adaptive_edit_policy(node)
+        self._log(
+            f"[mcts] edit detected — running majority vote (max={vote_samples}), "
+            f"candidates={candidate_limit}"
+        )
         winner, vote_counts, vote_used_samples = self._majority_vote_edit(
-            messages, self.edit_vote_samples, seed_call=probe_call
+            messages, vote_samples, seed_call=probe_call
         )
         if winner is None:
             winner = probe_call
@@ -1323,7 +1395,7 @@ class MCTSAgentLoop:
         # winner is first; add a runner-up explore sample if EXPANSION_CANDIDATES > 1
         candidates: list[dict[str, Any]] = [winner]
         seen_hashes: set[str] = {self._hash_action(winner["name"], winner.get("arguments", {}))}
-        if EXPANSION_CANDIDATES > 1:
+        if candidate_limit > 1:
             try:
                 explore_content, et_in, et_out = self._call_model(messages, EXPLORE_TEMPERATURE)
                 self._global_stats.input_tokens += et_in
@@ -1337,6 +1409,7 @@ class MCTSAgentLoop:
                         seen_hashes.add(eh)
             except Exception:
                 pass
+        candidates = candidates[:candidate_limit]
 
         children: list[SearchNode] = []
         for call in candidates:
@@ -1473,6 +1546,23 @@ class MCTSAgentLoop:
         candidates.sort(key=lambda n: (n.loop_state.executable_edit_made, self._estimate_value(n)), reverse=True)
         return candidates[0]
 
+    def _best_nonempty_patch_leaf(self, root: SearchNode) -> SearchNode | None:
+        """Best leaf that preserves a non-empty patch and at least one edit."""
+        candidates: list[SearchNode] = []
+
+        def walk(n: SearchNode) -> None:
+            if not n.children:
+                if n.loop_state.executable_edit_made and n.has_nonempty_patch:
+                    candidates.append(n)
+            for c in n.children:
+                walk(c)
+
+        walk(root)
+        if not candidates:
+            return None
+        candidates.sort(key=lambda n: (self._estimate_value(n), n.depth), reverse=True)
+        return candidates[0]
+
     # ------------------------------------------------------------------
     # Public run() entry point
     # ------------------------------------------------------------------
@@ -1550,6 +1640,17 @@ class MCTSAgentLoop:
         result_node = best_submitted or best_ready or self._best_terminal(root) or self._deepest_with_edit(root)
         if result_node is root:
             result_node.stopped_reason = "no_progress"
+        if (
+            not result_node.submitted
+            and result_node.depth >= 8
+            and not result_node.has_nonempty_patch
+        ):
+            alt = self._best_nonempty_patch_leaf(root)
+            if alt is not None and alt is not result_node:
+                self._log("[mcts] empty-patch guardrail: selecting best non-empty patch leaf")
+                result_node = alt
+                if not result_node.stopped_reason:
+                    result_node.stopped_reason = "empty_patch_guardrail"
 
         # Restore the container to the result node's state for patch capture
         self._restore_state(result_node)
@@ -1679,7 +1780,15 @@ def parse_args() -> argparse.Namespace:
                         choices=["single", "planner_coder", "planner_coder_reviewer"],
                         default="planner_coder")
     parser.add_argument("--reviewer-rounds", type=int, default=1)
+    parser.add_argument("--reviewer-gate-mode", choices=["strict", "soft"], default="soft",
+                        help="strict: any reviewer revise rejects; soft: only hard evidence blocks")
     parser.add_argument("--max-identical-tool-failures", type=int, default=3)
+    parser.add_argument(
+        "--adaptive-branching",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Enable adaptive edit vote/candidate expansion during post-edit stagnation",
+    )
 
     # Instances
     parser.add_argument("--instances-type", choices=["swe_bench", "file"], default="swe_bench")
@@ -1754,6 +1863,8 @@ def main() -> None:
         "reviewer_model": reviewer_model,
         "api_base": args.api_base,
         "agent_architecture": args.agent_architecture,
+        "reviewer_gate_mode": args.reviewer_gate_mode,
+        "adaptive_branching": bool(args.adaptive_branching),
         "mcts": {
             "iterations": MAX_ITERATIONS,
             "expansion_candidates": EXPANSION_CANDIDATES,
@@ -1924,6 +2035,7 @@ def main() -> None:
                     extra_user_prompts=round_extra,
                     log_fn=log_line,
                     edit_vote_samples=args.edit_vote_samples,
+                    adaptive_branching=bool(args.adaptive_branching),
                     verbose=args.verbose,
                 )
                 coder_result = mcts.run()
@@ -2022,7 +2134,34 @@ def main() -> None:
                     "tokens_out": int(prior.get("tokens_out", 0)) + rev_stats["tokens_out"],
                     "api_calls": int(prior.get("api_calls", 0)) + rev_stats["api_calls"],
                 }
-                log_line(f"[reviewer] decision={review_feedback.get('decision', 'unknown')}")
+                raw_decision = str(review_feedback.get("decision", "")).lower()
+                reviewer_hard_reject = False
+                if raw_decision == "revise":
+                    required_check_count = len(success_checks)
+                    satisfied_check_count = len((coder_result.get("loop_state") or {}).get("satisfied_success_checks", []))
+                    missing_required_checks = required_check_count > 0 and satisfied_check_count < required_check_count
+                    patch_empty = not patch_text.strip()
+                    failed_live_checks = any(not v.get("passed", False) for v in (live_check_results or {}).values())
+                    explicit_failing_evidence = bool(failed_live_checks or missing_required_checks or patch_empty)
+                    risk_high = "high" in str(review_feedback.get("risk_assessment", "")).lower()
+                    reviewer_hard_reject = (
+                        args.reviewer_gate_mode == "strict"
+                        or missing_required_checks
+                        or patch_empty
+                        or (risk_high and explicit_failing_evidence)
+                    )
+                    if args.reviewer_gate_mode == "soft" and not reviewer_hard_reject:
+                        review_feedback["decision"] = "accept_soft_gate"
+                        review_feedback["soft_gate_override"] = {
+                            "reason": "reviewer_revise_without_hard_failure_evidence",
+                            "missing_required_checks": missing_required_checks,
+                            "failed_live_checks": failed_live_checks,
+                            "patch_empty": patch_empty,
+                        }
+                log_line(
+                    f"[reviewer] decision={review_feedback.get('decision', 'unknown')} "
+                    f"(raw={raw_decision}, hard_reject={reviewer_hard_reject}, gate={args.reviewer_gate_mode})"
+                )
                 # Record this round's full history before potentially overwriting coder_result
                 coder_rounds.append({
                     "round": rnd + 1,
@@ -2035,12 +2174,14 @@ def main() -> None:
                     "vote_summary": coder_result.get("vote_summary", []),
                     "review_feedback": review_feedback,
                 })
-                if str(review_feedback.get("decision", "")).lower() == "accept":
+                if str(review_feedback.get("decision", "")).lower() in {"accept", "accept_soft_gate"}:
                     if not coder_result.get("submitted", False) and str(coder_result.get("patch", "")).strip():
                         coder_result["submitted"] = True
                         coder_result["stopped_reason"] = "reviewer_accepted_finalized"
                         coder_result["submission_summary"] = (
                             "Reviewer accepted patch; finalized without explicit submit."
+                            if str(review_feedback.get("decision", "")).lower() == "accept"
+                            else "Soft-gate override accepted patch despite reviewer revise without hard failure evidence."
                         )
                     break
                 log_line("[reviewer] revise — returning to MCTS coder")
@@ -2049,7 +2190,7 @@ def main() -> None:
             result = coder_result
             if (
                 args.agent_architecture == "planner_coder_reviewer"
-                and str((review_feedback or {}).get("decision", "")).lower() != "accept"
+                and str((review_feedback or {}).get("decision", "")).lower() not in {"accept", "accept_soft_gate"}
             ):
                 result["submitted"] = False
                 result["stopped_reason"] = "reviewer_rejected"

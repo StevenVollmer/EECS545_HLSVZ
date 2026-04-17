@@ -76,11 +76,12 @@ PRESETS: dict[str, dict[str, Any]] = {
         "model": "qwen3.5:9b",
         "planner_model": "qwen3.5:9b",
         "iterations": 18,       # max turns on a linear path; branching spends budget across paths
-        "expansion_candidates": 2,
+        "expansion_candidates": 1,
         "edit_vote_samples": 5,
         "max_node_depth": 18,   # equal to iterations: depth is the binding constraint
         "agent_architecture": "planner_coder_reviewer",
         "reviewer_rounds": 2,   # one retry after reviewer revise feedback
+        "reviewer_gate_mode": "soft",  # ablation confirmed +1 case vs strict, no regressions
     },
     "thorough": {
         "model": "qwen3.5:9b",
@@ -91,6 +92,18 @@ PRESETS: dict[str, dict[str, Any]] = {
         "max_node_depth": 20,   # < iterations: encourages broad search over deep grinding
         "agent_architecture": "planner_coder_reviewer",
         "reviewer_rounds": 2,
+    },
+    "hard_case_phase2": {
+        "model": "qwen3.5:9b",
+        "planner_model": "qwen3.5:9b",
+        "iterations": 18,
+        "expansion_candidates": 1,
+        "edit_vote_samples": 5,
+        "max_node_depth": 18,
+        "agent_architecture": "planner_coder_reviewer",
+        "reviewer_rounds": 2,
+        "reviewer_gate_mode": "soft",
+        "adaptive_branching": False,  # ablation showed no benefit; adds cost and instability
     },
     "debug": {
         "model": "qwen2.5-coder:7b-instruct",
@@ -138,6 +151,7 @@ def _parse_args() -> tuple[str, dict[str, Any]]:
     parser.add_argument("--agent-architecture", default=None,
                         choices=["single", "planner_coder", "planner_coder_reviewer"])
     parser.add_argument("--reviewer-rounds", type=int, default=None)
+    parser.add_argument("--reviewer-gate-mode", default=None, choices=["strict", "soft"])
     parser.add_argument("--num-ctx", type=int, default=None)
     parser.add_argument("--max-tokens", type=int, default=None)
     parser.add_argument("--api-base", default=None)
@@ -151,6 +165,7 @@ def _parse_args() -> tuple[str, dict[str, Any]]:
     parser.add_argument("--split", default=None)
     parser.add_argument("--verbose", action="store_true", default=False,
                         help="Print model prompts/responses to stdout during execution")
+    parser.add_argument("--adaptive-branching", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--resume", action="store_true", default=False,
                         help="Skip instances that already have a .traj file in output-dir")
     parser.add_argument("--failures-of", type=Path, default=None,
@@ -179,6 +194,7 @@ def _parse_args() -> tuple[str, dict[str, Any]]:
         "max_node_depth": args.max_node_depth,
         "agent_architecture": args.agent_architecture,
         "reviewer_rounds": args.reviewer_rounds,
+        "reviewer_gate_mode": args.reviewer_gate_mode,
         "num_ctx": args.num_ctx,
         "max_tokens": args.max_tokens,
         "api_base": args.api_base,
@@ -194,6 +210,7 @@ def _parse_args() -> tuple[str, dict[str, Any]]:
         "instances_path": args.instances_path,
         "output_dir": args.output_dir,
         "verbose": args.verbose if args.verbose else None,
+        "adaptive_branching": args.adaptive_branching,
         "resume": args.resume if args.resume else None,
     }
     for k, v in override_map.items():
@@ -249,7 +266,7 @@ def _cfg_to_argv(cfg: dict[str, Any]) -> list[str]:
     """Convert an effective config dict into a sys.argv list for run_tree_search.py."""
     argv = ["run_tree_search.py"]
 
-    bool_flags = {"shuffle", "verbose", "resume"}
+    bool_flags = {"shuffle", "verbose", "resume", "adaptive_branching"}
     list_flags = {"post_startup_command"}
     path_flags = {"instances_path", "output_dir"}
 
@@ -257,7 +274,12 @@ def _cfg_to_argv(cfg: dict[str, Any]) -> list[str]:
     for key, value in cfg.items():
         flag = "--" + key.replace("_", "-")
         if key in bool_flags:
-            if value:
+            if key == "adaptive_branching":
+                if value is True:
+                    argv.append("--adaptive-branching")
+                elif value is False:
+                    argv.append("--no-adaptive-branching")
+            elif value:
                 argv.append(flag)
         elif key in list_flags:
             for item in (value or []):
