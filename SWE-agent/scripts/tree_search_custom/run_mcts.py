@@ -51,6 +51,8 @@ debug     : Minimal run for quick iteration/debugging.  5 iterations, 1 vote sam
 from __future__ import annotations
 
 import argparse
+import json
+import re
 import runpy
 import sys
 from pathlib import Path
@@ -73,10 +75,10 @@ PRESETS: dict[str, dict[str, Any]] = {
     "standard": {
         "model": "qwen3.5:9b",
         "planner_model": "qwen3.5:9b",
-        "iterations": 15,       # max turns on a linear path; branching spends budget across paths
+        "iterations": 18,       # max turns on a linear path; branching spends budget across paths
         "expansion_candidates": 2,
         "edit_vote_samples": 5,
-        "max_node_depth": 15,   # equal to iterations: depth is the binding constraint
+        "max_node_depth": 18,   # equal to iterations: depth is the binding constraint
         "agent_architecture": "planner_coder_reviewer",
         "reviewer_rounds": 2,   # one retry after reviewer revise feedback
     },
@@ -149,6 +151,10 @@ def _parse_args() -> tuple[str, dict[str, Any]]:
     parser.add_argument("--split", default=None)
     parser.add_argument("--verbose", action="store_true", default=False,
                         help="Print model prompts/responses to stdout during execution")
+    parser.add_argument("--resume", action="store_true", default=False,
+                        help="Skip instances that already have a .traj file in output-dir")
+    parser.add_argument("--failures-of", type=Path, default=None,
+                        help="Run only the instances that did not submit in this run directory")
 
     args = parser.parse_args()
 
@@ -188,10 +194,33 @@ def _parse_args() -> tuple[str, dict[str, Any]]:
         "instances_path": args.instances_path,
         "output_dir": args.output_dir,
         "verbose": args.verbose if args.verbose else None,
+        "resume": args.resume if args.resume else None,
     }
     for k, v in override_map.items():
         if v is not None:
             effective[k] = v
+
+    # --failures-of: build a filter regex from non-submitted trajs in a prior run
+    if args.failures_of is not None:
+        if not args.failures_of.is_dir():
+            parser.error(f"--failures-of: not a directory: {args.failures_of}")
+        failed_ids: list[str] = []
+        for traj_path in sorted(args.failures_of.rglob("*.traj")):
+            try:
+                traj = json.loads(traj_path.read_text())
+            except Exception:
+                continue
+            submitted = bool(traj.get("submitted", traj.get("info", {}).get("submitted", False)))
+            if not submitted:
+                iid = traj.get("instance_id", traj_path.stem)
+                failed_ids.append(iid)
+        if not failed_ids:
+            print(f"[failures-of] No failures found in {args.failures_of} — nothing to run.")
+            sys.exit(0)
+        filter_regex = "(" + "|".join(re.escape(iid) for iid in failed_ids) + ")"
+        effective["filter"] = filter_regex
+        print(f"[failures-of] {len(failed_ids)} failures: {failed_ids}")
+        print(f"[failures-of] filter = {filter_regex}")
 
     # Ensure required fields
     if "instances_path" not in effective and args.instances_type == "file":
@@ -220,7 +249,7 @@ def _cfg_to_argv(cfg: dict[str, Any]) -> list[str]:
     """Convert an effective config dict into a sys.argv list for run_tree_search.py."""
     argv = ["run_tree_search.py"]
 
-    bool_flags = {"shuffle", "verbose"}
+    bool_flags = {"shuffle", "verbose", "resume"}
     list_flags = {"post_startup_command"}
     path_flags = {"instances_path", "output_dir"}
 

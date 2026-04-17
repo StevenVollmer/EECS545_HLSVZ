@@ -21,6 +21,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import sys
 from pathlib import Path
@@ -132,6 +133,17 @@ def _extract(traj: dict[str, Any], path: Path) -> dict[str, Any]:
     patch_lines = sum(1 for ln in patch.splitlines() if ln.startswith(("+", "-"))
                       and not ln.startswith(("+++", "---"))) if patch else 0
 
+    # Multi-round reviewer info
+    coder_rounds = traj.get("coder_rounds", [])
+    n_rounds = len(coder_rounds) if coder_rounds else (1 if turns > 0 else 0)
+    def _round_decision(n: int) -> str:
+        if n < len(coder_rounds):
+            rv = coder_rounds[n].get("review_feedback") or {}
+            return str(rv.get("decision", "")).lower() or "?"
+        return ""
+    reviewer_r1 = _round_decision(0)
+    reviewer_r2 = _round_decision(1)
+
     return {
         "instance_id":   instance_id,
         "submitted":     submitted,
@@ -154,6 +166,9 @@ def _extract(traj: dict[str, Any], path: Path) -> dict[str, Any]:
         "patch_lines":   patch_lines,
         "error":         error,
         "error_kind":    error_kind,
+        "coder_rounds":  n_rounds,
+        "reviewer_r1":   reviewer_r1,
+        "reviewer_r2":   reviewer_r2,
     }
 
 
@@ -281,6 +296,47 @@ def _fmt_role_breakdown(metrics: list[dict]) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# CSV export
+# ---------------------------------------------------------------------------
+
+_CSV_COLUMNS = [
+    "instance_id", "status", "submitted", "stopped_reason", "turns", "time_s",
+    "tok_in", "tok_out", "loops", "vote_edits", "vote_samples", "patch_lines",
+    "checks_satisfied", "coder_rounds", "reviewer_decision_r1", "reviewer_decision_r2",
+    "planner_tok_in", "coder_tok_in", "reviewer_tok_in",
+]
+
+
+def _write_csv(metrics: list[dict[str, Any]], path: Path) -> None:
+    with path.open("w", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=_CSV_COLUMNS, extrasaction="ignore")
+        writer.writeheader()
+        for m in metrics:
+            writer.writerow({
+                "instance_id":         m["instance_id"],
+                "status":              _status(m),
+                "submitted":           m["submitted"],
+                "stopped_reason":      m["stopped"],
+                "turns":               m["turns"],
+                "time_s":              round(m["duration"], 1),
+                "tok_in":              m["tok_in"],
+                "tok_out":             m["tok_out"],
+                "loops":               m["loop_count"],
+                "vote_edits":          m["vote_edits"],
+                "vote_samples":        m["vote_samples"],
+                "patch_lines":         m["patch_lines"],
+                "checks_satisfied":    m["checks_passed"],
+                "coder_rounds":        m["coder_rounds"],
+                "reviewer_decision_r1": m["reviewer_r1"],
+                "reviewer_decision_r2": m["reviewer_r2"],
+                "planner_tok_in":      m["planner_in"],
+                "coder_tok_in":        m["coder_in"],
+                "reviewer_tok_in":     m["reviewer_in"],
+            })
+    print(f"CSV written to {path}")
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -298,10 +354,22 @@ def main() -> None:
                         help="Show only non-submitted instances")
     parser.add_argument("--output", type=Path, default=None,
                         help="Write output to file instead of stdout")
+    parser.add_argument("--csv", type=Path, default=None,
+                        help="Write per-instance CSV to this path (for Excel)")
+    parser.add_argument("--emit-failures", action="store_true",
+                        help="Print a --filter regex of non-submitted instance IDs and exit")
     args = parser.parse_args()
 
     trajs = _find_trajs(args.run_dir)
     all_metrics = [_extract(_load(p), p) for p in trajs]
+
+    if args.emit_failures:
+        failed = [m["instance_id"] for m in all_metrics if not m["submitted"]]
+        if not failed:
+            print("(no failures found)")
+        else:
+            print("(" + "|".join(failed) + ")")
+        sys.exit(0)
 
     # Sort
     sort_key = {
@@ -332,6 +400,9 @@ def main() -> None:
         print(f"Written to {args.output}")
     else:
         print(output)
+
+    if args.csv:
+        _write_csv(all_metrics, args.csv)
 
 
 if __name__ == "__main__":

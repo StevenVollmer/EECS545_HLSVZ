@@ -14,6 +14,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import sys
 from pathlib import Path
@@ -210,6 +211,8 @@ def main() -> None:
                         help="Hide rows where outcome is identical across all runs")
     parser.add_argument("--output", type=Path, default=None,
                         help="Write output to file instead of stdout")
+    parser.add_argument("--csv", type=Path, default=None,
+                        help="Write per-instance comparison CSV to this path (for Excel)")
     args = parser.parse_args()
 
     if len(args.run_dirs) < 2:
@@ -224,6 +227,49 @@ def main() -> None:
         print(f"Written to {args.output}")
     else:
         print(output)
+
+    if args.csv:
+        _write_csv(args.run_dirs, runs, args.csv)
+
+
+def _write_csv(run_dirs: list[Path], runs: list[dict[str, dict[str, Any]]], path: Path) -> None:
+    all_ids = sorted({iid for r in runs for iid in r})
+    run_labels = [d.name for d in run_dirs]
+
+    columns = ["instance_id", "run", "status", "submitted", "turns", "tok_in",
+               "delta_turns", "delta_tok_in", "outcome_change"]
+
+    base_run = runs[0]
+    with path.open("w", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=columns, extrasaction="ignore")
+        writer.writeheader()
+        for iid in all_ids:
+            base = _summary(base_run[iid]) if iid in base_run else None
+            for run_dir, run in zip(run_dirs, runs):
+                s = _summary(run[iid]) if iid in run else None
+                if s is None:
+                    continue
+                if base is not None and s is not base:
+                    d_turns = s["turns"] - base["turns"]
+                    d_tok = s["tok_in"] - base["tok_in"]
+                    chg = _outcome_change(base["stopped"], s["stopped"]).strip()
+                    outcome = "improved" if chg == "✓↑" else ("regressed" if chg == "✗↓" else "unchanged")
+                else:
+                    d_turns = 0
+                    d_tok = 0
+                    outcome = "baseline"
+                writer.writerow({
+                    "instance_id":   iid,
+                    "run":           run_dir.name,
+                    "status":        s["stopped"],
+                    "submitted":     s["submitted"],
+                    "turns":         s["turns"],
+                    "tok_in":        s["tok_in"],
+                    "delta_turns":   d_turns,
+                    "delta_tok_in":  d_tok,
+                    "outcome_change": outcome,
+                })
+    print(f"CSV written to {path}")
 
 
 if __name__ == "__main__":

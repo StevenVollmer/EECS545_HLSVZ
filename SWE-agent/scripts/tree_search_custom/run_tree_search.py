@@ -162,6 +162,13 @@ def _build_reviewer_constraints_prompt(review_feedback: dict[str, Any]) -> str:
     if validations_to_rerun:
         lines.append("- Required validations to rerun (exact commands):")
         lines.extend(f"  - {cmd}" for cmd in validations_to_rerun[:8])
+    # Escalate "no hardcoding" into a CRITICAL constraint if reviewer mentioned it
+    if any("hardcod" in str(c).lower() for c in required_changes):
+        lines.append(
+            "- CRITICAL: Do NOT hardcode specific string values, names, or IDs. "
+            "The fix must work for ANY input, not just the test case shown. "
+            "A hardcoded replacement that only fixes the example will be rejected."
+        )
     lines.append("- Do not submit until the above constraints are satisfied.")
     return "\n".join(lines)
 
@@ -309,14 +316,17 @@ def _build_planner_task_prompt_slim(
     problem_statement: str,
     repo_root: str,
     runtime_context: str,
+    case_analysis: str = "",
 ) -> str:
     """Slim planner task prompt — truncated context keeps token count low."""
     # Limit context to 1500 chars so the full prompt fits comfortably in 4K ctx
     ctx_snippet = runtime_context[:1500].strip()
+    analysis_section = f"\n{case_analysis}\n" if case_analysis.strip() else ""
     return (
         f"Plan a fix for the issue below in `{repo_root}`. Return JSON only.\n\n"
-        f"ISSUE:\n{problem_statement}\n\n"
-        f"REPOSITORY CONTEXT:\n{ctx_snippet}\n"
+        f"ISSUE:\n{problem_statement}\n"
+        f"{analysis_section}"
+        f"\nREPOSITORY CONTEXT:\n{ctx_snippet}\n"
     )
 
 
@@ -451,7 +461,7 @@ def _load_custom_file_instances_local(path: Path, filter_regex: str, slice_spec:
 # ---------------------------------------------------------------------------
 
 UCB_C = 1.414          # exploration constant (√2)
-EXPANSION_CANDIDATES = 2  # branch candidates at edit-intent turns
+EXPANSION_CANDIDATES = 1  # branch candidates at edit-intent turns (explore branch never helped in practice)
 EXPLORE_TEMPERATURE = 0.7  # temperature for explore candidate
 EXPLOIT_TEMPERATURE = 0.1  # temperature for greedy / linear turns
 MAX_ITERATIONS = 20     # total MCTS iterations (tree expansions)
@@ -810,6 +820,41 @@ class MCTSAgentLoop:
         used_samples = sum(votes.values())
         return hash_to_call[winner_hash], dict(votes), used_samples
 
+    def _sweep_success_checks_after_edit(self, child: SearchNode) -> None:
+        """Run all unsatisfied success checks immediately after an edit node is created.
+
+        This gives UCB1 empirical pass/fail signal on the edit within the same
+        iteration rather than waiting for the model to run the check itself.
+        Called only for edit-branch children, not for linear (non-edit) nodes.
+        """
+        if not child.loop_state.executable_edit_made:
+            return
+        for check in self.success_validation_checks:
+            check_name = str(check.get("name", check.get("command", "")))
+            if check_name in child.loop_state.satisfied_success_checks:
+                continue
+            cmd = str(check.get("command", "")).strip()
+            if not cmd:
+                continue
+            try:
+                chk_out = self.env.communicate(
+                    input=f"cd {shlex.quote(self.repo_root)}\n{cmd}",
+                    check="ignore", timeout=60,
+                )
+                exit_raw = self.env.communicate(
+                    input="echo $?", check="ignore", timeout=5,
+                ).strip()
+                chk_exit = int(exit_raw) if exit_raw.isdigit() else 1
+            except Exception:
+                continue
+            passed = _command_output_satisfies_check(check, exit_code=chk_exit, output=chk_out)
+            if passed:
+                child.loop_state.satisfied_success_checks.add(check_name)
+                self._log(f"[mcts] post-edit check '{check_name}' PASSED")
+            else:
+                self._log(f"[mcts] post-edit check '{check_name}' failed")
+            child.loop_state.validation_attempted_after_edit = True
+
     def _is_ready_for_finalization(self, node: SearchNode) -> bool:
         if not node.loop_state.executable_edit_made:
             return False
@@ -1081,6 +1126,26 @@ class MCTSAgentLoop:
                     "then run the required success validation command."
                 ),
             })
+        elif (
+            name in {"str_replace", "insert"}
+            and not parent.loop_state.executable_edit_made
+            and self.success_validation_checks
+        ):
+            # First edit in this branch: remind the model to validate with the
+            # exact check command so it observes actual vs expected output.
+            cmds = [
+                str(c.get("command", "")).strip()
+                for c in self.success_validation_checks
+                if str(c.get("command", "")).strip()
+            ]
+            if cmds:
+                new_messages.append({
+                    "role": "user",
+                    "content": (
+                        "Now run the validation to verify this edit produced the correct output: "
+                        + "; ".join(cmds[:2])
+                    ),
+                })
 
         # Verbose: show tool execution result
         if self.verbose:
@@ -1194,14 +1259,41 @@ class MCTSAgentLoop:
 
         if probe_call is None:
             self._log(f"[mcts] parse failed: {probe_outcome.error}")
-            child = SearchNode(
-                parent=node, depth=node.depth + 1, git_diff=node.git_diff,
-                loop_state=copy.deepcopy(node.loop_state), messages=messages,
-                action=None, observation="(no parseable action produced)",
-                stopped_reason="parse_failure", parse_errors=node.parse_errors + 1,
-            )
-            node.children.append(child)
-            return [child]
+            # Inline retry on first failure — the correction node in _expand()
+            # is never reached because parse-fail nodes are terminal. Give the
+            # model one chance to self-correct with the specific error.
+            if node.parse_errors == 0:
+                correction_messages = list(messages) + [{
+                    "role": "user",
+                    "content": (
+                        f"Your response could not be parsed as JSON: {probe_outcome.error}\n"
+                        "Respond with exactly one JSON action object and nothing else. "
+                        "No prose, no markdown, no explanation — only the JSON object."
+                    ),
+                }]
+                try:
+                    retry_content, r_in, r_out = self._call_model(correction_messages, 0.5)
+                    self._global_stats.input_tokens += r_in
+                    self._global_stats.output_tokens += r_out
+                    self._global_stats.tool_calls += 1
+                    retry_outcome = self._parse_action(retry_content)
+                    probe_call = retry_outcome.tool_calls[0] if retry_outcome.tool_calls else None
+                    if probe_call is not None:
+                        self._log("[mcts] parse retry succeeded")
+                    else:
+                        self._log(f"[mcts] parse retry also failed: {retry_outcome.error}")
+                except Exception as exc:
+                    self._log(f"[mcts] parse retry call failed: {exc}")
+
+            if probe_call is None:
+                child = SearchNode(
+                    parent=node, depth=node.depth + 1, git_diff=node.git_diff,
+                    loop_state=copy.deepcopy(node.loop_state), messages=messages,
+                    action=None, observation="(no parseable action produced)",
+                    stopped_reason="parse_failure", parse_errors=node.parse_errors + 1,
+                )
+                node.children.append(child)
+                return [child]
 
         # ------------------------------------------------------------------
         # 2a. Non-edit action → linear execution (single child, no branching)
@@ -1254,6 +1346,10 @@ class MCTSAgentLoop:
             child.is_branch_point = True
             child.vote_counts = vote_counts if call is winner else {}
             child.vote_total_samples = vote_used_samples if call is winner else 0
+            # Run success checks immediately so UCB1 gets empirical signal this
+            # iteration rather than waiting for the model to run them itself.
+            if self.success_validation_checks and not child.is_terminal:
+                self._sweep_success_checks_after_edit(child)
             node.children.append(child)
             children.append(child)
             total_samples = vote_used_samples
@@ -1600,6 +1696,8 @@ def parse_args() -> argparse.Namespace:
     # Output
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--run-name", default="mcts_ollama")
+    parser.add_argument("--resume", action="store_true",
+                        help="Skip instances that already have a .traj file in output-dir")
     parser.add_argument("--verbose", action="store_true",
                         help="Print model prompts and responses to stdout during execution")
 
@@ -1677,6 +1775,18 @@ def main() -> None:
     for instance in instances:
         instance_id = instance.problem_statement.id
         instance_dir = output_dir / instance_id
+
+        if args.resume and (instance_dir / f"{instance_id}.traj").exists():
+            print(f"[resume] skipping {instance_id} — .traj already exists", flush=True)
+            # Reload prediction so preds.json stays consistent when resuming
+            pred_path = instance_dir / f"{instance_id}.pred"
+            if pred_path.exists():
+                try:
+                    all_preds[instance_id] = json.loads(pred_path.read_text())
+                except Exception:
+                    pass
+            continue
+
         instance_dir.mkdir(parents=True, exist_ok=True)
         info_log_path = instance_dir / f"{instance_id}.info.log"
 
@@ -1757,7 +1867,8 @@ def main() -> None:
                     # Use slim prompt: 5-key schema + example, fits small models
                     system_prompt=_build_planner_system_prompt_slim(repo_root),
                     user_prompt=_build_planner_task_prompt_slim(
-                        instance.problem_statement.text, repo_root, runtime_context
+                        instance.problem_statement.text, repo_root, runtime_context,
+                        case_analysis=case_analysis_prompt,
                     ),
                     fallback_payload=_default_planner_handoff(),
                 )
@@ -1847,7 +1958,9 @@ def main() -> None:
                         passed = _command_output_satisfies_check(chk, exit_code=chk_exit, output=chk_out)
                         live_check_results[str(chk.get("name", chk_cmd[:40]))] = {
                             "passed": passed,
-                            "output": chk_out[:400],
+                            "actual_output": chk_out[:300],
+                            "expected_contains": chk.get("stdout_contains", []),
+                            "must_not_contain": chk.get("stdout_not_contains", []),
                         }
                 if (
                     live_check_results
@@ -1898,6 +2011,7 @@ def main() -> None:
                         case_evaluation=case_evaluation,
                         case_policy=case_policy,
                         live_check_results=live_check_results or None,
+                        prior_reviewer_feedback=review_feedback if rnd > 0 else None,
                     ),
                     fallback_payload=_default_reviewer_feedback(),
                 )

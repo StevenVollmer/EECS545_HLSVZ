@@ -111,27 +111,38 @@ def _role_size_ranks(
     return planner_rank, coder_rank, reviewer_rank
 
 
-def _resolve_cases_root(path: Path) -> Path:
-    return path.resolve()
-
-
-def _load_case_map(cases_root: Path) -> dict[str, dict[str, Any]]:
-    case_map: dict[str, dict[str, Any]] = {}
-    for case_file in sorted(cases_root.glob("*/case.json")):
-        raw = yaml.safe_load(case_file.read_text())
-        if not isinstance(raw, list):
+def _resolve_cases_roots(value: str) -> list[Path]:
+    roots: list[Path] = []
+    for chunk in value.split(","):
+        cleaned = chunk.strip()
+        if not cleaned:
             continue
-        for item in raw:
-            if not isinstance(item, dict):
+        roots.append(Path(cleaned).resolve())
+    return roots
+
+
+def _load_case_map(cases_roots: list[Path]) -> dict[str, dict[str, Any]]:
+    case_map: dict[str, dict[str, Any]] = {}
+    for cases_root in cases_roots:
+        if not cases_root.exists():
+            continue
+        for case_file in sorted(cases_root.glob("*/case.json")):
+            raw = yaml.safe_load(case_file.read_text())
+            if not isinstance(raw, list):
                 continue
-            instance_id = str(item.get("instance_id", "")).strip()
-            if not instance_id:
-                continue
-            case_map[instance_id] = {
-                "case_file": case_file.resolve(),
-                "case_dir": case_file.parent.resolve(),
-                "item": item,
-            }
+            for item in raw:
+                if not isinstance(item, dict):
+                    continue
+                instance_id = str(item.get("instance_id", "")).strip()
+                if not instance_id:
+                    continue
+                if instance_id in case_map:
+                    raise ValueError(f"Duplicate instance_id '{instance_id}' found in {case_file}")
+                case_map[instance_id] = {
+                    "case_file": case_file.resolve(),
+                    "case_dir": case_file.parent.resolve(),
+                    "item": item,
+                }
     return case_map
 
 
@@ -717,7 +728,11 @@ def _aggregate(results: list[dict[str, Any]]) -> dict[str, Any]:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target", type=Path, help="Run root, single run dir, or single .traj file.")
-    parser.add_argument("--cases-root", type=Path, default=Path("SWE-agent/custom_cases"))
+    parser.add_argument(
+        "--cases-roots",
+        default="SWE-agent/custom_cases,SWE-agent/custom_cases_2",
+        help="Comma-separated case roots to scan for instance metadata.",
+    )
     parser.add_argument("--run-install", action="store_true", help="Run case install/setup commands before evaluation checks.")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--write-json", type=Path)
@@ -726,8 +741,8 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    cases_root = _resolve_cases_root(args.cases_root)
-    case_map = _load_case_map(cases_root)
+    cases_roots = _resolve_cases_roots(args.cases_roots)
+    case_map = _load_case_map(cases_roots)
     artifacts = _collect_artifacts(args.target)
     if not artifacts:
         raise SystemExit(f"No custom-run artifacts found under {args.target}")
@@ -743,7 +758,7 @@ def main() -> None:
 
     payload = {
         "target": str(args.target.resolve()),
-        "cases_root": str(cases_root),
+        "cases_roots": [str(path) for path in cases_roots],
         "missing_cases": sorted(set(missing_cases)),
         "aggregate": _aggregate(results),
         "results": results,

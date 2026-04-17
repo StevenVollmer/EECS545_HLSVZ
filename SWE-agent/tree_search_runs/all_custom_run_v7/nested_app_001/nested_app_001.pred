@@ -1,0 +1,5 @@
+{
+  "model_name_or_path": "mcts_ollama",
+  "instance_id": "nested_app_001",
+  "model_patch": "diff --git a/app/utils/strings.py b/app/utils/strings.py\nindex c76158a..37a0cc7 100644\n--- a/app/utils/strings.py\n+++ b/app/utils/strings.py\n@@ -1,2 +1,15 @@\n def title_case_words(value: str) -> str:\n-    return \" \".join(word.capitalize() for word in value.split(\" \"))\n+    words = value.split(\" \")\n+    result = []\n+    for word in words:\n+        # Capitalize each word but preserve apostrophe casing (e.g., \"O'connor\" -> \"O'connor\")\n+        if \"'\" in word:\n+            # Find the part before and after apostrophe\n+            idx = word.index(\"'\")\n+            before = word[:idx]\n+            after = word[idx+1:]\n+            capitalized = before.capitalize() + \"'\" + after.capitalize()\n+            result.append(capitalized)\n+        else:\n+            result.append(word.capitalize())\n+    return \" \".join(result)\n"
+}

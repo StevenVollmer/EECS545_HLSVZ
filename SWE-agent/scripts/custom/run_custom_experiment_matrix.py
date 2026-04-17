@@ -22,7 +22,10 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 RUNNER_SCRIPT = REPO_ROOT / "SWE-agent" / "scripts" / "custom" / "run_custom_swebench.py"
 ANALYZER_SCRIPT = REPO_ROOT / "SWE-agent" / "scripts" / "custom" / "analyze_custom_runs.py"
 PRESET_FILE = REPO_ROOT / "SWE-agent" / "config" / "custom_configs" / "custom_runner_model_presets.yaml"
-CUSTOM_CASES_ROOT = REPO_ROOT / "SWE-agent" / "custom_cases"
+DEFAULT_CASE_ROOTS = [
+    REPO_ROOT / "SWE-agent" / "custom_cases",
+    REPO_ROOT / "SWE-agent" / "custom_cases_2",
+]
 TRANSIENT_RUNNER_ERROR_MARKERS = (
     "Runtime did not start within timeout",
     "ClientConnectorError:",
@@ -54,19 +57,25 @@ def _load_presets() -> dict[str, dict[str, Any]]:
     return presets
 
 
-def _load_cases(root: Path) -> dict[str, dict[str, Any]]:
+def _load_cases(roots: list[Path]) -> dict[str, dict[str, Any]]:
     cases: dict[str, dict[str, Any]] = {}
-    for case_file in sorted(root.glob("*/case.json")):
-        raw = yaml.safe_load(case_file.read_text())
-        if not isinstance(raw, list) or len(raw) != 1 or not isinstance(raw[0], dict):
-            raise ValueError(f"{case_file} must contain a one-item list")
-        item = raw[0]
-        case_name = case_file.parent.name
-        cases[case_name] = {
-            "case_path": case_file.parent,
-            "instance_id": str(item["instance_id"]),
-            "problem_statement": str(item.get("problem_statement", "")),
-        }
+    for root in roots:
+        if not root.exists():
+            continue
+        for case_file in sorted(root.glob("*/case.json")):
+            raw = yaml.safe_load(case_file.read_text())
+            if not isinstance(raw, list) or len(raw) != 1 or not isinstance(raw[0], dict):
+                raise ValueError(f"{case_file} must contain a one-item list")
+            item = raw[0]
+            case_name = case_file.parent.name
+            if case_name in cases:
+                existing = cases[case_name]["case_path"]
+                raise ValueError(f"Duplicate case name '{case_name}' in {existing} and {case_file.parent}")
+            cases[case_name] = {
+                "case_path": case_file.parent,
+                "instance_id": str(item["instance_id"]),
+                "problem_statement": str(item.get("problem_statement", "")),
+            }
     return cases
 
 
@@ -328,7 +337,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     presets = _load_presets()
-    cases = _load_cases(CUSTOM_CASES_ROOT)
+    cases = _load_cases(DEFAULT_CASE_ROOTS)
 
     selected_presets = _split_csv(args.presets) or sorted(presets.keys())
     selected_architectures = _split_csv(args.architectures)

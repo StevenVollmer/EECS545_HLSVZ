@@ -18,21 +18,24 @@ from typing import Any
 from eval_patches import DOCKER_IMAGE, _evaluate, _find_trajs, _load
 
 
-def _load_hard_case_ids(custom_cases_root: Path) -> set[str]:
+def _load_hard_case_ids(custom_cases_roots: list[Path]) -> set[str]:
     hard_ids: set[str] = set()
-    for case_file in custom_cases_root.glob("*/case.json"):
-        try:
-            loaded = json.loads(case_file.read_text())
-        except Exception:
+    for custom_cases_root in custom_cases_roots:
+        if not custom_cases_root.exists():
             continue
-        items = loaded if isinstance(loaded, list) else [loaded]
-        for item in items:
-            if not isinstance(item, dict):
+        for case_file in custom_cases_root.glob("*/case.json"):
+            try:
+                loaded = json.loads(case_file.read_text())
+            except Exception:
                 continue
-            iid = str(item.get("instance_id", "")).strip()
-            analysis = item.get("analysis", {}) if isinstance(item.get("analysis"), dict) else {}
-            if iid and str(analysis.get("difficulty", "")).lower() == "hard":
-                hard_ids.add(iid)
+            items = loaded if isinstance(loaded, list) else [loaded]
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                iid = str(item.get("instance_id", "")).strip()
+                analysis = item.get("analysis", {}) if isinstance(item.get("analysis"), dict) else {}
+                if iid and str(analysis.get("difficulty", "")).lower() == "hard":
+                    hard_ids.add(iid)
     # Fallback to canonical Tier-3 custom set when difficulty tags are missing.
     if not hard_ids:
         hard_ids = {
@@ -45,6 +48,15 @@ def _load_hard_case_ids(custom_cases_root: Path) -> set[str]:
             "shipment_preview_001",
         }
     return hard_ids
+
+
+def _parse_case_roots(value: str) -> list[Path]:
+    roots: list[Path] = []
+    for chunk in value.split(","):
+        cleaned = chunk.strip()
+        if cleaned:
+            roots.append(Path(cleaned))
+    return roots
 
 
 def _traj_summary(run_dir: Path) -> dict[str, Any]:
@@ -83,10 +95,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("run_dir", type=Path, help="tree_search run directory")
     parser.add_argument(
-        "--custom-cases-root",
-        type=Path,
-        default=Path("SWE-agent/custom_cases"),
-        help="Path to custom cases root (default: SWE-agent/custom_cases)",
+        "--custom-cases-roots",
+        default="SWE-agent/custom_cases,SWE-agent/custom_cases_2",
+        help="Comma-separated case roots (default: SWE-agent/custom_cases,SWE-agent/custom_cases_2)",
     )
     parser.add_argument("--baseline-dir", type=Path, default=None, help="Optional baseline run dir for manual compare")
     parser.add_argument("--image", default=DOCKER_IMAGE, help=f"Docker image for patch verification (default: {DOCKER_IMAGE})")
@@ -96,7 +107,7 @@ def main() -> None:
     parser.add_argument("--max-avg-tok-in", type=float, default=50000.0)
     args = parser.parse_args()
 
-    hard_case_ids = _load_hard_case_ids(args.custom_cases_root)
+    hard_case_ids = _load_hard_case_ids(_parse_case_roots(args.custom_cases_roots))
     traj = _traj_summary(args.run_dir)
     verdicts = _verified_summary(args.run_dir, image=args.image, submitted_only=args.submitted_only)
     verdict_by_id = {str(v.get("iid", "")): v for v in verdicts}
@@ -130,4 +141,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

@@ -667,7 +667,9 @@ def _summarize_validation_events(
                     "command": command,
                     "turn": latest.get("turn"),
                     "exit_code": latest.get("exit_code"),
-                    "output": str(latest.get("output", ""))[:800],
+                    "actual_output": str(latest.get("output", ""))[:400],
+                    "expected_contains": check.get("stdout_contains", []),
+                    "must_not_contain": check.get("stdout_not_contains", []),
                 }
             )
 
@@ -721,6 +723,7 @@ def _build_reviewer_task_prompt(
     case_evaluation: dict[str, Any] | None,
     case_policy: dict[str, Any] | None,
     live_check_results: dict[str, dict] | None = None,
+    prior_reviewer_feedback: dict[str, Any] | None = None,
 ) -> str:
     success_checks: list[dict[str, Any]] = []
     if isinstance(case_evaluation, dict):
@@ -736,8 +739,14 @@ def _build_reviewer_task_prompt(
             for c in validation_report.get("passing_success_checks", [])
         ],
         "failing_success_checks": [
-            {"name": c.get("name", ""), "command": c.get("command", ""),
-             "turn": c.get("turn"), "output": str(c.get("output", ""))[:400]}
+            {
+                "name": c.get("name", ""),
+                "command": c.get("command", ""),
+                "turn": c.get("turn"),
+                "actual_output": str(c.get("actual_output") or c.get("output", ""))[:300],
+                "expected_contains": c.get("expected_contains", []),
+                "must_not_contain": c.get("must_not_contain", []),
+            }
             for c in validation_report.get("failing_success_checks", [])
         ],
         "missing_success_checks": [
@@ -763,6 +772,12 @@ def _build_reviewer_task_prompt(
     }
     if live_check_results:
         payload["live_check_results"] = live_check_results
+    if prior_reviewer_feedback:
+        payload["prior_reviewer_decision"] = {
+            "decision": prior_reviewer_feedback.get("decision", ""),
+            "primary_reason": prior_reviewer_feedback.get("primary_reason", ""),
+            "required_changes": prior_reviewer_feedback.get("required_changes", []),
+        }
 
     return json.dumps(payload, indent=2)
 
