@@ -1,0 +1,21 @@
+diff --git a/app/utils/branding.py b/app/utils/branding.py
+index 7f8713b..932278b 100644
+--- a/app/utils/branding.py
++++ b/app/utils/branding.py
+@@ -5,5 +5,15 @@ def normalize_campaign_code(name: str) -> str:
+ def format_brand_name(name: str) -> str:
+     words = []
+     for word in name.split():
+-        words.append(word[:1].upper() + word[1:].lower())
++        # Preserve original case for apostrophes and handle 'D'angelo' correctly
++        processed_word = ''
++        for i, char in enumerate(word):
++            if char == "'" and i > 0 and i < len(word) - 1:
++                processed_word += char
++            else:
++                if i == 0:
++                    processed_word += char.upper()
++                else:
++                    processed_word += char.lower()
++        words.append(processed_word)
+     return " ".join(words)

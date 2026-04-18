@@ -1,0 +1,5 @@
+{
+  "model_name_or_path": "D4_120b_surface",
+  "instance_id": "dispatch_preview_001",
+  "model_patch": "diff --git a/app/utils/names.py b/app/utils/names.py\nindex 5e98495..f55f941 100644\n--- a/app/utils/names.py\n+++ b/app/utils/names.py\n@@ -3,6 +3,13 @@ def normalize_route_code(name: str) -> str:\n \n \n def display_contact_name(name: str) -> str:\n-    cleaned = \"-\".join(part.strip().lower() for part in name.split(\"-\"))\n-    return cleaned[:1].upper() + cleaned[1:]\n+    # Split on hyphens. Capitalize the first part and any part containing an apostrophe.\n+    parts = []\n+    for i, part in enumerate(name.split(\"-\")):\n+        stripped = part.strip()\n+        if i == 0 or \"'\" in stripped:\n+            parts.append(stripped.title())\n+        else:\n+            parts.append(stripped.lower())\n+    return \"-\".join(parts)\n \n"
+}

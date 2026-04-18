@@ -1,0 +1,5 @@
+{
+  "model_name_or_path": "D4_120b_surface",
+  "instance_id": "campaign_header_001",
+  "model_patch": "diff --git a/app/utils/branding.py b/app/utils/branding.py\nindex 7f8713b..3bb6215 100644\n--- a/app/utils/branding.py\n+++ b/app/utils/branding.py\n@@ -5,5 +5,13 @@ def normalize_campaign_code(name: str) -> str:\n def format_brand_name(name: str) -> str:\n     words = []\n     for word in name.split():\n-        words.append(word[:1].upper() + word[1:].lower())\n+        # Preserve apostrophes by capitalizing each sub-part separated by apostrophes\n+        sub_parts = word.split(\"'\")\n+        capitalized_parts = []\n+        for part in sub_parts:\n+            if part:\n+                capitalized_parts.append(part[:1].upper() + part[1:].lower())\n+            else:\n+                capitalized_parts.append('')\n+        words.append(\"'\".join(capitalized_parts))\n     return \" \".join(words)\n"
+}

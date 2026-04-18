@@ -1,0 +1,688 @@
+{
+  "turns": [
+    {
+      "turn": 1,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/utils/names.py",
+            "start_line": 1,
+            "end_line": 200
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/utils/names.py",
+            "start_line": 1,
+            "end_line": 200
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/utils/names.py:\n     1\tdef normalize_route_code(name: str) -> str:\n     2\t    return \"-\".join(part.strip().upper() for part in name.split(\"-\"))\n     3\t\n     4\t\n     5\tdef display_contact_name(name: str) -> str:\n     6\t    cleaned = \"-\".join(part.strip().lower() for part in name.split(\"-\"))\n     7\t    return cleaned[:1].upper() + cleaned[1:]\n     8\t",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 2,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/utils/names.py",
+            "old_str": "def display_contact_name(name: str) -> str:\n    cleaned = \"-\".join(part.strip().lower() for part in name.split(\"-\"))\n    return cleaned[:1].upper() + cleaned[1:]",
+            "new_str": "def display_contact_name(name: str) -> str:\n    # Split on hyphens, title\u2011case each part to handle apostrophes correctly, then re\u2011join.\n    parts = [part.strip().title() for part in name.split(\"-\")]\n    return \"-\".join(parts)"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/utils/names.py",
+            "old_str": "def display_contact_name(name: str) -> str:\n    cleaned = \"-\".join(part.strip().lower() for part in name.split(\"-\"))\n    return cleaned[:1].upper() + cleaned[1:]",
+            "new_str": "def display_contact_name(name: str) -> str:\n    # Split on hyphens, title\u2011case each part to handle apostrophes correctly, then re\u2011join.\n    parts = [part.strip().title() for part in name.split(\"-\")]\n    return \"-\".join(parts)"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/utils/names.py:\n     1\tdef normalize_route_code(name: str) -> str:\n     2\t    return \"-\".join(part.strip().upper() for part in name.split(\"-\"))\n     3\t\n     4\t\n     5\tdef display_contact_name(name: str) -> str:\n     6\t    # Split on hyphens, title\u2011case each part to handle apostrophes correctly, then re\u2011join.\n     7\t    parts = [part.strip().title() for part in name.split(\"-\")]\n     8\t    return \"-\".join(parts)\n     9\t",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 3,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q"
+          },
+          "output": "..F                                                                      [100%]\n=================================== FAILURES ===================================\n_____________ test_display_contact_name_hyphen_without_apostrophe ______________\n\n    def test_display_contact_name_hyphen_without_apostrophe() -> None:\n>       assert display_contact_name(\"mina-west\") == \"Mina-west\"\nE       AssertionError: assert 'Mina-West' == 'Mina-west'\nE         \nE         - Mina-west\nE         ?      ^\nE         + Mina-West\nE         ?      ^\n\ntests/test_name_helpers.py:9: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_name_helpers.py::test_display_contact_name_hyphen_without_apostrophe - AssertionError: assert 'Mina-West' == 'Mina-west'\n1 failed, 2 passed in 0.10s",
+          "is_error": true,
+          "exit_code": 1
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 4,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/utils/names.py",
+            "old_str": "def display_contact_name(name: str) -> str:\n    # Split on hyphens, title\u2011case each part to handle apostrophes correctly, then re\u2011join.\n    parts = [part.strip().title() for part in name.split(\"-\")]\n    return \"-\".join(parts)",
+            "new_str": "def display_contact_name(name: str) -> str:\n    # Split on hyphens. Capitalize the first part and any part containing an apostrophe.\n    parts = []\n    for i, part in enumerate(name.split(\"-\")):\n        stripped = part.strip()\n        if i == 0 or \"'\" in stripped:\n            parts.append(stripped.title())\n        else:\n            parts.append(stripped.lower())\n    return \"-\".join(parts)"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/utils/names.py",
+            "old_str": "def display_contact_name(name: str) -> str:\n    # Split on hyphens, title\u2011case each part to handle apostrophes correctly, then re\u2011join.\n    parts = [part.strip().title() for part in name.split(\"-\")]\n    return \"-\".join(parts)",
+            "new_str": "def display_contact_name(name: str) -> str:\n    # Split on hyphens. Capitalize the first part and any part containing an apostrophe.\n    parts = []\n    for i, part in enumerate(name.split(\"-\")):\n        stripped = part.strip()\n        if i == 0 or \"'\" in stripped:\n            parts.append(stripped.title())\n        else:\n            parts.append(stripped.lower())\n    return \"-\".join(parts)"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/utils/names.py:\n     1\tdef normalize_route_code(name: str) -> str:\n     2\t    return \"-\".join(part.strip().upper() for part in name.split(\"-\"))\n     3\t\n     4\t\n     5\tdef display_contact_name(name: str) -> str:\n     6\t    # Split on hyphens. Capitalize the first part and any part containing an apostrophe.\n     7\t    parts = []\n     8\t    for i, part in enumerate(name.split(\"-\")):\n     9\t        stripped = part.strip()\n    10\t        if i == 0 or \"'\" in stripped:\n    11\t            parts.append(stripped.title())\n    12\t        else:\n    13\t            parts.append(stripped.lower())\n    14\t    return \"-\".join(parts)\n    15\t",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    }
+  ],
+  "stats": {
+    "input_tokens": 35941,
+    "output_tokens": 8916,
+    "turns": 4,
+    "tool_calls": 4,
+    "iterations": 18,
+    "tree_nodes_created": 6,
+    "best_node_depth": 4,
+    "best_node_value": 40.723469259999995
+  },
+  "loop_state": {
+    "executable_edit_made": true,
+    "validation_passed": false,
+    "validation_attempted_after_edit": true,
+    "diff_checked": false,
+    "successful_post_edit_commands": [],
+    "satisfied_success_checks": [
+      "manual_repro_is_fixed",
+      "tests_still_pass_after_fix"
+    ],
+    "changed_files": [
+      "app/utils/names.py"
+    ]
+  },
+  "stopped_reason": "auto_finalized",
+  "submitted": true,
+  "submission_summary": "Auto-finalized: required success checks were satisfied with a non-empty patch.",
+  "patch": "diff --git a/app/utils/names.py b/app/utils/names.py\nindex 5e98495..f55f941 100644\n--- a/app/utils/names.py\n+++ b/app/utils/names.py\n@@ -3,6 +3,13 @@ def normalize_route_code(name: str) -> str:\n \n \n def display_contact_name(name: str) -> str:\n-    cleaned = \"-\".join(part.strip().lower() for part in name.split(\"-\"))\n-    return cleaned[:1].upper() + cleaned[1:]\n+    # Split on hyphens. Capitalize the first part and any part containing an apostrophe.\n+    parts = []\n+    for i, part in enumerate(name.split(\"-\")):\n+        stripped = part.strip()\n+        if i == 0 or \"'\" in stripped:\n+            parts.append(stripped.title())\n+        else:\n+            parts.append(stripped.lower())\n+    return \"-\".join(parts)\n \n",
+  "info": {
+    "submission": "diff --git a/app/utils/names.py b/app/utils/names.py\nindex 5e98495..f55f941 100644\n--- a/app/utils/names.py\n+++ b/app/utils/names.py\n@@ -3,6 +3,13 @@ def normalize_route_code(name: str) -> str:\n \n \n def display_contact_name(name: str) -> str:\n-    cleaned = \"-\".join(part.strip().lower() for part in name.split(\"-\"))\n-    return cleaned[:1].upper() + cleaned[1:]\n+    # Split on hyphens. Capitalize the first part and any part containing an apostrophe.\n+    parts = []\n+    for i, part in enumerate(name.split(\"-\")):\n+        stripped = part.strip()\n+        if i == 0 or \"'\" in stripped:\n+            parts.append(stripped.title())\n+        else:\n+            parts.append(stripped.lower())\n+    return \"-\".join(parts)\n \n",
+    "submitted": true,
+    "submission_summary": "Auto-finalized: required success checks were satisfied with a non-empty patch.",
+    "stopped_reason": "auto_finalized"
+  },
+  "auto_finalized": true,
+  "mcts_meta": {
+    "model": "openai/openai/gpt-oss-120b",
+    "iterations": 18,
+    "expansion_candidates": 1,
+    "edit_vote_samples": 5,
+    "ucb_c": 1.414,
+    "root_visits": 5,
+    "early_branching": false,
+    "early_branch_depth": 2
+  },
+  "vote_summary": [
+    {
+      "depth": 2,
+      "action": "str_replace",
+      "winner_votes": 1,
+      "total_samples": 5,
+      "unique_candidates": 5
+    },
+    {
+      "depth": 4,
+      "action": "str_replace",
+      "winner_votes": 1,
+      "total_samples": 6,
+      "unique_candidates": 6
+    }
+  ],
+  "mcts_tree": {
+    "nodes": [
+      {
+        "id": "0",
+        "parent_id": null,
+        "depth": 0,
+        "action_name": null,
+        "action_args_preview": "",
+        "visits": 5,
+        "mean_value": 12.07,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0",
+        "parent_id": "0",
+        "depth": 1,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"app/utils/names.py\", \"start_line\": 1, \"end_line\": 200}",
+        "visits": 5,
+        "mean_value": 12.07,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0",
+        "parent_id": "0.0",
+        "depth": 2,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"app/utils/names.py\", \"old_str\": \"def display_contact_name(name: str) -",
+        "visits": 4,
+        "mean_value": 15.09,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 1,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"def display_contact_name(name: str) -> str:\\n    # Split on hyphens, title\\u2011case each part to handle apostrophes correctly, then re\\u2011join.\\n    parts = [part.strip().title() for part in name.split(\\\"-\\\")]\\n    return \\\"-\\\".join(parts)\", \"old_str\": \"def display_contact_name(name: str) -> str:\\n    cleaned = \\\"-\\\".join(part.strip().lower() for part in name.split(\\\"-\\\"))\\n    return cleaned[:1].upper() + cleaned[1:]\", \"path\": \"app/utils/names.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"def display_contact_name(name: str) -> str:\\n    # Properly capitalize each hyphen-separated part, handling apostrophes correctly\\n    parts = [part.strip().lower().title() for part in name.split(\\\"-\\\")]\\n    return \\\"-\\\".join(parts)\", \"old_str\": \"def display_contact_name(name: str) -> str:\\n    cleaned = \\\"-\\\".join(part.strip().lower() for part in name.split(\\\"-\\\"))\\n    return cleaned[:1].upper() + cleaned[1:]\", \"path\": \"app/utils/names.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"def display_contact_name(name: str) -> str:\\n    # Capitalize each hyphen-separated part, preserving internal apostrophes\\n    parts = [part.strip().lower().title() for part in name.split(\\\"-\\\")]\\n    return \\\"-\\\".join(parts)\", \"old_str\": \"def display_contact_name(name: str) -> str:\\n    cleaned = \\\"-\\\".join(part.strip().lower() for part in name.split(\\\"-\\\"))\\n    return cleaned[:1].upper() + cleaned[1:]\", \"path\": \"app/utils/names.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"def display_contact_name(name: str) -> str:\\n    # Properly capitalize each part, handling apostrophes and hyphens\\n    cleaned = name.lower()\\n    return cleaned.title()\", \"old_str\": \"def display_contact_name(name: str) -> str:\\n    cleaned = \\\"-\\\".join(part.strip().lower() for part in name.split(\\\"-\\\"))\\n    return cleaned[:1].upper() + cleaned[1:]\", \"path\": \"app/utils/names.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"def display_contact_name(name: str) -> str:\\n    # Properly capitalize each hyphen-separated part, handling apostrophes correctly\\n    parts = [part.strip().title() for part in name.split(\\\"-\\\")]\\n    return \\\"-\\\".join(parts)\", \"old_str\": \"def display_contact_name(name: str) -> str:\\n    cleaned = \\\"-\\\".join(part.strip().lower() for part in name.split(\\\"-\\\"))\\n    return cleaned[:1].upper() + cleaned[1:]\", \"path\": \"app/utils/names.py\"}, \"name\": \"str_replace\"}": 1
+        },
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0",
+        "parent_id": "0.0.0",
+        "depth": 3,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q\"}",
+        "visits": 3,
+        "mean_value": 16.04,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 2,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0",
+        "parent_id": "0.0.0.0",
+        "depth": 4,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"app/utils/names.py\", \"old_str\": \"def display_contact_name(name: str) -",
+        "visits": 1,
+        "mean_value": 18.59,
+        "submitted": true,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 2,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 3,
+        "has_nonempty_patch": true,
+        "stopped_reason": "auto_finalized",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"def display_contact_name(name: str) -> str:\\n    # Split on hyphens. Capitalize the first part and any part containing an apostrophe.\\n    parts = []\\n    for i, part in enumerate(name.split(\\\"-\\\")):\\n        stripped = part.strip()\\n        if i == 0 or \\\"'\\\" in stripped:\\n            parts.append(stripped.title())\\n        else:\\n            parts.append(stripped.lower())\\n    return \\\"-\\\".join(parts)\", \"old_str\": \"def display_contact_name(name: str) -> str:\\n    # Split on hyphens, title\\u2011case each part to handle apostrophes correctly, then re\\u2011join.\\n    parts = [part.strip().title() for part in name.split(\\\"-\\\")]\\n    return \\\"-\\\".join(parts)\", \"path\": \"app/utils/names.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"def display_contact_name(name: str) -> str:\\n    # Split on hyphens. Title\\u2011case parts containing an apostrophe, otherwise lower\\u2011case.\\n    parts = [part.strip().title() if \\\"'\\\" in part else part.strip().lower() for part in name.split(\\\"-\\\")]\\n    # Join parts with hyphens.\\n    return \\\"-\\\".join(parts)\", \"old_str\": \"def display_contact_name(name: str) -> str:\\n    # Split on hyphens, title\\u2011case each part to handle apostrophes correctly, then re\\u2011join.\\n    parts = [part.strip().title() for part in name.split(\\\"-\\\")]\\n    return \\\"-\\\".join(parts)\", \"path\": \"app/utils/names.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"def display_contact_name(name: str) -> str:\\n    # If any part contains an apostrophe, title\\u2011case each hyphen\\u2011separated part.\\n    # Otherwise, lower\\u2011case all parts and capitalize only the first character of the whole string.\\n    parts_raw = [part.strip() for part in name.split(\\\"-\\\")]\\n    if any(\\\"'\\\" in part for part in parts_raw):\\n        parts = [part.title() for part in parts_raw]\\n        return \\\"-\\\".join(parts)\\n    cleaned = \\\"-\\\".join(part.lower() for part in parts_raw)\\n    return cleaned[:1].upper() + cleaned[1:]\", \"old_str\": \"def display_contact_name(name: str) -> str:\\n    # Split on hyphens, title\\u2011case each part to handle apostrophes correctly, then re\\u2011join.\\n    parts = [part.strip().title() for part in name.split(\\\"-\\\")]\\n    return \\\"-\\\".join(parts)\", \"path\": \"app/utils/names.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"def display_contact_name(name: str) -> str:\\n    # Properly format names with hyphens and apostrophes.\\n    parts = []\\n    for i, part in enumerate(name.split(\\\"-\\\")):\\n        cleaned = part.strip()\\n        if \\\"'\\\" in cleaned:\\n            # Title case to handle apostrophe correctly (e.g., O'Neil)\\n            parts.append(cleaned.title())\\n        else:\\n            # Capitalize first part, lower others\\n            if i == 0:\\n                parts.append(cleaned.title())\\n            else:\\n                parts.append(cleaned.lower())\\n    return \\\"-\\\".join(parts)\", \"old_str\": \"def display_contact_name(name: str) -> str:\\n    # Split on hyphens, title\\u2011case each part to handle apostrophes correctly, then re\\u2011join.\\n    parts = [part.strip().title() for part in name.split(\\\"-\\\")]\\n    return \\\"-\\\".join(parts)\", \"path\": \"app/utils/names.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"def display_contact_name(name: str) -> str:\\n    # If the name contains both an apostrophe and a hyphen, title\\u2011case each hyphen\\u2011separated part.\\n    # Otherwise, lowercase all parts and capitalize only the first character of the result.\\n    if \\\"-\\\" in name and \\\"'\\\" in name:\\n        parts = [part.strip().title() for part in name.split(\\\"-\\\")]\\n        cleaned = \\\"-\\\".join(parts)\\n    else:\\n        cleaned = \\\"-\\\".join(part.strip().lower() for part in name.split(\\\"-\\\"))\\n    return cleaned[:1].upper() + cleaned[1:]\", \"old_str\": \"def display_contact_name(name: str) -> str:\\n    # Split on hyphens, title\\u2011case each part to handle apostrophes correctly, then re\\u2011join.\\n    parts = [part.strip().title() for part in name.split(\\\"-\\\")]\\n    return \\\"-\\\".join(parts)\", \"path\": \"app/utils/names.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"def display_contact_name(name: str) -> str:\\n    # Split on hyphens and format each part. Capitalize the first part, keep subsequent parts lowercased\\n    # unless they contain an apostrophe, in which case title\\u2011case them to preserve proper casing.\\n    parts_raw = [part.strip() for part in name.split(\\\"-\\\")]\\n    formatted_parts = []\\n    for i, part in enumerate(parts_raw):\\n        lower = part.lower()\\n        if i == 0:\\n            # Capitalize first character of the first part\\n            formatted = lower[:1].upper() + lower[1:]\\n        else:\\n            # For later parts, title\\u2011case only if an apostrophe is present\\n            formatted = lower.title() if \\\"'\\\" in lower else lower\\n        formatted_parts.append(formatted)\\n    return \\\"-\\\".join(formatted_parts)\", \"old_str\": \"def display_contact_name(name: str) -> str:\\n    # Split on hyphens, title\\u2011case each part to handle apostrophes correctly, then re\\u2011join.\\n    parts = [part.strip().title() for part in name.split(\\\"-\\\")]\\n    return \\\"-\\\".join(parts)\", \"path\": \"app/utils/names.py\"}, \"name\": \"str_replace\"}": 1
+        },
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.1",
+        "parent_id": "0.0.0.0",
+        "depth": 4,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"app/utils/names.py\", \"old_str\": \"def display_contact_name(name: str) -",
+        "visits": 1,
+        "mean_value": 18.59,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 2,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 3,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": false
+      }
+    ],
+    "result_node_id": "0.0.0.0.0"
+  },
+  "agent_architecture": "planner_coder_reviewer",
+  "architecture": "planner_coder_reviewer",
+  "role_model_stats": {
+    "planner": {
+      "model": "openai/openai/gpt-oss-120b",
+      "tokens_in": 639,
+      "tokens_out": 563,
+      "api_calls": 1
+    },
+    "coder": {
+      "model": "openai/openai/gpt-oss-120b",
+      "input_tokens": 34269,
+      "output_tokens": 8002,
+      "turns": 4,
+      "tool_calls": 4,
+      "iterations": 18,
+      "tree_nodes_created": 6,
+      "best_node_depth": 4,
+      "best_node_value": 40.723469259999995
+    },
+    "reviewer": {
+      "model": "openai/openai/gpt-oss-120b",
+      "tokens_in": 1033,
+      "tokens_out": 351,
+      "api_calls": 1
+    }
+  },
+  "planner_handoff": {
+    "problem_summary": "",
+    "root_cause_hypothesis": "The name formatting helper in app/utils/names.py mishandles strings containing both an apostrophe and a hyphen, producing incorrectly cased output for dispatch previews.",
+    "files_likely_affected": [
+      "app/utils/names.py",
+      "app/main.py"
+    ],
+    "target_symbols": [],
+    "discovery_priority": [
+      "app/utils/names.py",
+      "app/main.py"
+    ],
+    "first_actions": [
+      "Read app/utils/names.py around the formatting function.",
+      "Run scripts/demo_dispatch.py (or equivalent) to reproduce the preview with a name like \"O'Neil-Smith\".",
+      "Inspect the current output versus the expected \"O'Neil\u2011Smith\"."
+    ],
+    "safe_reproduction_steps": [],
+    "reproduction_notes": [],
+    "required_validations": [
+      "python -m pytest tests/test_name_helpers.py",
+      "python -m pytest tests/test_exports.py"
+    ],
+    "allowed_change_types": [
+      "targeted runtime code fixes"
+    ],
+    "forbidden_edits": [
+      "Do not modify any test files.",
+      "Do not change the uppercase export logic in app/main.py."
+    ],
+    "escalation_conditions": [
+      "If the issue is still unclear after targeted inspection and reproduction."
+    ]
+  },
+  "review_feedback": {
+    "decision": "accept_soft_gate",
+    "primary_reason": "The manual_repro_is_fixed check failed, indicating the name formatting still does not produce the expected 'D'Arcy-Lee' output.",
+    "required_changes": [
+      "Update display_contact_name to correctly capitalize hyphen\u2011separated parts that also contain apostrophes, ensuring \"D'Arcy-Lee\" is produced.",
+      "Add handling for mixed hyphen and apostrophe cases without hard\u2011coding specific names."
+    ],
+    "validations_to_rerun": [
+      "python -m pytest -q",
+      "python scripts/demo_dispatch.py"
+    ],
+    "soft_gate_override": {
+      "reason": "reviewer_revise_without_hard_failure_evidence",
+      "missing_required_checks": false,
+      "failed_live_checks": true,
+      "patch_empty": false
+    }
+  },
+  "coder_rounds": [
+    {
+      "round": 1,
+      "turns": [
+        {
+          "turn": 1,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "app/utils/names.py",
+                "start_line": 1,
+                "end_line": 200
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "app/utils/names.py",
+                "start_line": 1,
+                "end_line": 200
+              },
+              "output": "Here's the result of running `cat -n` on /repo/app/utils/names.py:\n     1\tdef normalize_route_code(name: str) -> str:\n     2\t    return \"-\".join(part.strip().upper() for part in name.split(\"-\"))\n     3\t\n     4\t\n     5\tdef display_contact_name(name: str) -> str:\n     6\t    cleaned = \"-\".join(part.strip().lower() for part in name.split(\"-\"))\n     7\t    return cleaned[:1].upper() + cleaned[1:]\n     8\t",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 2,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "app/utils/names.py",
+                "old_str": "def display_contact_name(name: str) -> str:\n    cleaned = \"-\".join(part.strip().lower() for part in name.split(\"-\"))\n    return cleaned[:1].upper() + cleaned[1:]",
+                "new_str": "def display_contact_name(name: str) -> str:\n    # Split on hyphens, title\u2011case each part to handle apostrophes correctly, then re\u2011join.\n    parts = [part.strip().title() for part in name.split(\"-\")]\n    return \"-\".join(parts)"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "app/utils/names.py",
+                "old_str": "def display_contact_name(name: str) -> str:\n    cleaned = \"-\".join(part.strip().lower() for part in name.split(\"-\"))\n    return cleaned[:1].upper() + cleaned[1:]",
+                "new_str": "def display_contact_name(name: str) -> str:\n    # Split on hyphens, title\u2011case each part to handle apostrophes correctly, then re\u2011join.\n    parts = [part.strip().title() for part in name.split(\"-\")]\n    return \"-\".join(parts)"
+              },
+              "output": "Here's the result of running `cat -n` on /repo/app/utils/names.py:\n     1\tdef normalize_route_code(name: str) -> str:\n     2\t    return \"-\".join(part.strip().upper() for part in name.split(\"-\"))\n     3\t\n     4\t\n     5\tdef display_contact_name(name: str) -> str:\n     6\t    # Split on hyphens, title\u2011case each part to handle apostrophes correctly, then re\u2011join.\n     7\t    parts = [part.strip().title() for part in name.split(\"-\")]\n     8\t    return \"-\".join(parts)\n     9\t",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 3,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q"
+              },
+              "output": "..F                                                                      [100%]\n=================================== FAILURES ===================================\n_____________ test_display_contact_name_hyphen_without_apostrophe ______________\n\n    def test_display_contact_name_hyphen_without_apostrophe() -> None:\n>       assert display_contact_name(\"mina-west\") == \"Mina-west\"\nE       AssertionError: assert 'Mina-West' == 'Mina-west'\nE         \nE         - Mina-west\nE         ?      ^\nE         + Mina-West\nE         ?      ^\n\ntests/test_name_helpers.py:9: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_name_helpers.py::test_display_contact_name_hyphen_without_apostrophe - AssertionError: assert 'Mina-West' == 'Mina-west'\n1 failed, 2 passed in 0.10s",
+              "is_error": true,
+              "exit_code": 1
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 4,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "app/utils/names.py",
+                "old_str": "def display_contact_name(name: str) -> str:\n    # Split on hyphens, title\u2011case each part to handle apostrophes correctly, then re\u2011join.\n    parts = [part.strip().title() for part in name.split(\"-\")]\n    return \"-\".join(parts)",
+                "new_str": "def display_contact_name(name: str) -> str:\n    # Split on hyphens. Capitalize the first part and any part containing an apostrophe.\n    parts = []\n    for i, part in enumerate(name.split(\"-\")):\n        stripped = part.strip()\n        if i == 0 or \"'\" in stripped:\n            parts.append(stripped.title())\n        else:\n            parts.append(stripped.lower())\n    return \"-\".join(parts)"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "app/utils/names.py",
+                "old_str": "def display_contact_name(name: str) -> str:\n    # Split on hyphens, title\u2011case each part to handle apostrophes correctly, then re\u2011join.\n    parts = [part.strip().title() for part in name.split(\"-\")]\n    return \"-\".join(parts)",
+                "new_str": "def display_contact_name(name: str) -> str:\n    # Split on hyphens. Capitalize the first part and any part containing an apostrophe.\n    parts = []\n    for i, part in enumerate(name.split(\"-\")):\n        stripped = part.strip()\n        if i == 0 or \"'\" in stripped:\n            parts.append(stripped.title())\n        else:\n            parts.append(stripped.lower())\n    return \"-\".join(parts)"
+              },
+              "output": "Here's the result of running `cat -n` on /repo/app/utils/names.py:\n     1\tdef normalize_route_code(name: str) -> str:\n     2\t    return \"-\".join(part.strip().upper() for part in name.split(\"-\"))\n     3\t\n     4\t\n     5\tdef display_contact_name(name: str) -> str:\n     6\t    # Split on hyphens. Capitalize the first part and any part containing an apostrophe.\n     7\t    parts = []\n     8\t    for i, part in enumerate(name.split(\"-\")):\n     9\t        stripped = part.strip()\n    10\t        if i == 0 or \"'\" in stripped:\n    11\t            parts.append(stripped.title())\n    12\t        else:\n    13\t            parts.append(stripped.lower())\n    14\t    return \"-\".join(parts)\n    15\t",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        }
+      ],
+      "patch": "diff --git a/app/utils/names.py b/app/utils/names.py\nindex 5e98495..f55f941 100644\n--- a/app/utils/names.py\n+++ b/app/utils/names.py\n@@ -3,6 +3,13 @@ def normalize_route_code(name: str) -> str:\n \n \n def display_contact_name(name: str) -> str:\n-    cleaned = \"-\".join(part.strip().lower() for part in name.split(\"-\"))\n-    return cleaned[:1].upper() + cleaned[1:]\n+    # Split on hyphens. Capitalize the first part and any part containing an apostrophe.\n+    parts = []\n+    for i, part in enumerate(name.split(\"-\")):\n+        stripped = part.strip()\n+        if i == 0 or \"'\" in stripped:\n+            parts.append(stripped.title())\n+        else:\n+            parts.append(stripped.lower())\n+    return \"-\".join(parts)\n \n",
+      "submitted": true,
+      "stopped_reason": "auto_finalized",
+      "stats": {
+        "input_tokens": 35941,
+        "output_tokens": 8916,
+        "turns": 4,
+        "tool_calls": 4,
+        "iterations": 18,
+        "tree_nodes_created": 6,
+        "best_node_depth": 4,
+        "best_node_value": 40.723469259999995
+      },
+      "mcts_tree": {
+        "nodes": [
+          {
+            "id": "0",
+            "parent_id": null,
+            "depth": 0,
+            "action_name": null,
+            "action_args_preview": "",
+            "visits": 5,
+            "mean_value": 12.07,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0",
+            "parent_id": "0",
+            "depth": 1,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"app/utils/names.py\", \"start_line\": 1, \"end_line\": 200}",
+            "visits": 5,
+            "mean_value": 12.07,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0",
+            "parent_id": "0.0",
+            "depth": 2,
+            "action_name": "str_replace",
+            "action_args_preview": "{\"path\": \"app/utils/names.py\", \"old_str\": \"def display_contact_name(name: str) -",
+            "visits": 4,
+            "mean_value": 15.09,
+            "submitted": false,
+            "is_branch_point": true,
+            "edit_made": true,
+            "success_checks": 1,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 1,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {
+              "{\"arguments\": {\"new_str\": \"def display_contact_name(name: str) -> str:\\n    # Split on hyphens, title\\u2011case each part to handle apostrophes correctly, then re\\u2011join.\\n    parts = [part.strip().title() for part in name.split(\\\"-\\\")]\\n    return \\\"-\\\".join(parts)\", \"old_str\": \"def display_contact_name(name: str) -> str:\\n    cleaned = \\\"-\\\".join(part.strip().lower() for part in name.split(\\\"-\\\"))\\n    return cleaned[:1].upper() + cleaned[1:]\", \"path\": \"app/utils/names.py\"}, \"name\": \"str_replace\"}": 1,
+              "{\"arguments\": {\"new_str\": \"def display_contact_name(name: str) -> str:\\n    # Properly capitalize each hyphen-separated part, handling apostrophes correctly\\n    parts = [part.strip().lower().title() for part in name.split(\\\"-\\\")]\\n    return \\\"-\\\".join(parts)\", \"old_str\": \"def display_contact_name(name: str) -> str:\\n    cleaned = \\\"-\\\".join(part.strip().lower() for part in name.split(\\\"-\\\"))\\n    return cleaned[:1].upper() + cleaned[1:]\", \"path\": \"app/utils/names.py\"}, \"name\": \"str_replace\"}": 1,
+              "{\"arguments\": {\"new_str\": \"def display_contact_name(name: str) -> str:\\n    # Capitalize each hyphen-separated part, preserving internal apostrophes\\n    parts = [part.strip().lower().title() for part in name.split(\\\"-\\\")]\\n    return \\\"-\\\".join(parts)\", \"old_str\": \"def display_contact_name(name: str) -> str:\\n    cleaned = \\\"-\\\".join(part.strip().lower() for part in name.split(\\\"-\\\"))\\n    return cleaned[:1].upper() + cleaned[1:]\", \"path\": \"app/utils/names.py\"}, \"name\": \"str_replace\"}": 1,
+              "{\"arguments\": {\"new_str\": \"def display_contact_name(name: str) -> str:\\n    # Properly capitalize each part, handling apostrophes and hyphens\\n    cleaned = name.lower()\\n    return cleaned.title()\", \"old_str\": \"def display_contact_name(name: str) -> str:\\n    cleaned = \\\"-\\\".join(part.strip().lower() for part in name.split(\\\"-\\\"))\\n    return cleaned[:1].upper() + cleaned[1:]\", \"path\": \"app/utils/names.py\"}, \"name\": \"str_replace\"}": 1,
+              "{\"arguments\": {\"new_str\": \"def display_contact_name(name: str) -> str:\\n    # Properly capitalize each hyphen-separated part, handling apostrophes correctly\\n    parts = [part.strip().title() for part in name.split(\\\"-\\\")]\\n    return \\\"-\\\".join(parts)\", \"old_str\": \"def display_contact_name(name: str) -> str:\\n    cleaned = \\\"-\\\".join(part.strip().lower() for part in name.split(\\\"-\\\"))\\n    return cleaned[:1].upper() + cleaned[1:]\", \"path\": \"app/utils/names.py\"}, \"name\": \"str_replace\"}": 1
+            },
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0",
+            "parent_id": "0.0.0",
+            "depth": 3,
+            "action_name": "bash",
+            "action_args_preview": "{\"command\": \"python -m pytest -q\"}",
+            "visits": 3,
+            "mean_value": 16.04,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 1,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 2,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0",
+            "parent_id": "0.0.0.0",
+            "depth": 4,
+            "action_name": "str_replace",
+            "action_args_preview": "{\"path\": \"app/utils/names.py\", \"old_str\": \"def display_contact_name(name: str) -",
+            "visits": 1,
+            "mean_value": 18.59,
+            "submitted": true,
+            "is_branch_point": true,
+            "edit_made": true,
+            "success_checks": 2,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 3,
+            "has_nonempty_patch": true,
+            "stopped_reason": "auto_finalized",
+            "vote_counts": {
+              "{\"arguments\": {\"new_str\": \"def display_contact_name(name: str) -> str:\\n    # Split on hyphens. Capitalize the first part and any part containing an apostrophe.\\n    parts = []\\n    for i, part in enumerate(name.split(\\\"-\\\")):\\n        stripped = part.strip()\\n        if i == 0 or \\\"'\\\" in stripped:\\n            parts.append(stripped.title())\\n        else:\\n            parts.append(stripped.lower())\\n    return \\\"-\\\".join(parts)\", \"old_str\": \"def display_contact_name(name: str) -> str:\\n    # Split on hyphens, title\\u2011case each part to handle apostrophes correctly, then re\\u2011join.\\n    parts = [part.strip().title() for part in name.split(\\\"-\\\")]\\n    return \\\"-\\\".join(parts)\", \"path\": \"app/utils/names.py\"}, \"name\": \"str_replace\"}": 1,
+              "{\"arguments\": {\"new_str\": \"def display_contact_name(name: str) -> str:\\n    # Split on hyphens. Title\\u2011case parts containing an apostrophe, otherwise lower\\u2011case.\\n    parts = [part.strip().title() if \\\"'\\\" in part else part.strip().lower() for part in name.split(\\\"-\\\")]\\n    # Join parts with hyphens.\\n    return \\\"-\\\".join(parts)\", \"old_str\": \"def display_contact_name(name: str) -> str:\\n    # Split on hyphens, title\\u2011case each part to handle apostrophes correctly, then re\\u2011join.\\n    parts = [part.strip().title() for part in name.split(\\\"-\\\")]\\n    return \\\"-\\\".join(parts)\", \"path\": \"app/utils/names.py\"}, \"name\": \"str_replace\"}": 1,
+              "{\"arguments\": {\"new_str\": \"def display_contact_name(name: str) -> str:\\n    # If any part contains an apostrophe, title\\u2011case each hyphen\\u2011separated part.\\n    # Otherwise, lower\\u2011case all parts and capitalize only the first character of the whole string.\\n    parts_raw = [part.strip() for part in name.split(\\\"-\\\")]\\n    if any(\\\"'\\\" in part for part in parts_raw):\\n        parts = [part.title() for part in parts_raw]\\n        return \\\"-\\\".join(parts)\\n    cleaned = \\\"-\\\".join(part.lower() for part in parts_raw)\\n    return cleaned[:1].upper() + cleaned[1:]\", \"old_str\": \"def display_contact_name(name: str) -> str:\\n    # Split on hyphens, title\\u2011case each part to handle apostrophes correctly, then re\\u2011join.\\n    parts = [part.strip().title() for part in name.split(\\\"-\\\")]\\n    return \\\"-\\\".join(parts)\", \"path\": \"app/utils/names.py\"}, \"name\": \"str_replace\"}": 1,
+              "{\"arguments\": {\"new_str\": \"def display_contact_name(name: str) -> str:\\n    # Properly format names with hyphens and apostrophes.\\n    parts = []\\n    for i, part in enumerate(name.split(\\\"-\\\")):\\n        cleaned = part.strip()\\n        if \\\"'\\\" in cleaned:\\n            # Title case to handle apostrophe correctly (e.g., O'Neil)\\n            parts.append(cleaned.title())\\n        else:\\n            # Capitalize first part, lower others\\n            if i == 0:\\n                parts.append(cleaned.title())\\n            else:\\n                parts.append(cleaned.lower())\\n    return \\\"-\\\".join(parts)\", \"old_str\": \"def display_contact_name(name: str) -> str:\\n    # Split on hyphens, title\\u2011case each part to handle apostrophes correctly, then re\\u2011join.\\n    parts = [part.strip().title() for part in name.split(\\\"-\\\")]\\n    return \\\"-\\\".join(parts)\", \"path\": \"app/utils/names.py\"}, \"name\": \"str_replace\"}": 1,
+              "{\"arguments\": {\"new_str\": \"def display_contact_name(name: str) -> str:\\n    # If the name contains both an apostrophe and a hyphen, title\\u2011case each hyphen\\u2011separated part.\\n    # Otherwise, lowercase all parts and capitalize only the first character of the result.\\n    if \\\"-\\\" in name and \\\"'\\\" in name:\\n        parts = [part.strip().title() for part in name.split(\\\"-\\\")]\\n        cleaned = \\\"-\\\".join(parts)\\n    else:\\n        cleaned = \\\"-\\\".join(part.strip().lower() for part in name.split(\\\"-\\\"))\\n    return cleaned[:1].upper() + cleaned[1:]\", \"old_str\": \"def display_contact_name(name: str) -> str:\\n    # Split on hyphens, title\\u2011case each part to handle apostrophes correctly, then re\\u2011join.\\n    parts = [part.strip().title() for part in name.split(\\\"-\\\")]\\n    return \\\"-\\\".join(parts)\", \"path\": \"app/utils/names.py\"}, \"name\": \"str_replace\"}": 1,
+              "{\"arguments\": {\"new_str\": \"def display_contact_name(name: str) -> str:\\n    # Split on hyphens and format each part. Capitalize the first part, keep subsequent parts lowercased\\n    # unless they contain an apostrophe, in which case title\\u2011case them to preserve proper casing.\\n    parts_raw = [part.strip() for part in name.split(\\\"-\\\")]\\n    formatted_parts = []\\n    for i, part in enumerate(parts_raw):\\n        lower = part.lower()\\n        if i == 0:\\n            # Capitalize first character of the first part\\n            formatted = lower[:1].upper() + lower[1:]\\n        else:\\n            # For later parts, title\\u2011case only if an apostrophe is present\\n            formatted = lower.title() if \\\"'\\\" in lower else lower\\n        formatted_parts.append(formatted)\\n    return \\\"-\\\".join(formatted_parts)\", \"old_str\": \"def display_contact_name(name: str) -> str:\\n    # Split on hyphens, title\\u2011case each part to handle apostrophes correctly, then re\\u2011join.\\n    parts = [part.strip().title() for part in name.split(\\\"-\\\")]\\n    return \\\"-\\\".join(parts)\", \"path\": \"app/utils/names.py\"}, \"name\": \"str_replace\"}": 1
+            },
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.1",
+            "parent_id": "0.0.0.0",
+            "depth": 4,
+            "action_name": "str_replace",
+            "action_args_preview": "{\"path\": \"app/utils/names.py\", \"old_str\": \"def display_contact_name(name: str) -",
+            "visits": 1,
+            "mean_value": 18.59,
+            "submitted": false,
+            "is_branch_point": true,
+            "edit_made": true,
+            "success_checks": 2,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 3,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": false
+          }
+        ],
+        "result_node_id": "0.0.0.0.0"
+      },
+      "vote_summary": [
+        {
+          "depth": 2,
+          "action": "str_replace",
+          "winner_votes": 1,
+          "total_samples": 5,
+          "unique_candidates": 5
+        },
+        {
+          "depth": 4,
+          "action": "str_replace",
+          "winner_votes": 1,
+          "total_samples": 6,
+          "unique_candidates": 6
+        }
+      ],
+      "review_feedback": {
+        "decision": "accept_soft_gate",
+        "primary_reason": "The manual_repro_is_fixed check failed, indicating the name formatting still does not produce the expected 'D'Arcy-Lee' output.",
+        "required_changes": [
+          "Update display_contact_name to correctly capitalize hyphen\u2011separated parts that also contain apostrophes, ensuring \"D'Arcy-Lee\" is produced.",
+          "Add handling for mixed hyphen and apostrophe cases without hard\u2011coding specific names."
+        ],
+        "validations_to_rerun": [
+          "python -m pytest -q",
+          "python scripts/demo_dispatch.py"
+        ],
+        "soft_gate_override": {
+          "reason": "reviewer_revise_without_hard_failure_evidence",
+          "missing_required_checks": false,
+          "failed_live_checks": true,
+          "patch_empty": false
+        }
+      }
+    }
+  ],
+  "instance_id": "dispatch_preview_001",
+  "duration_seconds": 311.72
+}

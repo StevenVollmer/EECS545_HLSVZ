@@ -1,0 +1,23 @@
+diff --git a/app/services/board.py b/app/services/board.py
+index a166ec9..fc96638 100644
+--- a/app/services/board.py
++++ b/app/services/board.py
+@@ -2,10 +2,12 @@ from app.models.card import Card
+ 
+ 
+ def visible_owner_names(cards: list[Card]) -> list[str]:
+-    names = {
+-        card.owner
+-        for card in cards
+-        if card.active and card.needs_attention
+-    }
+-    return sorted(names)
++    seen = set()
++    names = []
++    for card in cards:
++        if card.active and card.needs_attention:
++            if card.owner not in seen:
++                seen.add(card.owner)
++                names.append(card.owner)
++    return names
+ 

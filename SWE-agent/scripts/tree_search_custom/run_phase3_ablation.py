@@ -92,12 +92,43 @@ def _cmd(
     return cmd
 
 
-def build_runs(output_root: Path, resume: bool) -> list[tuple[str, list[str]]]:
-    """Return (run_id, command) pairs in execution order."""
-    runs: list[tuple[str, list[str]]] = []
+def _count_trajs(run_dir: Path) -> int:
+    """Count .traj files in a run output directory."""
+    return len(list(run_dir.rglob("*.traj"))) if run_dir.exists() else 0
+
+
+def _expected_cases(filter_str: str | None, instances_path: str) -> int:
+    """Count how many instances a run would process."""
+    import re
+    path = Path(instances_path)
+    if not path.exists():
+        return 0
+    instance_ids: list[str] = []
+    for d in path.iterdir():
+        case_file = d / "case.json"
+        if not d.is_dir() or not case_file.exists():
+            continue
+        try:
+            raw = json.loads(case_file.read_text())
+            entries = raw if isinstance(raw, list) else [raw]
+            for entry in entries:
+                iid = entry.get("instance_id", "")
+                if iid:
+                    instance_ids.append(iid)
+        except Exception:
+            instance_ids.append(d.name)  # fallback to dir name
+    if filter_str is None:
+        return len(instance_ids)
+    pattern = re.compile(filter_str)
+    return sum(1 for iid in instance_ids if pattern.search(iid))
+
+
+def build_runs(output_root: Path, resume: bool) -> list[tuple[str, list[str], str | None, str]]:
+    """Return (run_id, command, filter_str, instances_path) tuples in execution order."""
+    runs: list[tuple[str, list[str], str | None, str]] = []
 
     def add(run_id: str, preset: str, path: str, filt: str | None, flags: list[str]) -> None:
-        runs.append((run_id, _cmd(run_id, preset, path, filt, output_root, flags, resume)))
+        runs.append((run_id, _cmd(run_id, preset, path, filt, output_root, flags, resume), filt, path))
 
     c2 = "SWE-agent/custom_cases_2"
     c1 = "SWE-agent/custom_cases"
@@ -213,10 +244,12 @@ def main() -> None:
     )
     parser.add_argument("--execute", action="store_true",
                         help="Run commands instead of printing only")
-    parser.add_argument("--resume", action="store_true",
-                        help="Add --resume to each run command")
+    parser.add_argument("--resume", action="store_true", default=True,
+                        help="Skip instances that already have a .traj file (default: on)")
     parser.add_argument("--only", default=None,
                         help="Comma-separated run IDs to execute (e.g. A1,B1,A2)")
+    parser.add_argument("--group", choices=["local", "remote"], default=None,
+                        help="local = 9b Ollama runs (A+B+C groups); remote = UMich cluster runs (D group)")
     parser.add_argument("--summarize", action="store_true",
                         help="Print result summary from completed runs and exit")
     args = parser.parse_args()
@@ -228,20 +261,34 @@ def main() -> None:
     only_ids: set[str] | None = None
     if args.only:
         only_ids = {s.strip() for s in args.only.split(",")}
+    elif args.group == "local":
+        only_ids = {"A1", "A2", "A3", "A4", "B1", "B2", "C1", "C2"}
+    elif args.group == "remote":
+        only_ids = {"D1", "D2", "D3", "D4"}
 
     runs = build_runs(args.output_root, args.resume)
 
     print(f"Phase-3 ablation — output root: {args.output_root}")
-    print(f"{'Run ID':<35}  Command")
-    print("-" * 100)
-    for run_id, cmd in runs:
+    print(f"{'Run ID':<35}  {'Status':<22}  Command")
+    print("-" * 110)
+    for run_id, cmd, filt, instances_path in runs:
         if only_ids and not any(run_id.startswith(oid) for oid in only_ids):
-            print(f"{run_id:<35}  [skipped]")
+            print(f"{run_id:<35}  {'[group skipped]':<22}")
             continue
+
+        run_dir = args.output_root / run_id
+        done = _count_trajs(run_dir)
+        expected = _expected_cases(filt, instances_path)
+        status = f"{done}/{expected} done"
+
+        if args.execute and done >= expected > 0:
+            print(f"{run_id:<35}  {status + ' — skipping':<22}")
+            continue
+
         printable = " ".join(cmd)
-        print(f"{run_id:<35}  {printable}")
+        print(f"{run_id:<35}  {status:<22}  {printable}")
         if args.execute:
-            print(f"\n{'='*60}\nStarting: {run_id}\n{'='*60}")
+            print(f"\n{'='*60}\nStarting: {run_id}  ({done}/{expected} already done)\n{'='*60}")
             result = subprocess.run(cmd)
             if result.returncode != 0:
                 print(f"\n[WARNING] {run_id} exited with code {result.returncode} — continuing")

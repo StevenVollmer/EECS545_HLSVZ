@@ -1,0 +1,36 @@
+diff --git a/app/ui/presenter.py b/app/ui/presenter.py
+index f888aed..dfe8c26 100644
+--- a/app/ui/presenter.py
++++ b/app/ui/presenter.py
+@@ -1,5 +1,5 @@
+-from app.utils.strings import title_case_words
++from app.utils.strings import title_case_words, title_case_name
+ 
+ 
+ def present_name(name: str) -> str:
+-    return title_case_words(name)
++    return title_case_name(name)
+diff --git a/app/utils/strings.py b/app/utils/strings.py
+index c76158a..0cb4636 100644
+--- a/app/utils/strings.py
++++ b/app/utils/strings.py
+@@ -1,2 +1,19 @@
+ def title_case_words(value: str) -> str:
+     return " ".join(word.capitalize() for word in value.split(" "))
++
++
++def title_case_name(name: str) -> str:
++    # Handle apostrophes and other special characters by preserving case
++    # Split on spaces, capitalize each word, but preserve apostrophe context
++    words = name.split(" ")
++    result = []
++    for word in words:
++        # Handle words with apostrophes like "o'connor"
++        if "'" in word:
++            # Split on apostrophe, capitalize each part
++            parts = word.split("'")
++            capitalized_parts = [part.capitalize() for part in parts]
++            result.append("'".join(capitalized_parts))
++        else:
++            result.append(word.capitalize())
++    return " ".join(result)

@@ -1,0 +1,592 @@
+{
+  "turns": [
+    {
+      "turn": 1,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "ls -R"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "ls -R"
+          },
+          "output": ".:\napp  scripts  tests\n\n./app:\n__init__.py  __pycache__  main.py  utils\n\n./app/__pycache__:\n__init__.cpython-312.pyc  main.cpython-312.pyc\n\n./app/utils:\n__init__.py  __pycache__  labels.py\n\n./app/utils/__pycache__:\n__init__.cpython-312.pyc  labels.cpython-312.pyc\n\n./scripts:\n__pycache__  demo_timeline.py\n\n./scripts/__pycache__:\ndemo_timeline.cpython-312.pyc\n\n./tests:\n__pycache__  test_exports.py  test_label_helpers.py\n\n./tests/__pycache__:\ntest_exports.cpython-312.pyc  test_label_helpers.cpython-312.pyc",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 2,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/utils/labels.py",
+            "start_line": 1,
+            "end_line": 200
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/utils/labels.py",
+            "start_line": 1,
+            "end_line": 200
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/utils/labels.py:\n     1\tdef normalize_route_label(owner: str) -> str:\n     2\t    return \"/\".join(part.strip().upper() for part in owner.split(\"/\"))\n     3\t\n     4\t\n     5\tdef format_timeline_label(owner: str) -> str:\n     6\t    sections = []\n     7\t    for section in owner.split(\"/\"):\n     8\t        words = []\n     9\t        for word in section.strip().split(\"-\"):\n    10\t            words.append(word[:1].upper() + word[1:].lower())\n    11\t        sections.append(\"-\".join(words))\n    12\t    return \"/\".join(sections)",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 3,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/utils/labels.py",
+            "old_str": "def format_timeline_label(owner: str) -> str:\n    sections = []\n    for section in owner.split(\"/\"):\n        words = []\n        for word in section.strip().split(\"-\"):\n            words.append(word[:1].upper() + word[1:].lower())\n        sections.append(\"-\".join(words))\n    return \"/\".join(sections)",
+            "new_str": "def format_timeline_label(owner: str) -> str:\n    # Preserve capitalization for apostrophes and hyphens using title case\n    return \"/\".join(section.strip().title() for section in owner.split(\"/\"))"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/utils/labels.py",
+            "old_str": "def format_timeline_label(owner: str) -> str:\n    sections = []\n    for section in owner.split(\"/\"):\n        words = []\n        for word in section.strip().split(\"-\"):\n            words.append(word[:1].upper() + word[1:].lower())\n        sections.append(\"-\".join(words))\n    return \"/\".join(sections)",
+            "new_str": "def format_timeline_label(owner: str) -> str:\n    # Preserve capitalization for apostrophes and hyphens using title case\n    return \"/\".join(section.strip().title() for section in owner.split(\"/\"))"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/utils/labels.py:\n     1\tdef normalize_route_label(owner: str) -> str:\n     2\t    return \"/\".join(part.strip().upper() for part in owner.split(\"/\"))\n     3\t\n     4\t\n     5\tdef format_timeline_label(owner: str) -> str:\n     6\t    # Preserve capitalization for apostrophes and hyphens using title case\n     7\t    return \"/\".join(section.strip().title() for section in owner.split(\"/\"))",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    }
+  ],
+  "stats": {
+    "input_tokens": 19120,
+    "output_tokens": 3732,
+    "turns": 3,
+    "tool_calls": 5,
+    "iterations": 18,
+    "tree_nodes_created": 4,
+    "best_node_depth": 3,
+    "best_node_value": 43.808304
+  },
+  "loop_state": {
+    "executable_edit_made": true,
+    "validation_passed": false,
+    "validation_attempted_after_edit": true,
+    "diff_checked": false,
+    "successful_post_edit_commands": [],
+    "satisfied_success_checks": [
+      "manual_repro_is_fixed",
+      "tests_still_pass_after_fix"
+    ],
+    "changed_files": [
+      "app/utils/labels.py"
+    ]
+  },
+  "stopped_reason": "auto_finalized",
+  "submitted": true,
+  "submission_summary": "Auto-finalized: required success checks were satisfied with a non-empty patch.",
+  "patch": "diff --git a/app/utils/labels.py b/app/utils/labels.py\nindex 4ef7164..d112f8f 100644\n--- a/app/utils/labels.py\n+++ b/app/utils/labels.py\n@@ -3,10 +3,5 @@ def normalize_route_label(owner: str) -> str:\n \n \n def format_timeline_label(owner: str) -> str:\n-    sections = []\n-    for section in owner.split(\"/\"):\n-        words = []\n-        for word in section.strip().split(\"-\"):\n-            words.append(word[:1].upper() + word[1:].lower())\n-        sections.append(\"-\".join(words))\n-    return \"/\".join(sections)\n+    # Preserve capitalization for apostrophes and hyphens using title case\n+    return \"/\".join(section.strip().title() for section in owner.split(\"/\"))\n",
+  "info": {
+    "submission": "diff --git a/app/utils/labels.py b/app/utils/labels.py\nindex 4ef7164..d112f8f 100644\n--- a/app/utils/labels.py\n+++ b/app/utils/labels.py\n@@ -3,10 +3,5 @@ def normalize_route_label(owner: str) -> str:\n \n \n def format_timeline_label(owner: str) -> str:\n-    sections = []\n-    for section in owner.split(\"/\"):\n-        words = []\n-        for word in section.strip().split(\"-\"):\n-            words.append(word[:1].upper() + word[1:].lower())\n-        sections.append(\"-\".join(words))\n-    return \"/\".join(sections)\n+    # Preserve capitalization for apostrophes and hyphens using title case\n+    return \"/\".join(section.strip().title() for section in owner.split(\"/\"))\n",
+    "submitted": true,
+    "submission_summary": "Auto-finalized: required success checks were satisfied with a non-empty patch.",
+    "stopped_reason": "auto_finalized"
+  },
+  "auto_finalized": true,
+  "mcts_meta": {
+    "model": "openai/openai/gpt-oss-120b",
+    "iterations": 18,
+    "expansion_candidates": 1,
+    "edit_vote_samples": 5,
+    "ucb_c": 1.414,
+    "root_visits": 3,
+    "early_branching": false,
+    "early_branch_depth": 2
+  },
+  "vote_summary": [
+    {
+      "depth": 3,
+      "action": "str_replace",
+      "winner_votes": 1,
+      "total_samples": 4,
+      "unique_candidates": 4
+    }
+  ],
+  "mcts_tree": {
+    "nodes": [
+      {
+        "id": "0",
+        "parent_id": null,
+        "depth": 0,
+        "action_name": null,
+        "action_args_preview": "",
+        "visits": 3,
+        "mean_value": 7.0,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0",
+        "parent_id": "0",
+        "depth": 1,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"ls -R\"}",
+        "visits": 3,
+        "mean_value": 7.0,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0",
+        "parent_id": "0.0",
+        "depth": 2,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"app/utils/labels.py\", \"start_line\": 1, \"end_line\": 200}",
+        "visits": 2,
+        "mean_value": 10.5,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0",
+        "parent_id": "0.0.0",
+        "depth": 3,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"app/utils/labels.py\", \"old_str\": \"def format_timeline_label(owner: str",
+        "visits": 1,
+        "mean_value": 20.99,
+        "submitted": true,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 2,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 1,
+        "has_nonempty_patch": true,
+        "stopped_reason": "auto_finalized",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"def format_timeline_label(owner: str) -> str:\\n    # Preserve capitalization for apostrophes and hyphens using title case\\n    return \\\"/\\\".join(section.strip().title() for section in owner.split(\\\"/\\\"))\", \"old_str\": \"def format_timeline_label(owner: str) -> str:\\n    sections = []\\n    for section in owner.split(\\\"/\\\"):\\n        words = []\\n        for word in section.strip().split(\\\"-\\\"):\\n            words.append(word[:1].upper() + word[1:].lower())\\n        sections.append(\\\"-\\\".join(words))\\n    return \\\"/\\\".join(sections)\", \"path\": \"app/utils/labels.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"for word in section.strip().split(\\\"-\\\"):\\n            # Preserve apostrophe-separated parts capitalization\\n            sub_parts = []\\n            for sub in word.split(\\\"'\\\"):\\n                if sub:\\n                    sub_parts.append(sub[:1].upper() + sub[1:].lower())\\n                else:\\n                    sub_parts.append('')\\n            words.append(\\\"'\\\".join(sub_parts))\", \"old_str\": \"for word in section.strip().split(\\\"-\\\"):\\n            words.append(word[:1].upper() + word[1:].lower())\", \"path\": \"app/utils/labels.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"def format_timeline_label(owner: str) -> str:\\n    def title_word(word: str) -> str:\\n        # Capitalize each part separated by apostrophes, preserving proper case after apostrophe\\n        return \\\"'\\\".join(part[:1].upper() + part[1:].lower() for part in word.split(\\\"'\\\"))\\n\\n    sections = []\\n    for section in owner.split(\\\"/\\\"):\\n        words = []\\n        for word in section.strip().split(\\\"-\\\"):\\n            words.append(title_word(word))\\n        sections.append(\\\"-\\\".join(words))\\n    return \\\"/\\\".join(sections)\", \"old_str\": \"def format_timeline_label(owner: str) -> str:\\n    sections = []\\n    for section in owner.split(\\\"/\\\"):\\n        words = []\\n        for word in section.strip().split(\\\"-\\\"):\\n            words.append(word[:1].upper() + word[1:].lower())\\n        sections.append(\\\"-\\\".join(words))\\n    return \\\"/\\\".join(sections)\", \"path\": \"app/utils/labels.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"def format_timeline_label(owner: str) -> str:\\n    # Capitalize each word, handling hyphens and apostrophes correctly\\n    def capitalize_section(section: str) -> str:\\n        # Preserve hyphens and apostrophes, capitalize letters after them or at start\\n        result_chars = []\\n        for i, ch in enumerate(section.strip()):\\n            if i == 0 or section.strip()[i - 1] in \\\"-'\\\":\\n                result_chars.append(ch.upper())\\n            else:\\n                result_chars.append(ch.lower())\\n        return \\\"\\\".join(result_chars)\\n\\n    sections = [capitalize_section(sec) for sec in owner.split(\\\"/\\\")]\\n    return \\\"/\\\".join(sections)\", \"old_str\": \"def format_timeline_label(owner: str) -> str:\\n    sections = []\\n    for section in owner.split(\\\"/\\\"):\\n        words = []\\n        for word in section.strip().split(\\\"-\\\"):\\n            words.append(word[:1].upper() + word[1:].lower())\\n        sections.append(\\\"-\\\".join(words))\\n    return \\\"/\\\".join(sections)\", \"path\": \"app/utils/labels.py\"}, \"name\": \"str_replace\"}": 1
+        },
+        "on_result_path": true
+      }
+    ],
+    "result_node_id": "0.0.0.0"
+  },
+  "agent_architecture": "planner_coder_reviewer",
+  "architecture": "planner_coder_reviewer",
+  "role_model_stats": {
+    "planner": {
+      "model": "openai/openai/gpt-oss-120b",
+      "tokens_in": 637,
+      "tokens_out": 594,
+      "api_calls": 1
+    },
+    "coder": {
+      "model": "openai/openai/gpt-oss-120b",
+      "input_tokens": 17993,
+      "output_tokens": 2925,
+      "turns": 3,
+      "tool_calls": 5,
+      "iterations": 18,
+      "tree_nodes_created": 4,
+      "best_node_depth": 3,
+      "best_node_value": 43.808304
+    },
+    "reviewer": {
+      "model": "openai/openai/gpt-oss-120b",
+      "tokens_in": 490,
+      "tokens_out": 213,
+      "api_calls": 1
+    }
+  },
+  "planner_handoff": {
+    "problem_summary": "",
+    "root_cause_hypothesis": "The preview label formatter in app/utils/labels.py strips or replaces apostrophes, causing owner names with many apostrophes to render incorrectly while export labels remain uppercase",
+    "files_likely_affected": [
+      "app/utils/labels.py",
+      "app/main.py"
+    ],
+    "target_symbols": [],
+    "discovery_priority": [
+      "app/utils/labels.py",
+      "app/main.py"
+    ],
+    "first_actions": [
+      "Read app/utils/labels.py to locate the preview label generation function",
+      "Run scripts/demo_timeline.py (or equivalent) with an owner name containing multiple apostrophes to reproduce the preview bug",
+      "Run pytest -q to ensure existing tests still pass"
+    ],
+    "safe_reproduction_steps": [],
+    "reproduction_notes": [],
+    "required_validations": [
+      "pytest -q",
+      "python scripts/demo_timeline.py | grep \"owner's\" (or similar) to confirm apostrophes appear in preview output"
+    ],
+    "allowed_change_types": [
+      "targeted runtime code fixes"
+    ],
+    "forbidden_edits": [
+      "Do not modify export label functions that enforce uppercase",
+      "Do not change any test files"
+    ],
+    "escalation_conditions": [
+      "If the issue is still unclear after targeted inspection and reproduction."
+    ]
+  },
+  "review_feedback": {
+    "decision": "accept",
+    "primary_reason": "All success checks verified (pre-run); skipping model reviewer.",
+    "required_changes": [],
+    "validations_to_rerun": []
+  },
+  "coder_rounds": [
+    {
+      "round": 1,
+      "turns": [],
+      "patch": "",
+      "submitted": false,
+      "stopped_reason": "parse_failure",
+      "stats": {
+        "input_tokens": 5945,
+        "output_tokens": 581,
+        "turns": 2,
+        "tool_calls": 3,
+        "iterations": 18,
+        "tree_nodes_created": 3,
+        "best_node_depth": 2,
+        "best_node_value": 0.0
+      },
+      "mcts_tree": {
+        "nodes": [
+          {
+            "id": "0",
+            "parent_id": null,
+            "depth": 0,
+            "action_name": null,
+            "action_args_preview": "",
+            "visits": 18,
+            "mean_value": 0.0,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0",
+            "parent_id": "0",
+            "depth": 1,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"app/utils/labels.py\", \"start_line\": 1, \"end_line\": 200}",
+            "visits": 18,
+            "mean_value": 0.0,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0",
+            "parent_id": "0.0",
+            "depth": 2,
+            "action_name": null,
+            "action_args_preview": "",
+            "visits": 17,
+            "mean_value": 0.0,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "parse_failure",
+            "vote_counts": {},
+            "on_result_path": true
+          }
+        ],
+        "result_node_id": "0.0.0"
+      },
+      "vote_summary": [],
+      "review_feedback": {
+        "decision": "revise",
+        "primary_reason": "Patch is empty; no changes were made to address the issue.",
+        "required_changes": [
+          "Submit a non-empty patch that implements the fix for the label formatter.",
+          "Ensure the patch does not modify any test files."
+        ],
+        "validations_to_rerun": [
+          "python -m pytest -q",
+          "python scripts/demo_timeline.py"
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "turns": [
+        {
+          "turn": 1,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "ls -R"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "ls -R"
+              },
+              "output": ".:\napp  scripts  tests\n\n./app:\n__init__.py  __pycache__  main.py  utils\n\n./app/__pycache__:\n__init__.cpython-312.pyc  main.cpython-312.pyc\n\n./app/utils:\n__init__.py  __pycache__  labels.py\n\n./app/utils/__pycache__:\n__init__.cpython-312.pyc  labels.cpython-312.pyc\n\n./scripts:\n__pycache__  demo_timeline.py\n\n./scripts/__pycache__:\ndemo_timeline.cpython-312.pyc\n\n./tests:\n__pycache__  test_exports.py  test_label_helpers.py\n\n./tests/__pycache__:\ntest_exports.cpython-312.pyc  test_label_helpers.cpython-312.pyc",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 2,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "app/utils/labels.py",
+                "start_line": 1,
+                "end_line": 200
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "app/utils/labels.py",
+                "start_line": 1,
+                "end_line": 200
+              },
+              "output": "Here's the result of running `cat -n` on /repo/app/utils/labels.py:\n     1\tdef normalize_route_label(owner: str) -> str:\n     2\t    return \"/\".join(part.strip().upper() for part in owner.split(\"/\"))\n     3\t\n     4\t\n     5\tdef format_timeline_label(owner: str) -> str:\n     6\t    sections = []\n     7\t    for section in owner.split(\"/\"):\n     8\t        words = []\n     9\t        for word in section.strip().split(\"-\"):\n    10\t            words.append(word[:1].upper() + word[1:].lower())\n    11\t        sections.append(\"-\".join(words))\n    12\t    return \"/\".join(sections)",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 3,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "app/utils/labels.py",
+                "old_str": "def format_timeline_label(owner: str) -> str:\n    sections = []\n    for section in owner.split(\"/\"):\n        words = []\n        for word in section.strip().split(\"-\"):\n            words.append(word[:1].upper() + word[1:].lower())\n        sections.append(\"-\".join(words))\n    return \"/\".join(sections)",
+                "new_str": "def format_timeline_label(owner: str) -> str:\n    # Preserve capitalization for apostrophes and hyphens using title case\n    return \"/\".join(section.strip().title() for section in owner.split(\"/\"))"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "app/utils/labels.py",
+                "old_str": "def format_timeline_label(owner: str) -> str:\n    sections = []\n    for section in owner.split(\"/\"):\n        words = []\n        for word in section.strip().split(\"-\"):\n            words.append(word[:1].upper() + word[1:].lower())\n        sections.append(\"-\".join(words))\n    return \"/\".join(sections)",
+                "new_str": "def format_timeline_label(owner: str) -> str:\n    # Preserve capitalization for apostrophes and hyphens using title case\n    return \"/\".join(section.strip().title() for section in owner.split(\"/\"))"
+              },
+              "output": "Here's the result of running `cat -n` on /repo/app/utils/labels.py:\n     1\tdef normalize_route_label(owner: str) -> str:\n     2\t    return \"/\".join(part.strip().upper() for part in owner.split(\"/\"))\n     3\t\n     4\t\n     5\tdef format_timeline_label(owner: str) -> str:\n     6\t    # Preserve capitalization for apostrophes and hyphens using title case\n     7\t    return \"/\".join(section.strip().title() for section in owner.split(\"/\"))",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        }
+      ],
+      "patch": "diff --git a/app/utils/labels.py b/app/utils/labels.py\nindex 4ef7164..d112f8f 100644\n--- a/app/utils/labels.py\n+++ b/app/utils/labels.py\n@@ -3,10 +3,5 @@ def normalize_route_label(owner: str) -> str:\n \n \n def format_timeline_label(owner: str) -> str:\n-    sections = []\n-    for section in owner.split(\"/\"):\n-        words = []\n-        for word in section.strip().split(\"-\"):\n-            words.append(word[:1].upper() + word[1:].lower())\n-        sections.append(\"-\".join(words))\n-    return \"/\".join(sections)\n+    # Preserve capitalization for apostrophes and hyphens using title case\n+    return \"/\".join(section.strip().title() for section in owner.split(\"/\"))\n",
+      "submitted": true,
+      "stopped_reason": "auto_finalized",
+      "stats": {
+        "input_tokens": 19120,
+        "output_tokens": 3732,
+        "turns": 3,
+        "tool_calls": 5,
+        "iterations": 18,
+        "tree_nodes_created": 4,
+        "best_node_depth": 3,
+        "best_node_value": 43.808304
+      },
+      "mcts_tree": {
+        "nodes": [
+          {
+            "id": "0",
+            "parent_id": null,
+            "depth": 0,
+            "action_name": null,
+            "action_args_preview": "",
+            "visits": 3,
+            "mean_value": 7.0,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0",
+            "parent_id": "0",
+            "depth": 1,
+            "action_name": "bash",
+            "action_args_preview": "{\"command\": \"ls -R\"}",
+            "visits": 3,
+            "mean_value": 7.0,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0",
+            "parent_id": "0.0",
+            "depth": 2,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"app/utils/labels.py\", \"start_line\": 1, \"end_line\": 200}",
+            "visits": 2,
+            "mean_value": 10.5,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0",
+            "parent_id": "0.0.0",
+            "depth": 3,
+            "action_name": "str_replace",
+            "action_args_preview": "{\"path\": \"app/utils/labels.py\", \"old_str\": \"def format_timeline_label(owner: str",
+            "visits": 1,
+            "mean_value": 20.99,
+            "submitted": true,
+            "is_branch_point": true,
+            "edit_made": true,
+            "success_checks": 2,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 1,
+            "has_nonempty_patch": true,
+            "stopped_reason": "auto_finalized",
+            "vote_counts": {
+              "{\"arguments\": {\"new_str\": \"def format_timeline_label(owner: str) -> str:\\n    # Preserve capitalization for apostrophes and hyphens using title case\\n    return \\\"/\\\".join(section.strip().title() for section in owner.split(\\\"/\\\"))\", \"old_str\": \"def format_timeline_label(owner: str) -> str:\\n    sections = []\\n    for section in owner.split(\\\"/\\\"):\\n        words = []\\n        for word in section.strip().split(\\\"-\\\"):\\n            words.append(word[:1].upper() + word[1:].lower())\\n        sections.append(\\\"-\\\".join(words))\\n    return \\\"/\\\".join(sections)\", \"path\": \"app/utils/labels.py\"}, \"name\": \"str_replace\"}": 1,
+              "{\"arguments\": {\"new_str\": \"for word in section.strip().split(\\\"-\\\"):\\n            # Preserve apostrophe-separated parts capitalization\\n            sub_parts = []\\n            for sub in word.split(\\\"'\\\"):\\n                if sub:\\n                    sub_parts.append(sub[:1].upper() + sub[1:].lower())\\n                else:\\n                    sub_parts.append('')\\n            words.append(\\\"'\\\".join(sub_parts))\", \"old_str\": \"for word in section.strip().split(\\\"-\\\"):\\n            words.append(word[:1].upper() + word[1:].lower())\", \"path\": \"app/utils/labels.py\"}, \"name\": \"str_replace\"}": 1,
+              "{\"arguments\": {\"new_str\": \"def format_timeline_label(owner: str) -> str:\\n    def title_word(word: str) -> str:\\n        # Capitalize each part separated by apostrophes, preserving proper case after apostrophe\\n        return \\\"'\\\".join(part[:1].upper() + part[1:].lower() for part in word.split(\\\"'\\\"))\\n\\n    sections = []\\n    for section in owner.split(\\\"/\\\"):\\n        words = []\\n        for word in section.strip().split(\\\"-\\\"):\\n            words.append(title_word(word))\\n        sections.append(\\\"-\\\".join(words))\\n    return \\\"/\\\".join(sections)\", \"old_str\": \"def format_timeline_label(owner: str) -> str:\\n    sections = []\\n    for section in owner.split(\\\"/\\\"):\\n        words = []\\n        for word in section.strip().split(\\\"-\\\"):\\n            words.append(word[:1].upper() + word[1:].lower())\\n        sections.append(\\\"-\\\".join(words))\\n    return \\\"/\\\".join(sections)\", \"path\": \"app/utils/labels.py\"}, \"name\": \"str_replace\"}": 1,
+              "{\"arguments\": {\"new_str\": \"def format_timeline_label(owner: str) -> str:\\n    # Capitalize each word, handling hyphens and apostrophes correctly\\n    def capitalize_section(section: str) -> str:\\n        # Preserve hyphens and apostrophes, capitalize letters after them or at start\\n        result_chars = []\\n        for i, ch in enumerate(section.strip()):\\n            if i == 0 or section.strip()[i - 1] in \\\"-'\\\":\\n                result_chars.append(ch.upper())\\n            else:\\n                result_chars.append(ch.lower())\\n        return \\\"\\\".join(result_chars)\\n\\n    sections = [capitalize_section(sec) for sec in owner.split(\\\"/\\\")]\\n    return \\\"/\\\".join(sections)\", \"old_str\": \"def format_timeline_label(owner: str) -> str:\\n    sections = []\\n    for section in owner.split(\\\"/\\\"):\\n        words = []\\n        for word in section.strip().split(\\\"-\\\"):\\n            words.append(word[:1].upper() + word[1:].lower())\\n        sections.append(\\\"-\\\".join(words))\\n    return \\\"/\\\".join(sections)\", \"path\": \"app/utils/labels.py\"}, \"name\": \"str_replace\"}": 1
+            },
+            "on_result_path": true
+          }
+        ],
+        "result_node_id": "0.0.0.0"
+      },
+      "vote_summary": [
+        {
+          "depth": 3,
+          "action": "str_replace",
+          "winner_votes": 1,
+          "total_samples": 4,
+          "unique_candidates": 4
+        }
+      ],
+      "review_feedback": {
+        "decision": "accept",
+        "primary_reason": "All success checks verified (pre-run); skipping model reviewer.",
+        "required_changes": [],
+        "validations_to_rerun": []
+      }
+    }
+  ],
+  "instance_id": "timeline_caption_001",
+  "duration_seconds": 169.66
+}
