@@ -730,7 +730,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("target", type=Path, help="Run root, single run dir, or single .traj file.")
     parser.add_argument(
         "--cases-roots",
-        default="SWE-agent/custom_cases,SWE-agent/custom_cases_2",
+        default="SWE-agent/custom_cases,SWE-agent/custom_cases_2,SWE-agent/custom_cases_3",
         help="Comma-separated case roots to scan for instance metadata.",
     )
     parser.add_argument("--run-install", action="store_true", help="Run case install/setup commands before evaluation checks.")

@@ -25,6 +25,7 @@ PRESET_FILE = REPO_ROOT / "SWE-agent" / "config" / "custom_configs" / "custom_ru
 DEFAULT_CASE_ROOTS = [
     REPO_ROOT / "SWE-agent" / "custom_cases",
     REPO_ROOT / "SWE-agent" / "custom_cases_2",
+    REPO_ROOT / "SWE-agent" / "custom_cases_3",
 ]
 TRANSIENT_RUNNER_ERROR_MARKERS = (
     "Runtime did not start within timeout",

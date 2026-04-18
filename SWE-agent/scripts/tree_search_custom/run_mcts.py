@@ -105,6 +105,83 @@ PRESETS: dict[str, dict[str, Any]] = {
         "reviewer_gate_mode": "soft",
         "adaptive_branching": False,  # ablation showed no benefit; adds cost and instability
     },
+    "swe_bench": {
+        "model": "qwen3.5:9b",
+        "planner_model": "qwen3.5:9b",
+        "iterations": 18,
+        "expansion_candidates": 2,   # parse-failure resilience: 2nd branch unblocks dead-end trees
+        "edit_vote_samples": 5,
+        "max_node_depth": 18,
+        "max_tokens": 512,           # slightly more room for complex multi-file diffs
+        "agent_architecture": "planner_coder_reviewer",
+        "reviewer_rounds": 2,
+        "reviewer_gate_mode": "soft",
+    },
+    "early_branch_test": {
+        "model": "qwen3.5:9b",
+        "planner_model": "qwen3.5:9b",
+        "iterations": 24,           # extra budget: 2 early branches × ~12 turns each
+        "expansion_candidates": 1,  # no edit branching — isolate early branching as the variable
+        "edit_vote_samples": 5,
+        "max_node_depth": 18,
+        "agent_architecture": "planner_coder_reviewer",
+        "reviewer_rounds": 2,
+        "reviewer_gate_mode": "soft",
+        "early_branching": True,
+    },
+    "umich_30b": {
+        "model": "openai/Qwen/Qwen3-VL-30B-A3B-Instruct",
+        "planner_model": "openai/Qwen/Qwen3-VL-30B-A3B-Instruct",
+        "reviewer_model": "openai/Qwen/Qwen3-VL-30B-A3B-Instruct",
+        "api_base": "http://promaxgb10-d668.eecs.umich.edu:8000/v1",
+        "api_key": "api_RPnuSxgxJQamqW04ma9uJW27vc4TyBdy",
+        "iterations": 18,
+        "expansion_candidates": 1,
+        "edit_vote_samples": 5,
+        "max_node_depth": 18,
+        "max_tokens": 1024,
+        "agent_architecture": "planner_coder_reviewer",
+        "reviewer_rounds": 2,
+        "reviewer_gate_mode": "soft",
+    },
+    "umich_120b": {
+        "model": "openai/openai/gpt-oss-120b",
+        "planner_model": "openai/openai/gpt-oss-120b",
+        "reviewer_model": "openai/openai/gpt-oss-120b",
+        "api_base": "http://promaxgb10-d473.eecs.umich.edu:8000/v1",
+        "api_key": "api_IcLlffdxoWOSgBPWW3X3zS15YSBHim5a",
+        "iterations": 18,
+        "expansion_candidates": 1,
+        "edit_vote_samples": 5,
+        "max_node_depth": 18,
+        "max_tokens": 1024,
+        "agent_architecture": "planner_coder_reviewer",
+        "reviewer_rounds": 2,
+        "reviewer_gate_mode": "soft",
+    },
+    "standard_think": {
+        "model": "qwen3.5:9b",
+        "planner_model": "qwen3.5:9b",
+        "iterations": 18,
+        "expansion_candidates": 1,
+        "edit_vote_samples": 5,
+        "max_node_depth": 18,
+        "max_tokens": 768,          # headroom: thinking tokens count against output budget
+        "agent_architecture": "planner_coder_reviewer",
+        "reviewer_rounds": 2,
+        "reviewer_gate_mode": "soft",
+        "thinking_mode": True,
+    },
+    "baseline_single": {
+        "model": "qwen3.5:9b",
+        "iterations": 18,
+        "expansion_candidates": 1,
+        "edit_vote_samples": 1,       # no majority voting — single sample
+        "max_node_depth": 18,
+        "max_tokens": 384,
+        "agent_architecture": "single",  # no planner, no reviewer
+        "reviewer_gate_mode": "strict",
+    },
     "debug": {
         "model": "qwen2.5-coder:7b-instruct",
         "planner_model": "qwen3.5:9b",
@@ -166,6 +243,9 @@ def _parse_args() -> tuple[str, dict[str, Any]]:
     parser.add_argument("--verbose", action="store_true", default=False,
                         help="Print model prompts/responses to stdout during execution")
     parser.add_argument("--adaptive-branching", action=argparse.BooleanOptionalAction, default=None)
+    parser.add_argument("--early-branching", action=argparse.BooleanOptionalAction, default=None)
+    parser.add_argument("--thinking-mode", action=argparse.BooleanOptionalAction, default=None)
+    parser.add_argument("--failure-surfacing", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--resume", action="store_true", default=False,
                         help="Skip instances that already have a .traj file in output-dir")
     parser.add_argument("--failures-of", type=Path, default=None,
@@ -211,6 +291,9 @@ def _parse_args() -> tuple[str, dict[str, Any]]:
         "output_dir": args.output_dir,
         "verbose": args.verbose if args.verbose else None,
         "adaptive_branching": args.adaptive_branching,
+        "early_branching": args.early_branching,
+        "thinking_mode": args.thinking_mode,
+        "failure_surfacing": args.failure_surfacing,
         "resume": args.resume if args.resume else None,
     }
     for k, v in override_map.items():
@@ -266,7 +349,7 @@ def _cfg_to_argv(cfg: dict[str, Any]) -> list[str]:
     """Convert an effective config dict into a sys.argv list for run_tree_search.py."""
     argv = ["run_tree_search.py"]
 
-    bool_flags = {"shuffle", "verbose", "resume", "adaptive_branching"}
+    bool_flags = {"shuffle", "verbose", "resume", "adaptive_branching", "early_branching", "thinking_mode", "failure_surfacing"}
     list_flags = {"post_startup_command"}
     path_flags = {"instances_path", "output_dir"}
 
@@ -274,11 +357,11 @@ def _cfg_to_argv(cfg: dict[str, Any]) -> list[str]:
     for key, value in cfg.items():
         flag = "--" + key.replace("_", "-")
         if key in bool_flags:
-            if key == "adaptive_branching":
+            if key in {"adaptive_branching", "early_branching", "thinking_mode", "failure_surfacing"}:
                 if value is True:
-                    argv.append("--adaptive-branching")
+                    argv.append(flag)
                 elif value is False:
-                    argv.append("--no-adaptive-branching")
+                    argv.append("--no-" + key.replace("_", "-"))
             elif value:
                 argv.append(flag)
         elif key in list_flags:

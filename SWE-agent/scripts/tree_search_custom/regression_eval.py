@@ -96,8 +96,8 @@ def main() -> None:
     parser.add_argument("run_dir", type=Path, help="tree_search run directory")
     parser.add_argument(
         "--custom-cases-roots",
-        default="SWE-agent/custom_cases,SWE-agent/custom_cases_2",
-        help="Comma-separated case roots (default: SWE-agent/custom_cases,SWE-agent/custom_cases_2)",
+        default="SWE-agent/custom_cases,SWE-agent/custom_cases_2,SWE-agent/custom_cases_3",
+        help="Comma-separated case roots (default: SWE-agent/custom_cases,SWE-agent/custom_cases_2,SWE-agent/custom_cases_3)",
     )
     parser.add_argument("--baseline-dir", type=Path, default=None, help="Optional baseline run dir for manual compare")
     parser.add_argument("--image", default=DOCKER_IMAGE, help=f"Docker image for patch verification (default: {DOCKER_IMAGE})")

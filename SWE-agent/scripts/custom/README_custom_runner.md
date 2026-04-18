@@ -326,8 +326,8 @@ UMich endpoint:
 - `--post-startup-command` can be repeated to bootstrap dependencies before the model starts.
 - `--instances-type file --instances-path <case-folder>` lets you run custom local cases instead of SWE-bench.
 - The runner accepts a case folder and looks for `case.json`, `case.yaml`, or `case.yml` inside it.
-- Matrix helpers now scan both `SWE-agent/custom_cases` and `SWE-agent/custom_cases_2` by default.
-- `analyze_custom_runs.py` now scans both roots by default; override with `--cases-roots <csv>` if needed.
+- Matrix helpers now scan `SWE-agent/custom_cases`, `SWE-agent/custom_cases_2`, and `SWE-agent/custom_cases_3` by default.
+- `analyze_custom_runs.py` now scans those three roots by default; override with `--cases-roots <csv>` if needed.
 - Keep copied fixture contents under a sibling `repo/` directory.
 - In custom case metadata, use `install_commands` and `setup_commands` to define per-case bootstrap steps.
 - Ollama defaults to `http://localhost:11434`.

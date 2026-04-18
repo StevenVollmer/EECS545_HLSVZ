@@ -173,6 +173,82 @@ def _build_reviewer_constraints_prompt(review_feedback: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _extract_test_failure_details(
+    coder_result: dict[str, Any],
+    live_check_results: dict[str, dict] | None = None,
+    max_failures: int = 3,
+) -> str:
+    """Scan coder turn outputs for pytest/check failures and return a compact summary.
+
+    Extracts the exact expected-vs-actual values from AssertionError blocks and from
+    failed live success-checks so the round-2 coder sees the precise string delta.
+    Returns an empty string if no actionable details are found.
+    """
+    import re as _re
+
+    # pytest failure body: test name is in a ___dashes___ header; E-prefixed lines hold values
+    _test_header_re = _re.compile(r"^_{3,}\s*([\w]+)\s*_{3,}$")
+    _e_line_re = _re.compile(r"^E\s{1,4}")
+
+    seen_snippets: set[str] = set()
+    snippets: list[str] = []
+
+    def _scan_output(output: str) -> None:
+        if not output or ("AssertionError" not in output and "assert" not in output):
+            return
+        lines = output.splitlines()
+        i = 0
+        while i < len(lines) and len(snippets) < max_failures:
+            m = _test_header_re.match(lines[i].strip())
+            if m:
+                test_name = m.group(1)
+                block: list[str] = []
+                for j in range(i + 1, min(i + 40, len(lines))):
+                    line = lines[j]
+                    if _e_line_re.match(line):
+                        cleaned = line[1:].strip()
+                        if cleaned:
+                            block.append(cleaned)
+                    elif _test_header_re.match(line.strip()) and j > i + 1:
+                        break
+                if block:
+                    snippet = f"Test {test_name}:\n" + "\n".join(f"  {l}" for l in block[:6])
+                    if snippet not in seen_snippets:
+                        seen_snippets.add(snippet)
+                        snippets.append(snippet)
+            i += 1
+
+    for turn in coder_result.get("turns", []):
+        for tr in turn.get("tool_results", []):
+            _scan_output(str(tr.get("output", "")))
+
+    # Also surface failed live success-checks (e.g. demo script output mismatches)
+    for check_name, chk in (live_check_results or {}).items():
+        if chk.get("passed"):
+            continue
+        actual = str(chk.get("actual_output", "")).strip()
+        expected = chk.get("expected_contains", [])
+        must_not = chk.get("must_not_contain", [])
+        if actual and (expected or must_not) and len(snippets) < max_failures:
+            lines = [f"Check '{check_name}' failed:"]
+            lines.append(f"  actual output:   {actual[:200]}")
+            if expected:
+                lines.append(f"  must contain:    {expected[0][:200]}")
+            if must_not:
+                lines.append(f"  must NOT contain: {must_not[0][:200]}")
+            snippet = "\n".join(lines)
+            if snippet not in seen_snippets:
+                seen_snippets.add(snippet)
+                snippets.append(snippet)
+
+    if not snippets:
+        return ""
+    return (
+        "EXACT TEST FAILURES from round 1 (use these to write the correct fix):\n"
+        + "\n".join(snippets)
+    )
+
+
 def _start_env_with_retries(env, log_fn: Callable[[str], None], max_attempts: int = 3) -> None:
     last_exc: Exception | None = None
     for attempt in range(1, max_attempts + 1):
@@ -464,9 +540,14 @@ UCB_C = 1.414          # exploration constant (√2)
 EXPANSION_CANDIDATES = 1  # branch candidates at edit-intent turns (explore branch never helped in practice)
 EXPLORE_TEMPERATURE = 0.7  # temperature for explore candidate
 EXPLOIT_TEMPERATURE = 0.1  # temperature for greedy / linear turns
+
+# Early-turn branching: branch at exploration depth (file selection) not edit depth
+EARLY_BRANCH_DEPTH = 2          # branch on non-edit turns at or below this depth
+EARLY_BRANCH_CANDIDATES = 2     # diverse exploration paths to generate
+EARLY_BRANCH_TEMPERATURE = 0.7  # high temp to force different file selections
 MAX_ITERATIONS = 20     # total MCTS iterations (tree expansions)
 MAX_NODE_DEPTH = 20     # max turns per branch before treating as terminal
-MAX_TOKENS_REACT = 384  # token limit for react_json mode (small models)
+MAX_TOKENS_REACT = 384  # default token limit for react_json mode (small/local models)
 
 # Improvement 1/3: selective branching + majority vote
 EDIT_VOTE_SAMPLES = 5   # majority-vote samples when an edit action is detected
@@ -607,6 +688,8 @@ class MCTSAgentLoop:
         log_fn: Callable[[str], None] | None = None,
         edit_vote_samples: int = EDIT_VOTE_SAMPLES,
         adaptive_branching: bool = True,
+        early_branching: bool = False,
+        thinking_mode: bool = False,
         verbose: bool = False,
     ):
         self.model = model
@@ -631,6 +714,8 @@ class MCTSAgentLoop:
         self.log_fn = log_fn or (lambda _: None)
         self.edit_vote_samples = max(1, edit_vote_samples)
         self.adaptive_branching = adaptive_branching
+        self.early_branching = early_branching
+        self.thinking_mode = thinking_mode
         self.verbose = verbose
         self._global_stats = RunStats()
         self._turn_counter = 0  # used to generate unique tool call IDs
@@ -750,6 +835,28 @@ class MCTSAgentLoop:
     def _is_edit_action(self, action: dict[str, Any]) -> bool:
         """Return True when the action will modify a file."""
         return action.get("name") in {"str_replace", "insert"}
+
+    def _is_early_branch_point(self, node: "SearchNode") -> bool:
+        """True when we should try multiple exploration directions from this node."""
+        return (
+            self.early_branching
+            and node.depth <= EARLY_BRANCH_DEPTH
+            and not node.loop_state.executable_edit_made
+        )
+
+    def _extract_exploration_target(self, action: dict[str, Any]) -> str:
+        """Return a deduplication key for a non-edit action (the primary file/path targeted)."""
+        name = action.get("name", "")
+        args = action.get("arguments", {})
+        if name == "view":
+            return str(args.get("path", ""))
+        if name in {"bash", "execute_bash"}:
+            cmd = str(args.get("command", args.get("cmd", "")))
+            for token in cmd.split():
+                if "/" in token or token.endswith(".py"):
+                    return token
+            return cmd[:60]
+        return name + ":" + str(list(args.values())[:1])[:40]
 
     def _compress_messages(self, messages: list[dict[str, Any]], node_depth: int) -> list[dict[str, Any]]:
         """Truncate old tool outputs once history grows beyond COMPRESS_AFTER_TURNS.
@@ -985,11 +1092,12 @@ class MCTSAgentLoop:
             "api_key": self.api_key,
             "messages": messages,
             "temperature": temperature,
-            "max_tokens": min(self.max_tokens, MAX_TOKENS_REACT),
+            "max_tokens": self.max_tokens,
         }
-        # reasoning_effort is only meaningful for Ollama reasoning models
+        # For Ollama, any of low/medium/high maps to think=True; "none" disables thinking.
+        # The specific level doesn't control depth on Ollama (unlike OpenAI o-models).
         if self.model.startswith("ollama/"):
-            kwargs["reasoning_effort"] = "none"
+            kwargs["reasoning_effort"] = "high" if self.thinking_mode else "none"
         if self.num_ctx is not None:
             kwargs["num_ctx"] = self.num_ctx
         response = litellm.completion(**kwargs)
@@ -1364,18 +1472,60 @@ class MCTSAgentLoop:
                 return [child]
 
         # ------------------------------------------------------------------
-        # 2a. Non-edit action → linear execution (single child, no branching)
+        # 2a. Non-edit action — linear, or early-branch if at exploration depth
         # ------------------------------------------------------------------
         if not self._is_edit_action(probe_call):
-            self._restore_state(node)
-            tr = ToolRuntime(self.env, self.repo_root)
-            child = self._execute_action(node, probe_call, "linear", tr)
-            node.children.append(child)
-            self._log(
-                f"[mcts] linear  tool={probe_call['name']} "
-                f"depth={child.depth} submitted={tr.submitted}"
-            )
-            return [child]
+            if self._is_early_branch_point(node):
+                # Generate EARLY_BRANCH_CANDIDATES diverse exploration paths.
+                # Dedup by primary file target so both branches read different files.
+                exp_candidates: list[dict[str, Any]] = [probe_call]
+                seen_targets: set[str] = {self._extract_exploration_target(probe_call)}
+                attempts = 0
+                while len(exp_candidates) < EARLY_BRANCH_CANDIDATES and attempts < 4:
+                    attempts += 1
+                    try:
+                        exp_content, et_in, et_out = self._call_model(
+                            messages, EARLY_BRANCH_TEMPERATURE
+                        )
+                        self._global_stats.input_tokens += et_in
+                        self._global_stats.output_tokens += et_out
+                        self._global_stats.tool_calls += 1
+                        exp_outcome = self._parse_action(exp_content)
+                        if exp_outcome.tool_calls:
+                            ec = exp_outcome.tool_calls[0]
+                            target = self._extract_exploration_target(ec)
+                            if target not in seen_targets and not self._is_edit_action(ec):
+                                exp_candidates.append(ec)
+                                seen_targets.add(target)
+                    except Exception:
+                        pass
+
+                children: list[SearchNode] = []
+                multi = len(exp_candidates) > 1
+                for i, call in enumerate(exp_candidates):
+                    self._restore_state(node)
+                    tr = ToolRuntime(self.env, self.repo_root)
+                    child = self._execute_action(node, call, "explore_branch", tr)
+                    child.is_branch_point = multi
+                    node.children.append(child)
+                    children.append(child)
+                    branch_tag = f"early_branch[{i}]" if multi else "linear"
+                    tgt = self._extract_exploration_target(call)
+                    self._log(
+                        f"[mcts] {branch_tag}  tool={call['name']} "
+                        f"depth={child.depth} target={tgt!r}"
+                    )
+                return children
+            else:
+                self._restore_state(node)
+                tr = ToolRuntime(self.env, self.repo_root)
+                child = self._execute_action(node, probe_call, "linear", tr)
+                node.children.append(child)
+                self._log(
+                    f"[mcts] linear  tool={probe_call['name']} "
+                    f"depth={child.depth} submitted={tr.submitted}"
+                )
+                return [child]
 
         # ------------------------------------------------------------------
         # 2b. Edit action → majority vote, then execute top-K unique edits
@@ -1729,6 +1879,8 @@ class MCTSAgentLoop:
                 "edit_vote_samples": self.edit_vote_samples,
                 "ucb_c": UCB_C,
                 "root_visits": root.visits,
+                "early_branching": self.early_branching,
+                "early_branch_depth": EARLY_BRANCH_DEPTH,
             },
             "vote_summary": vote_summary,
             "mcts_tree": self._serialize_tree(root, result_node),
@@ -1788,6 +1940,24 @@ def parse_args() -> argparse.Namespace:
         action=argparse.BooleanOptionalAction,
         default=True,
         help="Enable adaptive edit vote/candidate expansion during post-edit stagnation",
+    )
+    parser.add_argument(
+        "--early-branching",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Branch at exploration depth (≤EARLY_BRANCH_DEPTH) to diversify initial file selection",
+    )
+    parser.add_argument(
+        "--thinking-mode",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Enable Qwen3.5 chain-of-thought reasoning tokens (maps to think=True in Ollama)",
+    )
+    parser.add_argument(
+        "--failure-surfacing",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Inject exact AssertionError/check diffs into round-2 coder context (default: on)",
     )
 
     # Instances
@@ -2011,10 +2181,28 @@ def main() -> None:
                         check="ignore", timeout=30,
                     )
 
-                round_extra = list(extra_prompts)
-                if review_feedback:
-                    round_extra.append(_build_reviewer_feedback_prompt(review_feedback))
-                    round_extra.append(_build_reviewer_constraints_prompt(review_feedback))
+                if rnd == 0:
+                    round_extra = list(extra_prompts)
+                else:
+                    # Clean-context retry: drop stale planner plan so the round 1
+                    # hypothesis doesn't anchor the model before it reads the reviewer
+                    # diagnosis. Keep case_validation_prompt (success check commands)
+                    # but replace the planner handoff with reviewer feedback as the
+                    # sole directive.
+                    round_extra = []
+                    if case_validation_prompt:
+                        round_extra.append(case_validation_prompt)
+                    if review_feedback:
+                        round_extra.append(_build_reviewer_feedback_prompt(review_feedback))
+                        round_extra.append(_build_reviewer_constraints_prompt(review_feedback))
+                    # Surface exact assertion failures so the coder sees the precise
+                    # expected-vs-actual string delta, not just "test failed".
+                    if coder_result and getattr(args, "failure_surfacing", True):
+                        failure_details = _extract_test_failure_details(
+                            coder_result, live_check_results=live_check_results or {}
+                        )
+                        if failure_details:
+                            round_extra.append(failure_details)
 
                 log_line(f"[mcts] coder round={rnd + 1} model={model}")
                 mcts = MCTSAgentLoop(
@@ -2036,6 +2224,8 @@ def main() -> None:
                     log_fn=log_line,
                     edit_vote_samples=args.edit_vote_samples,
                     adaptive_branching=bool(args.adaptive_branching),
+                    early_branching=bool(getattr(args, "early_branching", False)),
+                    thinking_mode=bool(getattr(args, "thinking_mode", False)),
                     verbose=args.verbose,
                 )
                 coder_result = mcts.run()

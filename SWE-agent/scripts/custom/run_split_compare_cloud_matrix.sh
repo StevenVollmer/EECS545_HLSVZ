@@ -8,7 +8,7 @@ PARALLEL=20
 RUNNER_RETRIES=1
 
 ROOT="${1:-SWE-agent/custom_matrix_runs/benchmark_round_split_compare_cloud}"
-CASES="${CASES:-$(find SWE-agent/custom_cases SWE-agent/custom_cases_2 -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort | paste -sd, -)}"
+CASES="${CASES:-$(find SWE-agent/custom_cases SWE-agent/custom_cases_2 SWE-agent/custom_cases_3 -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort | paste -sd, -)}"
 SPLIT_PRESETS="${SPLIT_PRESETS:-umich_gptoss_120b,umich_qwen,umich_gptoss_planner_umich_qwen_coder}"
 BASELINE_PRESETS="${BASELINE_PRESETS:-openai_gpt4o_mini,umich_gptoss_120b,umich_qwen}"
 CASE_COUNT="$(printf '%s' "${CASES}" | tr ',' '\n' | sed '/^$/d' | wc -l | tr -d ' ')"
