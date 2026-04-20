@@ -1,0 +1,491 @@
+{
+  "turns": [
+    {
+      "turn": 1,
+      "assistant_text": "{\"command\":\"pytest -q\"}",
+      "tool_calls": [
+        {
+          "id": "react-1-bash",
+          "name": "bash",
+          "arguments": {
+            "command": "pytest -q"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "pytest -q"
+          },
+          "output": "\n==================================== ERRORS ====================================\n_______________ ERROR collecting tests/test_milestone_rollup.py ________________\nImportError while importing test module '/repo/tests/test_milestone_rollup.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n/usr/local/lib/python3.11/importlib/__init__.py:126: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_milestone_rollup.py:1: in <module>\n    from app.models.milestone import Milestone\nE   ModuleNotFoundError: No module named 'app'\n=========================== short test summary info ============================\nERROR tests/test_milestone_rollup.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.05s",
+          "is_error": true,
+          "exit_code": 2
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 2,
+      "assistant_text": "{\"command\":\"python -m pytest -q\"}",
+      "tool_calls": [
+        {
+          "id": "react-1-bash",
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q"
+          },
+          "output": "F..                                                                      [100%]\n=================================== FAILURES ===================================\n_________________ test_blocker_count_ignores_closed_milestones _________________\n\n    def test_blocker_count_ignores_closed_milestones() -> None:\n        milestones = [\n            Milestone(name=\"API\", blocked=True),\n            Milestone(name=\"Billing\", blocked=True, closed=True),\n        ]\n>       assert blocker_count(milestones) == 1\nE       AssertionError: assert 2 == 1\nE        +  where 2 = blocker_count([Milestone(name='API', blocked=True, closed=False), Milestone(name='Billing', blocked=True, closed=True)])\n\ntests/test_milestone_rollup.py:10: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_milestone_rollup.py::test_blocker_count_ignores_closed_milestones - AssertionError: assert 2 == 1\n1 failed, 2 passed in 0.03s",
+          "is_error": true,
+          "exit_code": 1
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 3,
+      "assistant_text": "{\"path\":\"app/services/milestone_rollup.py\",\"start_line\":1,\"end_line\":200}",
+      "tool_calls": [
+        {
+          "id": "react-1-view",
+          "name": "view",
+          "arguments": {
+            "path": "app/services/milestone_rollup.py",
+            "start_line": 1,
+            "end_line": 200
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/services/milestone_rollup.py",
+            "start_line": 1,
+            "end_line": 200
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/services/milestone_rollup.py:\n     1\tfrom app.models.milestone import Milestone\n     2\t\n     3\t\n     4\tdef blocker_count(milestones: list[Milestone]) -> int:\n     5\t    blockers = [milestone for milestone in milestones if milestone.blocked]\n     6\t    return len(blockers)",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 4,
+      "assistant_text": "{\"path\":\"app/models/milestone.py\",\"start_line\":1,\"end_line\":200}\n{\"path\":\"app/models/milestone.py\",\"start_line\":1,\"end_line\":200}",
+      "tool_calls": [
+        {
+          "id": "react-1-view",
+          "name": "view",
+          "arguments": {
+            "path": "app/models/milestone.py",
+            "start_line": 1,
+            "end_line": 200
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/models/milestone.py",
+            "start_line": 1,
+            "end_line": 200
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/models/milestone.py:\n     1\tfrom dataclasses import dataclass\n     2\t\n     3\t\n     4\t@dataclass\n     5\tclass Milestone:\n     6\t    name: str\n     7\t    blocked: bool = False\n     8\t    closed: bool = False",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": "Returned the same action multiple times in one response; recovered the first action only."
+    },
+    {
+      "turn": 5,
+      "assistant_text": "{\"tool\":\"str_replace\",\"arguments\":{\"path\":\"app/services/milestone_rollup.py\",\"old_str\":\"blockers = [milestone for milestone in milestones if milestone.blocked]\",\"new_str\":\"blockers = [milestone for milestone in milestones if milestone.blocked and not milestone.closed]\"}}",
+      "tool_calls": [
+        {
+          "id": "react-1-str_replace",
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/services/milestone_rollup.py",
+            "old_str": "blockers = [milestone for milestone in milestones if milestone.blocked]",
+            "new_str": "blockers = [milestone for milestone in milestones if milestone.blocked and not milestone.closed]"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/services/milestone_rollup.py",
+            "old_str": "blockers = [milestone for milestone in milestones if milestone.blocked]",
+            "new_str": "blockers = [milestone for milestone in milestones if milestone.blocked and not milestone.closed]"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/services/milestone_rollup.py:\n     1\tfrom app.models.milestone import Milestone\n     2\t\n     3\t\n     4\tdef blocker_count(milestones: list[Milestone]) -> int:\n     5\t    blockers = [milestone for milestone in milestones if milestone.blocked and not milestone.closed]\n     6\t    return len(blockers)",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 6,
+      "assistant_text": "{\"command\":\"pytest -q\"}",
+      "tool_calls": [
+        {
+          "id": "react-1-bash",
+          "name": "bash",
+          "arguments": {
+            "command": "pytest -q"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "pytest -q"
+          },
+          "output": "\n==================================== ERRORS ====================================\n_______________ ERROR collecting tests/test_milestone_rollup.py ________________\nImportError while importing test module '/repo/tests/test_milestone_rollup.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n/usr/local/lib/python3.11/importlib/__init__.py:126: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_milestone_rollup.py:1: in <module>\n    from app.models.milestone import Milestone\nE   ModuleNotFoundError: No module named 'app'\n=========================== short test summary info ============================\nERROR tests/test_milestone_rollup.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.06s",
+          "is_error": true,
+          "exit_code": 2
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 7,
+      "assistant_text": "{\"command\":\"ls -R\"}",
+      "tool_calls": [
+        {
+          "id": "react-1-bash",
+          "name": "bash",
+          "arguments": {
+            "command": "ls -R"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "ls -R"
+          },
+          "output": ".:\nREADME.md  app\ttests\n\n./app:\n__init__.py  __pycache__  models  services\n\n./app/__pycache__:\n__init__.cpython-311.pyc  __init__.cpython-313.pyc\n\n./app/models:\n__init__.py  __pycache__  milestone.py\n\n./app/models/__pycache__:\n__init__.cpython-311.pyc  milestone.cpython-311.pyc\n__init__.cpython-313.pyc  milestone.cpython-313.pyc\n\n./app/services:\n__init__.py  __pycache__  milestone_rollup.py\n\n./app/services/__pycache__:\n__init__.cpython-311.pyc  milestone_rollup.cpython-311.pyc\n__init__.cpython-313.pyc  milestone_rollup.cpython-313.pyc\n\n./tests:\n__pycache__  test_milestone_rollup.py\n\n./tests/__pycache__:\ntest_milestone_rollup.cpython-311-pytest-9.0.2.pyc\ntest_milestone_rollup.cpython-313-pytest-9.0.2.pyc",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 8,
+      "assistant_text": "{\"command\":\"pytest -q\"], \"timeout\": 100000}",
+      "tool_calls": [],
+      "tool_results": [],
+      "finish_reason": "stop",
+      "parse_error": "Could not parse model action JSON. json.loads failed: Expecting ',' delimiter at line 1 column 23 | ast.literal_eval failed: closing parenthesis ']' does not match opening parenthesis '{' (<unknown>, line 1) | multi-object decode failed: Expecting ',' delimiter at column 23 Unbalanced delimiters detected: braces 1/1, brackets 0/1."
+    },
+    {
+      "turn": 9,
+      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"pytest -q\"}}",
+      "tool_calls": [
+        {
+          "id": "react-1-bash",
+          "name": "bash",
+          "arguments": {
+            "command": "pytest -q"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "pytest -q"
+          },
+          "output": "\n==================================== ERRORS ====================================\n_______________ ERROR collecting tests/test_milestone_rollup.py ________________\nImportError while importing test module '/repo/tests/test_milestone_rollup.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n/usr/local/lib/python3.11/importlib/__init__.py:126: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_milestone_rollup.py:1: in <module>\n    from app.models.milestone import Milestone\nE   ModuleNotFoundError: No module named 'app'\n=========================== short test summary info ============================\nERROR tests/test_milestone_rollup.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.11s",
+          "is_error": true,
+          "exit_code": 2
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 10,
+      "assistant_text": "{\"command\":\"python - <<'PY'\\nimport sys, os; print('cwd', os.getcwd()); print('sys.path', sys.path[:3])\\ntry:\\n    import app\\n    print('imported app')\\nexcept Exception as e:\\n    print('error', e)\\nPY\"}",
+      "tool_calls": [
+        {
+          "id": "react-1-bash",
+          "name": "bash",
+          "arguments": {
+            "command": "python - <<'PY'\nimport sys, os; print('cwd', os.getcwd()); print('sys.path', sys.path[:3])\ntry:\n    import app\n    print('imported app')\nexcept Exception as e:\n    print('error', e)\nPY"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python - <<'PY'\nimport sys, os; print('cwd', os.getcwd()); print('sys.path', sys.path[:3])\ntry:\n    import app\n    print('imported app')\nexcept Exception as e:\n    print('error', e)\nPY"
+          },
+          "output": "cwd /repo\nsys.path ['', '/usr/local/lib/python311.zip', '/usr/local/lib/python3.11']\nimported app",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 11,
+      "assistant_text": "{\"command\":\"python - <<'PY'\\nimport sys, os, subprocess, json, shlex, textwrap, pathlib\\nprint('Running pytest via subprocess')\\nproc = subprocess.run(['pytest','-q'], capture_output=True, text=True)\\nprint('stdout:', proc.stdout)\\nprint('stderr:', proc.stderr)\\nPY\"}",
+      "tool_calls": [
+        {
+          "id": "react-1-bash",
+          "name": "bash",
+          "arguments": {
+            "command": "python - <<'PY'\nimport sys, os, subprocess, json, shlex, textwrap, pathlib\nprint('Running pytest via subprocess')\nproc = subprocess.run(['pytest','-q'], capture_output=True, text=True)\nprint('stdout:', proc.stdout)\nprint('stderr:', proc.stderr)\nPY"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python - <<'PY'\nimport sys, os, subprocess, json, shlex, textwrap, pathlib\nprint('Running pytest via subprocess')\nproc = subprocess.run(['pytest','-q'], capture_output=True, text=True)\nprint('stdout:', proc.stdout)\nprint('stderr:', proc.stderr)\nPY"
+          },
+          "output": "Running pytest via subprocess\nstdout: \n==================================== ERRORS ====================================\n_______________ ERROR collecting tests/test_milestone_rollup.py ________________\nImportError while importing test module '/repo/tests/test_milestone_rollup.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n/usr/local/lib/python3.11/importlib/__init__.py:126: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_milestone_rollup.py:1: in <module>\n    from app.models.milestone import Milestone\nE   ModuleNotFoundError: No module named 'app'\n=========================== short test summary info ============================\nERROR tests/test_milestone_rollup.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.08s\n\nstderr:",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 12,
+      "assistant_text": "{\"path\":\"tests/test_milestone_rollup.py\",\"start_line\":1,\"end_line\":200}\n{\"path\":\"tests/test_milestone_rollup.py\",\"start_line\":1,\"end_line\":200}",
+      "tool_calls": [
+        {
+          "id": "react-1-view",
+          "name": "view",
+          "arguments": {
+            "path": "tests/test_milestone_rollup.py",
+            "start_line": 1,
+            "end_line": 200
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "tests/test_milestone_rollup.py",
+            "start_line": 1,
+            "end_line": 200
+          },
+          "output": "Here's the result of running `cat -n` on /repo/tests/test_milestone_rollup.py:\n     1\tfrom app.models.milestone import Milestone\n     2\tfrom app.services.milestone_rollup import blocker_count\n     3\t\n     4\t\n     5\tdef test_blocker_count_ignores_closed_milestones() -> None:\n     6\t    milestones = [\n     7\t        Milestone(name=\"API\", blocked=True),\n     8\t        Milestone(name=\"Billing\", blocked=True, closed=True),\n     9\t    ]\n    10\t    assert blocker_count(milestones) == 1\n    11\t\n    12\t\n    13\tdef test_blocker_count_handles_zero_blockers() -> None:\n    14\t    assert blocker_count([Milestone(name=\"API\", blocked=False)]) == 0\n    15\t\n    16\t\n    17\tdef test_blocker_count_counts_open_blockers() -> None:\n    18\t    milestones = [\n    19\t        Milestone(name=\"API\", blocked=True),\n    20\t        Milestone(name=\"Billing\", blocked=True),\n    21\t    ]\n    22\t    assert blocker_count(milestones) == 2",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": "Returned the same action multiple times in one response; recovered the first action only."
+    },
+    {
+      "turn": 13,
+      "assistant_text": "",
+      "tool_calls": [],
+      "tool_results": [],
+      "finish_reason": "length",
+      "parse_error": "Empty response; expected JSON action object or array."
+    },
+    {
+      "turn": 14,
+      "assistant_text": "",
+      "tool_calls": [],
+      "tool_results": [],
+      "finish_reason": "length",
+      "parse_error": "Empty response; expected JSON action object or array."
+    },
+    {
+      "turn": 15,
+      "assistant_text": "",
+      "tool_calls": [],
+      "tool_results": [],
+      "finish_reason": "length",
+      "parse_error": "Empty response; expected JSON action object or array."
+    },
+    {
+      "turn": 16,
+      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"python -m pytest -q\"}}",
+      "tool_calls": [
+        {
+          "id": "react-1-bash",
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q"
+          },
+          "output": "...                                                                      [100%]\n3 passed in 0.00s",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 17,
+      "assistant_text": "{\"tool\":\"submit\",\"arguments\":{\"summary\":\"Fixed blocker count to ignore closed milestones\"}}",
+      "tool_calls": [
+        {
+          "id": "react-1-submit",
+          "name": "submit",
+          "arguments": {
+            "summary": "Fixed blocker count to ignore closed milestones"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "submit",
+          "arguments": {
+            "summary": "Fixed blocker count to ignore closed milestones"
+          },
+          "output": "Do not submit yet. Inspect `git diff` first.",
+          "is_error": true,
+          "exit_code": null
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 18,
+      "assistant_text": "{\"command\":\"git diff\"}",
+      "tool_calls": [
+        {
+          "id": "react-1-bash",
+          "name": "bash",
+          "arguments": {
+            "command": "git diff"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "git diff"
+          },
+          "output": "diff --git a/app/services/milestone_rollup.py b/app/services/milestone_rollup.py\nindex b2942dd..d82395c 100644\n--- a/app/services/milestone_rollup.py\n+++ b/app/services/milestone_rollup.py\n@@ -2,5 +2,5 @@ from app.models.milestone import Milestone\n \n \n def blocker_count(milestones: list[Milestone]) -> int:\n-    blockers = [milestone for milestone in milestones if milestone.blocked]\n+    blockers = [milestone for milestone in milestones if milestone.blocked and not milestone.closed]\n     return len(blockers)",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 19,
+      "assistant_text": "{\"tool\":\"submit\",\"arguments\":{\"summary\":\"Implemented blocker_count to exclude closed milestones, fixing inflated blocker summary.\"}}",
+      "tool_calls": [
+        {
+          "id": "react-1-submit",
+          "name": "submit",
+          "arguments": {
+            "summary": "Implemented blocker_count to exclude closed milestones, fixing inflated blocker summary."
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "submit",
+          "arguments": {
+            "summary": "Implemented blocker_count to exclude closed milestones, fixing inflated blocker summary."
+          },
+          "output": "Submission recorded. Summary: Implemented blocker_count to exclude closed milestones, fixing inflated blocker summary.",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    }
+  ],
+  "stats": {
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "turns": 19,
+    "tool_calls": 15,
+    "api_calls": 0
+  },
+  "loop_state": {
+    "executable_edit_made": true,
+    "validation_passed": true,
+    "validation_attempted_after_edit": true,
+    "diff_checked": true,
+    "successful_post_edit_commands": [
+      "git diff",
+      "ls -R",
+      "python - <<'PY'\nimport sys, os, subprocess, json, shlex, textwrap, pathlib\nprint('Running pytest via subprocess')\nproc = subprocess.run(['pytest','-q'], capture_output=True, text=True)\nprint('stdout:', proc.stdout)\nprint('stderr:', proc.stderr)\nPY",
+      "python - <<'PY'\nimport sys, os; print('cwd', os.getcwd()); print('sys.path', sys.path[:3])\ntry:\n    import app\n    print('imported app')\nexcept Exception as e:\n    print('error', e)\nPY",
+      "python -m pytest -q"
+    ],
+    "satisfied_success_checks": [],
+    "changed_files": [
+      "app/services/milestone_rollup.py"
+    ]
+  },
+  "stopped_reason": "submitted",
+  "submitted": true,
+  "submission_summary": "Implemented blocker_count to exclude closed milestones, fixing inflated blocker summary.",
+  "patch": "diff --git a/app/services/milestone_rollup.py b/app/services/milestone_rollup.py\nindex b2942dd..d82395c 100644\n--- a/app/services/milestone_rollup.py\n+++ b/app/services/milestone_rollup.py\n@@ -2,5 +2,5 @@ from app.models.milestone import Milestone\n \n \n def blocker_count(milestones: list[Milestone]) -> int:\n-    blockers = [milestone for milestone in milestones if milestone.blocked]\n+    blockers = [milestone for milestone in milestones if milestone.blocked and not milestone.closed]\n     return len(blockers)\n",
+  "info": {
+    "submission": "diff --git a/app/services/milestone_rollup.py b/app/services/milestone_rollup.py\nindex b2942dd..d82395c 100644\n--- a/app/services/milestone_rollup.py\n+++ b/app/services/milestone_rollup.py\n@@ -2,5 +2,5 @@ from app.models.milestone import Milestone\n \n \n def blocker_count(milestones: list[Milestone]) -> int:\n-    blockers = [milestone for milestone in milestones if milestone.blocked]\n+    blockers = [milestone for milestone in milestones if milestone.blocked and not milestone.closed]\n     return len(blockers)\n",
+    "submitted": true,
+    "submission_summary": "Implemented blocker_count to exclude closed milestones, fixing inflated blocker summary.",
+    "stopped_reason": "submitted"
+  },
+  "agent_architecture": "single",
+  "role_model_stats": {
+    "coder": {
+      "model": "openai/openai/gpt-oss-120b",
+      "tokens_in": 0,
+      "tokens_out": 0,
+      "api_calls": 0,
+      "turns": 19,
+      "tool_calls": 15
+    }
+  },
+  "planner_handoff": {},
+  "review_feedback": {},
+  "instance_id": "milestone_rollup_001",
+  "duration_seconds": 346.93
+}

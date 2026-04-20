@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import copy
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -95,6 +96,35 @@ DEFAULT_VARIANTS = _build_default_variants()
 VARIANTS = DEFAULT_VARIANTS
 VARIANT_SPEC_BY_NAME = {spec.name: spec for spec in VARIANT_SPECS}
 
+INSTANCE_SETS: dict[str, dict[str, Any]] = {
+    "lite_default": {
+        "description": "Default SWE-bench Lite dev slice from the variant YAMLs.",
+    },
+    "sweagent_easy_first": {
+        "description": "SWE-agent's in-repo easiest known SWE-bench dev fixture.",
+        "subset": "full",
+        "split": "dev",
+        "evaluate": False,
+        "filter": "pydicom__pydicom-1458",
+        "shuffle": False,
+    },
+    "4omini_smoke": {
+        "description": "Single historically reachable issue for weak/small-model smoke tests.",
+        "filter": "pylint-dev__astroid-1866",
+        "shuffle": False,
+    },
+    "4omini_easy_pair": {
+        "description": "Two historically most reachable Lite-dev issues in this repo's prior runs.",
+        "filter": "pylint-dev__astroid-1866|pvlib__pvlib-python-1072",
+        "shuffle": False,
+    },
+    "astroid_only": {
+        "description": "Restrict to the strongest historically reachable astroid issue.",
+        "filter": "pylint-dev__astroid-1866",
+        "shuffle": False,
+    },
+}
+
 
 @dataclass
 class SlotModelSpec:
@@ -123,6 +153,10 @@ def preset_config_path() -> Path:
     return config_dir() / "model_presets.yaml"
 
 
+def prompt_bundle_path() -> Path:
+    return config_dir() / "role_prompts.yaml"
+
+
 def config_path(variant: str) -> Path:
     return config_dir() / f"{variant}.yaml"
 
@@ -137,6 +171,18 @@ def default_sweagent_bin() -> Path:
         if candidate.exists():
             return candidate
     return candidates[0]
+
+
+def default_python_bin() -> Path:
+    candidates = [
+        project_root() / "env" / "bin" / "python",
+        project_root() / ".venv" / "bin" / "python",
+        repo_root() / "env" / "bin" / "python",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return Path("python3")
 
 
 def default_results_root() -> Path:
@@ -166,6 +212,16 @@ def sweep_names() -> list[str]:
     return sorted(load_presets().get("sweeps", {}).keys())
 
 
+def instance_set_names() -> list[str]:
+    return sorted(INSTANCE_SETS.keys())
+
+
+def resolve_instance_set(instance_set_name: str) -> dict[str, Any]:
+    if instance_set_name not in INSTANCE_SETS:
+        raise KeyError(f"Unknown instance set '{instance_set_name}'")
+    return copy.deepcopy(INSTANCE_SETS[instance_set_name])
+
+
 def resolve_profile(profile_name: str) -> dict[str, Any]:
     presets = load_presets().get("profiles", {})
     if profile_name not in presets:
@@ -180,11 +236,28 @@ def resolve_sweep(sweep_name: str) -> list[str]:
     return list(sweeps[sweep_name])
 
 
+def load_prompt_bundle() -> dict[str, Any]:
+    return load_yaml(prompt_bundle_path())
+
+
+def _resolve_nonsecret_env(value: Any) -> Any:
+    if not isinstance(value, str) or not value.startswith("$"):
+        return value
+    env_var_name = value[1:]
+    resolved = os.getenv(env_var_name)
+    if not resolved:
+        raise KeyError(f"Environment variable '{env_var_name}' is not set")
+    return resolved
+
+
 def build_slot_spec(raw: dict[str, Any]) -> SlotModelSpec:
+    role_model_name = str(_resolve_nonsecret_env(raw["role_model_name"]))
+    client_model_name = str(_resolve_nonsecret_env(raw.get("client_model_name", role_model_name)))
+    api_base = str(_resolve_nonsecret_env(raw.get("api_base", "https://api.openai.com/v1")))
     return SlotModelSpec(
-        role_model_name=str(raw["role_model_name"]),
-        client_model_name=str(raw.get("client_model_name", "openai/local-model")),
-        api_base=str(raw["api_base"]),
+        role_model_name=role_model_name,
+        client_model_name=client_model_name,
+        api_base=api_base,
         api_key=raw.get("api_key"),
         max_input_tokens=raw.get("max_input_tokens", 300000),
         max_output_tokens=raw.get("max_output_tokens"),
@@ -227,15 +300,30 @@ def role_model_config(spec: SlotModelSpec) -> dict[str, Any]:
     return config
 
 
+def apply_prompt_bundle(base: dict[str, Any]) -> None:
+    prompt_bundle = load_prompt_bundle()
+    agent = base.setdefault("agent", {})
+    templates = prompt_bundle.get("templates")
+    roles = prompt_bundle.get("roles")
+    if isinstance(templates, dict):
+        agent["templates"] = copy.deepcopy(templates)
+    if isinstance(roles, dict):
+        agent["roles"] = copy.deepcopy(roles)
+
+
 def build_variant_config(
     variant: str,
     profile_name: str,
     output_root: Path,
     slot_overrides: dict[str, dict[str, Any]] | None = None,
+    instance_set_name: str | None = None,
+    instance_filter: str | None = None,
     instance_slice: str | None = None,
+    num_workers: int | None = None,
 ) -> dict[str, Any]:
     spec = VARIANT_SPEC_BY_NAME[variant]
     base = load_yaml(config_path(spec.template_variant))
+    apply_prompt_bundle(base)
     profile = build_profile(profile_name, slot_overrides)
 
     agent = base["agent"]
@@ -265,8 +353,27 @@ def build_variant_config(
     if shared_spec.litellm_model_registry is not None:
         agent["model"]["litellm_model_registry"] = shared_spec.litellm_model_registry
 
+    if instance_set_name is not None:
+        instance_set = resolve_instance_set(instance_set_name)
+        instances_cfg = base["instances"]
+        for key in ("subset", "split", "evaluate"):
+            if key in instance_set:
+                instances_cfg[key] = instance_set[key]
+        if "filter" in instance_set:
+            instances_cfg["filter"] = instance_set["filter"]
+            instances_cfg.pop("slice", None)
+        if "shuffle" in instance_set:
+            instances_cfg["shuffle"] = instance_set["shuffle"]
+
+    if instance_filter is not None:
+        base["instances"]["filter"] = instance_filter
+        base["instances"].pop("slice", None)
+
     if instance_slice is not None:
         base["instances"]["slice"] = instance_slice
+
+    if num_workers is not None:
+        base["num_workers"] = num_workers
 
     base["output_dir"] = str(output_root / variant)
     return base

@@ -1,0 +1,27 @@
+diff --git a/app/presenters/invoice_footer.py b/app/presenters/invoice_footer.py
+index 4bdd5da..f4006d0 100644
+--- a/app/presenters/invoice_footer.py
++++ b/app/presenters/invoice_footer.py
+@@ -2,4 +2,7 @@ from app.utils.currency import format_money
+ 
+ 
+ def render_invoice_footer(customer: str, total_due: float) -> str:
+-    return f"Invoice for {customer}: total due {format_money(total_due)}"
++    formatted = format_money(total_due)
++    if formatted.endswith('.'):
++        formatted += '0'
++    return f"Invoice for {customer}: total due {formatted}"
+diff --git a/app/utils/currency.py b/app/utils/currency.py
+index c9dea98..db31b5f 100644
+--- a/app/utils/currency.py
++++ b/app/utils/currency.py
+@@ -2,7 +2,7 @@ def format_money(amount: float) -> str:
+     whole = int(amount)
+     cents = int(round((amount - whole) * 100))
+     if cents == 0:
+-        return f"${whole:,}"
++        return f"${whole:,}.00"
+     if cents % 10 == 0:
+-        return f"${whole:,}.{cents // 10}"
++        return f"${whole:,}.{cents // 10}0"
+     return f"${whole:,}.{cents:02d}"

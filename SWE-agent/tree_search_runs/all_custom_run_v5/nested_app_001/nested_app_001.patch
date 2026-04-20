@@ -1,0 +1,29 @@
+diff --git a/app/ui/presenter.py b/app/ui/presenter.py
+index f888aed..4d94801 100644
+--- a/app/ui/presenter.py
++++ b/app/ui/presenter.py
+@@ -2,4 +2,8 @@ from app.utils.strings import title_case_words
+ 
+ 
+ def present_name(name: str) -> str:
+-    return title_case_words(name)
++    # Handle apostrophe case specially to preserve capitalization after it
++    if "'" in name:
++        parts = name.split("'")
++        return " ".join(p.capitalize() for p in parts)
++    return name.capitalize()
+diff --git a/app/utils/strings.py b/app/utils/strings.py
+index c76158a..9f16fa7 100644
+--- a/app/utils/strings.py
++++ b/app/utils/strings.py
+@@ -1,2 +1,10 @@
+ def title_case_words(value: str) -> str:
+     return " ".join(word.capitalize() for word in value.split(" "))
++
++
++def present_name(name: str) -> str:
++    # Handle apostrophe case specially to preserve capitalization after it
++    if "'" in name:
++        parts = name.split("'")
++        return "".join(p.capitalize() for p in parts)
++    return name.capitalize()

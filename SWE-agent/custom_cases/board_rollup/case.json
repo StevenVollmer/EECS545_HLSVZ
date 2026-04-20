@@ -1,0 +1,43 @@
+[
+  {
+    "image_name": "python:3.11",
+    "instance_id": "board_rollup_001",
+    "problem_statement": "The team board's visible alert count is too high for some boards. The display should reflect only active cards that still need attention, not the full raw list. Investigate the board pipeline, reproduce with the relevant tests, fix the behavior, inspect the diff, and submit.",
+    "repo_path": "repo",
+    "install_commands": [
+      "pip install pytest"
+    ],
+    "analysis": {
+      "likely_fix_paths": [
+        "app/services/board_service.py",
+        "app/presenters/summary_presenter.py"
+      ]
+    },
+    "evaluation": {
+      "baseline_checks": [
+        {
+          "name": "board_service_fails_on_archived_count",
+          "command": "python -m pytest -q tests/test_board_service.py",
+          "expect_exit_code": 1,
+          "stdout_contains": [
+            "FAILED",
+            "test_active_alert_total_excludes_archived_cards"
+          ]
+        }
+      ],
+      "success_checks": [
+        {
+          "name": "board_tests_pass",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "3 passed"
+          ],
+          "stdout_not_contains": [
+            "FAILED"
+          ]
+        }
+      ]
+    }
+  }
+]

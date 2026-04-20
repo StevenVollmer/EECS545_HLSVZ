@@ -1,0 +1,38 @@
+diff --git a/app/utils/text.py b/app/utils/text.py
+index 0addf0e..3d4494a 100644
+--- a/app/utils/text.py
++++ b/app/utils/text.py
+@@ -12,19 +12,21 @@ def normalize_spacing(value: str) -> str:
+     return " ".join(pieces)
+ 
+ 
+-def _capitalize_fragment(fragment: str) -> str:
++def _capitalize_fragment(fragment: str, joiners: set = None) -> str:
+     if not fragment:
+         return fragment
++    if joiners and fragment[0] in joiners:
++        return fragment
+     return fragment[0].upper() + fragment[1:].lower()
+ 
+ 
+ def _capitalize_word_with_joiners(word: str) -> str:
+     if not word:
+         return word
+-    return _capitalize_fragment(word)
++    return _capitalize_fragment(word, joiners=NAME_JOINERS)
+ 
+ 
+-def title_case_words(value: str) -> str:
++def title_case_with_joiners(value: str) -> str:
+     words = value.split(" ")
+     return " ".join(_capitalize_word_with_joiners(word) for word in words)
+ 
+@@ -33,7 +35,7 @@ def normalize_display_name(value: str) -> str:
+     cleaned = collapse_outer_whitespace(value)
+     cleaned = cleaned.replace("_", " ")
+     cleaned = normalize_spacing(cleaned)
+-    return title_case_words(cleaned)
++    return title_case_with_joiners(cleaned)
+ 
+ 
+ def summarize_identifier(value: str) -> str:

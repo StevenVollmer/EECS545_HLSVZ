@@ -1,0 +1,19 @@
+diff --git a/app/utils/text.py b/app/utils/text.py
+index 0addf0e..e4865b1 100644
+--- a/app/utils/text.py
++++ b/app/utils/text.py
+@@ -15,7 +15,13 @@ def normalize_spacing(value: str) -> str:
+ def _capitalize_fragment(fragment: str) -> str:
+     if not fragment:
+         return fragment
+-    return fragment[0].upper() + fragment[1:].lower()
++    # Skip leading punctuation and capitalize the first alphabetic character
++    i = 0
++    while i < len(fragment) and not fragment[i].isalpha():
++        i += 1
++    if i >= len(fragment):
++        return fragment
++    return fragment[:i] + fragment[i].upper() + fragment[i+1:].lower()
+ 
+ 
+ def _capitalize_word_with_joiners(word: str) -> str:

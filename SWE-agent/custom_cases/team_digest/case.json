@@ -1,0 +1,36 @@
+[
+  {
+    "image_name": "python:3.11",
+    "instance_id": "team_digest_001",
+    "problem_statement": "A team digest service reports too many action items because snoozed tasks are still counted. Reproduce the failing tests, fix the runtime code in the correct layer, rerun the relevant tests, inspect the diff, and submit.",
+    "repo_path": "repo",
+    "install_commands": ["pip install pytest"],
+    "analysis": {
+      "showcase": "planner",
+      "difficulty": "medium",
+      "likely_fix_paths": [
+        "app/services/team_digest.py",
+        "app/models/task.py"
+      ]
+    },
+    "evaluation": {
+      "baseline_checks": [
+        {
+          "name": "team_digest_tests_fail",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 1,
+          "stdout_contains": ["FAILED", "assert 3 == 2"]
+        }
+      ],
+      "success_checks": [
+        {
+          "name": "team_digest_tests_pass",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": ["3 passed"],
+          "stdout_not_contains": ["FAILED"]
+        }
+      ]
+    }
+  }
+]

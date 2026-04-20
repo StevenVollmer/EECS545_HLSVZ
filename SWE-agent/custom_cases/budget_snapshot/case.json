@@ -1,0 +1,61 @@
+[
+  {
+    "image_name": "python:3.11",
+    "instance_id": "budget_snapshot_001",
+    "problem_statement": "A budget snapshot preview jumps to an awkward abbreviated money label around the upper end of the thousands range. Existing automated tests still pass, so reproduce the bug directly from the preview path, fix the behavior in the correct layer, run relevant validation, inspect the diff, and submit.",
+    "repo_path": "repo",
+    "install_commands": [
+      "pip install pytest"
+    ],
+    "analysis": {
+      "likely_fix_paths": [
+        "app/utils/currency.py",
+        "app/presenters/snapshot_presenter.py"
+      ]
+    },
+    "evaluation": {
+      "baseline_checks": [
+        {
+          "name": "existing_tests_still_pass",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "6 passed"
+          ]
+        },
+        {
+          "name": "manual_preview_shows_bad_threshold_label",
+          "command": "python scripts/demo_snapshot.py",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "Total planned spend: $1000.0K"
+          ],
+          "stdout_not_contains": [
+            "Total planned spend: $999.9K"
+          ]
+        }
+      ],
+      "success_checks": [
+        {
+          "name": "tests_still_pass_after_fix",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "6 passed"
+          ]
+        },
+        {
+          "name": "manual_preview_is_fixed",
+          "command": "python scripts/demo_snapshot.py",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "Total planned spend: $999.9K"
+          ],
+          "stdout_not_contains": [
+            "Total planned spend: $1000.0K"
+          ]
+        }
+      ]
+    }
+  }
+]

@@ -15,6 +15,7 @@ from matrix_easy_common import (
     build_variant_config,
     default_results_root,
     default_sweagent_bin,
+    instance_set_names,
     preset_names,
     repo_root,
     write_yaml,
@@ -62,6 +63,7 @@ def main() -> int:
     parser.add_argument("variant", nargs="?", help="Variant name. Use --list to see valid names.")
     parser.add_argument("--list", action="store_true", help="List valid variants and exit.")
     parser.add_argument("--list-presets", action="store_true", help="List valid model presets and exit.")
+    parser.add_argument("--list-instance-sets", action="store_true", help="List named instance sets and exit.")
     parser.add_argument(
         "--preset",
         default="qwen_local_35b_9b",
@@ -73,6 +75,16 @@ def main() -> int:
         help="Output subdirectory label. Defaults to the preset name.",
     )
     parser.add_argument(
+        "--instance-set",
+        default=None,
+        help="Named instance set override. Use --list-instance-sets to see options.",
+    )
+    parser.add_argument(
+        "--instance-filter",
+        default=None,
+        help="Regex filter for explicit instance ids. Overrides the config slice when provided.",
+    )
+    parser.add_argument(
         "--instance-slice",
         default=None,
         help="Override the instance slice in the generated config, e.g. ':1' or '5:6'.",
@@ -82,6 +94,12 @@ def main() -> int:
         type=Path,
         default=default_results_root(),
         help="Root directory where generated configs and run outputs are written.",
+    )
+    parser.add_argument(
+        "--num-workers",
+        type=int,
+        default=None,
+        help="Set run-batch num_workers in the generated config.",
     )
     parser.add_argument(
         "--sweagent-bin",
@@ -103,6 +121,10 @@ def main() -> int:
         for preset in preset_names():
             print(preset)
         return 0
+    if args.list_instance_sets:
+        for instance_set in instance_set_names():
+            print(instance_set)
+        return 0
 
     if not args.variant:
         raise SystemExit("Provide a variant name or use --list.")
@@ -110,6 +132,10 @@ def main() -> int:
         raise SystemExit(f"Unknown variant '{args.variant}'. Valid variants: {', '.join(ALL_VARIANTS)}")
     if args.preset not in preset_names():
         raise SystemExit(f"Unknown preset '{args.preset}'. Valid presets: {', '.join(preset_names())}")
+    if args.instance_set is not None and args.instance_set not in instance_set_names():
+        raise SystemExit(
+            f"Unknown instance set '{args.instance_set}'. Valid sets: {', '.join(instance_set_names())}"
+        )
 
     run_label = args.run_label or args.preset
     results_root = args.results_root.resolve()
@@ -118,7 +144,10 @@ def main() -> int:
         args.preset,
         results_root / run_label,
         slot_overrides_from_args(args),
+        instance_set_name=args.instance_set,
+        instance_filter=args.instance_filter,
         instance_slice=args.instance_slice,
+        num_workers=args.num_workers,
     )
     generated_config = generated_config_path(results_root, run_label, args.variant)
     write_yaml(generated_config, config)

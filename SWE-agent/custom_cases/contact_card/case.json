@@ -1,0 +1,48 @@
+[
+  {
+    "image_name": "python:3.11",
+    "instance_id": "contact_card_001",
+    "problem_statement": "A contact card preview renders punctuation-heavy names incorrectly. Existing tests still pass, but the direct preview output is wrong for names with apostrophes and hyphens. Reproduce the preview bug directly, fix the correct runtime code, rerun the relevant validations, inspect the diff, and submit.",
+    "repo_path": "repo",
+    "install_commands": ["pip install pytest"],
+    "analysis": {
+      "showcase": "reviewer",
+      "difficulty": "hard",
+      "likely_fix_paths": [
+        "app/utils/text.py",
+        "app/presenters/contact_card.py"
+      ]
+    },
+    "evaluation": {
+      "baseline_checks": [
+        {
+          "name": "tests_pass_at_baseline",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": ["4 passed"]
+        },
+        {
+          "name": "preview_is_wrong",
+          "command": "python scripts/demo_contact.py",
+          "expect_exit_code": 0,
+          "stdout_contains": ["Primary Contact: O'brien-smith"]
+        }
+      ],
+      "success_checks": [
+        {
+          "name": "tests_still_pass",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": ["4 passed"]
+        },
+        {
+          "name": "preview_is_fixed",
+          "command": "python scripts/demo_contact.py",
+          "expect_exit_code": 0,
+          "stdout_contains": ["Primary Contact: O'Brien-Smith"],
+          "stdout_not_contains": ["Primary Contact: O'brien-Smith"]
+        }
+      ]
+    }
+  }
+]

@@ -1,0 +1,5 @@
+{
+  "model_name_or_path": "E_c2_mixed_hindsight",
+  "instance_id": "campaign_header_001",
+  "model_patch": "diff --git a/app/utils/branding.py b/app/utils/branding.py\nindex 7f8713b..626132c 100644\n--- a/app/utils/branding.py\n+++ b/app/utils/branding.py\n@@ -5,5 +5,12 @@ def normalize_campaign_code(name: str) -> str:\n def format_brand_name(name: str) -> str:\n     words = []\n     for word in name.split():\n-        words.append(word[:1].upper() + word[1:].lower())\n+        # Capitalize first letter of each word, preserving case after apostrophes\n+        formatted_word = []\n+        for i, char in enumerate(word):\n+            if i == 0 or (i > 0 and word[i-1] == \"'\"):\n+                formatted_word.append(char.upper())\n+            else:\n+                formatted_word.append(char.lower())\n+        words.append(\"\".join(formatted_word))\n     return \" \".join(words)\n"
+}

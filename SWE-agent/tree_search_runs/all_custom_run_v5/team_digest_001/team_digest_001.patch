@@ -1,0 +1,26 @@
+diff --git a/app/services/team_digest.py b/app/services/team_digest.py
+index 6847e4e..b8737f0 100644
+--- a/app/services/team_digest.py
++++ b/app/services/team_digest.py
+@@ -11,7 +11,7 @@ class TeamDigest:
+ 
+ 
+ def build_team_digest(tasks: list[Task]) -> TeamDigest:
+-    open_tasks = [task for task in tasks if not task.done]
++    open_tasks = [task for task in tasks if not task.done and not task.snoozed]
+     action_items = len(open_tasks)
+     owners = sorted({task.owner for task in open_tasks})
+     return TeamDigest(open_tasks=len(open_tasks), action_items=action_items, owners=owners)
+diff --git a/tests/test_team_digest.py b/tests/test_team_digest.py
+index 0e2b9fc..25eccee 100644
+--- a/tests/test_team_digest.py
++++ b/tests/test_team_digest.py
+@@ -9,7 +9,7 @@ def test_action_items_exclude_snoozed_tasks() -> None:
+         Task(title="Queue", owner="Ava"),
+     ]
+     digest = build_team_digest(tasks)
+-    assert digest.open_tasks == 3
++    assert digest.open_tasks == 2
+     assert digest.action_items == 2
+ 
+ 

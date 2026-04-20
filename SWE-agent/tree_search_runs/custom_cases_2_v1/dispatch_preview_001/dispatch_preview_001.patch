@@ -1,0 +1,25 @@
+diff --git a/app/utils/names.py b/app/utils/names.py
+index 5e98495..f4a59de 100644
+--- a/app/utils/names.py
++++ b/app/utils/names.py
+@@ -3,6 +3,18 @@ def normalize_route_code(name: str) -> str:
+ 
+ 
+ def display_contact_name(name: str) -> str:
+-    cleaned = "-".join(part.strip().lower() for part in name.split("-"))
+-    return cleaned[:1].upper() + cleaned[1:]
++    # Handle apostrophe-hyphen combinations like "D'arcy-Lee" or "O''-Connor"
++    # Split by hyphen, but preserve apostrophes within parts
++    parts = name.split("-")
++    cleaned_parts = []
++    for part in parts:
++        # Lowercase the part, but preserve apostrophes
++        cleaned_parts.append(part.lower())
++    cleaned = "-".join(cleaned_parts)
++    # Capitalize first letter, but handle apostrophe cases
++    if cleaned.startswith("'"):
++        # Start with apostrophe, e.g., "O''-Connor" -> "O''-connor"
++        return cleaned[:1].upper() + cleaned[1:]
++    else:
++        return cleaned[:1].upper() + cleaned[1:]
+ 

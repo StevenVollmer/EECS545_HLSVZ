@@ -1,0 +1,24 @@
+diff --git a/app/utils/labels.py b/app/utils/labels.py
+index 4ef7164..272707c 100644
+--- a/app/utils/labels.py
++++ b/app/utils/labels.py
+@@ -7,6 +7,6 @@ def format_timeline_label(owner: str) -> str:
+     for section in owner.split("/"):
+         words = []
+         for word in section.strip().split("-"):
+-            words.append(word[:1].upper() + word[1:].lower())
++            words.append(word[:1].upper() + (word[1:].lower() if word[1:] else ''))
+         sections.append("-".join(words))
+     return "/".join(sections)
+diff --git a/tests/test_label_helpers.py b/tests/test_label_helpers.py
+index e7b7e6f..140372e 100644
+--- a/tests/test_label_helpers.py
++++ b/tests/test_label_helpers.py
+@@ -7,3 +7,7 @@ def test_format_timeline_label_basic_case() -> None:
+ 
+ def test_format_timeline_label_trims_sections() -> None:
+     assert format_timeline_label("  operations / platform-team  ") == "Operations/Platform-Team"
++
++
++def test_format_timeline_label_with_apostrophe() -> None:
++    assert format_timeline_label("operations/O'Neil-Ward") == "Operations/O'Neil-Ward"

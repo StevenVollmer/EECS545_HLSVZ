@@ -5,10 +5,9 @@ from __future__ import annotations
 
 import argparse
 import subprocess
-import sys
 from pathlib import Path
 
-from matrix_easy_common import default_results_root, preset_names, repo_root, sweep_names, resolve_sweep
+from matrix_easy_common import default_python_bin, default_results_root, preset_names, repo_root, sweep_names, resolve_sweep
 
 
 def main() -> int:
@@ -23,6 +22,12 @@ def main() -> int:
         type=Path,
         default=default_results_root(),
         help="Root directory where generated configs and run outputs are written.",
+    )
+    parser.add_argument(
+        "--num-workers",
+        type=int,
+        default=None,
+        help="Set run-batch num_workers for each preset run.",
     )
     parser.add_argument(
         "--variants",
@@ -63,7 +68,7 @@ def main() -> int:
 
     for preset in presets:
         cmd = [
-            sys.executable,
+            str(default_python_bin()),
             str(repo_root() / "scripts" / "run_matrix_easy.py"),
             "--preset",
             preset,
@@ -76,6 +81,8 @@ def main() -> int:
             cmd.extend(["--variants", *args.variants])
         if args.instance_slice is not None:
             cmd.extend(["--instance-slice", args.instance_slice])
+        if args.num_workers is not None:
+            cmd.extend(["--num-workers", str(args.num_workers)])
         if args.dry_run:
             cmd.append("--dry-run")
 

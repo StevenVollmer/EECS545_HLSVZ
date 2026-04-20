@@ -1,0 +1,77 @@
+agent:
+  type: default
+  templates:
+    system_template: |-
+      You are a helpful assistant that can interact with a computer to solve tasks.
+    instance_template: |-
+      <uploaded_files>
+      {{working_dir}}
+      </uploaded_files>
+      I've uploaded a python code repository in the directory {{working_dir}}. Consider the following PR description:
+
+      <pr_description>
+      {{problem_statement}}
+      </pr_description>
+
+      Can you help me implement the necessary changes to the repository so that the requirements specified in the <pr_description> are met?
+      I've already taken care of all changes to any of the test files described in the <pr_description>. This means you DON'T have to modify the testing logic or any of the tests in any way!
+      Your task is to make the minimal changes to non-tests files in the {{working_dir}} directory to ensure the <pr_description> is satisfied.
+      Follow these steps to resolve the issue:
+      1. Find and read code relevant to the problem.
+      2. Create a small reproduction script and run it with `python <filename.py>` if needed.
+      3. Edit the repository to resolve the issue.
+      4. Re-run the reproduction and confirm the issue is fixed.
+      5. Remove any temporary reproduction script before final submit.
+    next_step_template: |-
+      OBSERVATION:
+      {{observation}}
+    next_step_no_output_template: |-
+      Your command ran successfully and did not produce any output.
+  tools:
+    env_variables:
+      PAGER: cat
+      MANPAGER: cat
+      LESS: -R
+      PIP_PROGRESS_BAR: 'off'
+      TQDM_DISABLE: '1'
+      GIT_PAGER: cat
+    bundles:
+      - path: tools/registry
+      - path: tools/edit_anthropic
+      - path: tools/review_on_submit_m
+    registry_variables:
+      USE_FILEMAP: 'true'
+      SUBMIT_REVIEW_MESSAGES:
+        - |
+          Thank you for your work on this issue. Please carefully follow the steps below to help review your changes.
+
+          1. If you made any changes after running the reproduction script, run the reproduction again.
+          2. Remove your reproduction script if you created one.
+          3. Revert any changes to tests.
+          4. Run `submit` again to confirm.
+
+          <diff>
+          {{diff}}
+          </diff>
+    enable_bash_tool: true
+    parse_function:
+      type: function_calling
+  history_processors:
+    - type: cache_control
+      last_n_messages: 2
+  model:
+    name: gpt-4o-mini
+    api_key: $OPENAI_API_KEY
+    api_base: https://api.openai.com/v1
+    per_instance_cost_limit: 3
+    total_cost_limit: 0
+    per_instance_call_limit: 0
+    temperature: 0.0
+env:
+  repo:
+    github_url: https://github.com/SWE-agent/test-repo
+  deployment:
+    image: tiny
+    python_standalone_dir: ""
+problem_statement:
+  github_url: https://github.com/SWE-agent/test-repo/issues/1

@@ -1,0 +1,36 @@
+[
+  {
+    "image_name": "python:3.11",
+    "instance_id": "milestone_rollup_001",
+    "problem_statement": "The milestone rollup counts closed milestones as blockers, which inflates the blocker summary. Reproduce the failing tests, fix the runtime logic, rerun the tests, inspect the diff, and submit.",
+    "repo_path": "repo",
+    "install_commands": ["pip install pytest"],
+    "analysis": {
+      "showcase": "planner",
+      "difficulty": "medium",
+      "likely_fix_paths": [
+        "app/services/milestone_rollup.py",
+        "app/models/milestone.py"
+      ]
+    },
+    "evaluation": {
+      "baseline_checks": [
+        {
+          "name": "milestone_rollup_tests_fail",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 1,
+          "stdout_contains": ["FAILED", "assert 2 == 1"]
+        }
+      ],
+      "success_checks": [
+        {
+          "name": "milestone_rollup_tests_pass",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": ["3 passed"],
+          "stdout_not_contains": ["FAILED"]
+        }
+      ]
+    }
+  }
+]

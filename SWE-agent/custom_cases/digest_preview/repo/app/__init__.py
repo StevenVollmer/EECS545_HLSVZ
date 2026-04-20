@@ -1,0 +1,1 @@
+"""Digest preview demo application."""

@@ -1,0 +1,446 @@
+{
+  "turns": [],
+  "stats": {
+    "input_tokens": 7567,
+    "output_tokens": 1718,
+    "turns": 2,
+    "tool_calls": 3,
+    "iterations": 18,
+    "tree_nodes_created": 3,
+    "best_node_depth": 2,
+    "best_node_value": 0.0
+  },
+  "loop_state": {
+    "executable_edit_made": false,
+    "validation_passed": false,
+    "validation_attempted_after_edit": false,
+    "diff_checked": false,
+    "successful_post_edit_commands": [],
+    "satisfied_success_checks": [],
+    "changed_files": []
+  },
+  "stopped_reason": "reviewer_rejected",
+  "submitted": false,
+  "submission_summary": "",
+  "patch": "",
+  "info": {
+    "submission": "",
+    "submitted": false,
+    "submission_summary": "",
+    "stopped_reason": "parse_failure"
+  },
+  "auto_finalized": false,
+  "mcts_meta": {
+    "model": "openai/openai/gpt-oss-120b",
+    "iterations": 18,
+    "expansion_candidates": 1,
+    "edit_vote_samples": 5,
+    "ucb_c": 1.414,
+    "root_visits": 18,
+    "early_branching": false,
+    "early_branch_depth": 2
+  },
+  "vote_summary": [],
+  "mcts_tree": {
+    "nodes": [
+      {
+        "id": "0",
+        "parent_id": null,
+        "depth": 0,
+        "action_name": null,
+        "action_args_preview": "",
+        "visits": 18,
+        "mean_value": 0.0,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0",
+        "parent_id": "0",
+        "depth": 1,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"app/utils/names.py\", \"start_line\": 1, \"end_line\": 200}",
+        "visits": 18,
+        "mean_value": 0.0,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0",
+        "parent_id": "0.0",
+        "depth": 2,
+        "action_name": null,
+        "action_args_preview": "",
+        "visits": 17,
+        "mean_value": 0.0,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "parse_failure",
+        "vote_counts": {},
+        "on_result_path": true
+      }
+    ],
+    "result_node_id": "0.0.0"
+  },
+  "agent_architecture": "planner_coder_reviewer",
+  "architecture": "planner_coder_reviewer",
+  "role_model_stats": {
+    "planner": {
+      "model": "openai/openai/gpt-oss-120b",
+      "tokens_in": 639,
+      "tokens_out": 523,
+      "api_calls": 1
+    },
+    "coder": {
+      "model": "openai/openai/gpt-oss-120b",
+      "input_tokens": 5501,
+      "output_tokens": 674,
+      "turns": 2,
+      "tool_calls": 3,
+      "iterations": 18,
+      "tree_nodes_created": 3,
+      "best_node_depth": 2,
+      "best_node_value": 0.0
+    },
+    "reviewer": {
+      "model": "openai/openai/gpt-oss-120b",
+      "tokens_in": 1427,
+      "tokens_out": 521,
+      "api_calls": 2
+    }
+  },
+  "planner_handoff": {
+    "problem_summary": "",
+    "root_cause_hypothesis": "The name formatting function in app/utils/names.py mishandles strings containing both an apostrophe and a hyphen, producing a wrong order or missing characters in the dispatch preview.",
+    "files_likely_affected": [
+      "app/utils/names.py",
+      "app/main.py"
+    ],
+    "target_symbols": [],
+    "discovery_priority": [
+      "app/utils/names.py",
+      "app/main.py"
+    ],
+    "first_actions": [
+      "Read app/utils/names.py around the formatting helper (e.g., format_recipient_name).",
+      "Run scripts/demo_dispatch.py to view the current preview output for a name like \"O'Neil-Smith\".",
+      "Inspect the output and compare it to the expected format \"O'Neil\u2011Smith\"."
+    ],
+    "safe_reproduction_steps": [],
+    "reproduction_notes": [],
+    "required_validations": [
+      "python scripts/demo_dispatch.py | grep \"O'Neil\u2011Smith\"",
+      "python -m pytest tests/test_name_helpers.py"
+    ],
+    "allowed_change_types": [
+      "targeted runtime code fixes"
+    ],
+    "forbidden_edits": [
+      "Do not modify any test files.",
+      "Do not change route export constants or their uppercase requirement."
+    ],
+    "escalation_conditions": [
+      "If the issue is still unclear after targeted inspection and reproduction."
+    ]
+  },
+  "review_feedback": {
+    "decision": "revise",
+    "primary_reason": "Patch is empty; no changes were made to the code.",
+    "required_changes": [
+      "Submit a non-empty patch that modifies the appropriate source file (e.g., app/utils/names.py) to fix the name formatting issue."
+    ],
+    "validations_to_rerun": []
+  },
+  "coder_rounds": [
+    {
+      "round": 1,
+      "turns": [],
+      "patch": "diff --git a/app/utils/names.py b/app/utils/names.py\nindex 5e98495..ab08a91 100644\n--- a/app/utils/names.py\n+++ b/app/utils/names.py\n@@ -3,6 +3,7 @@ def normalize_route_code(name: str) -> str:\n \n \n def display_contact_name(name: str) -> str:\n-    cleaned = \"-\".join(part.strip().lower() for part in name.split(\"-\"))\n-    return cleaned[:1].upper() + cleaned[1:]\n+    parts = [part.strip().lower() for part in name.split(\"-\")]\n+    parts = [part.title() for part in parts]\n+    return \"-\".join(parts)\n \n",
+      "submitted": false,
+      "stopped_reason": "parse_failure",
+      "stats": {
+        "input_tokens": 29630,
+        "output_tokens": 2442,
+        "turns": 6,
+        "tool_calls": 9,
+        "iterations": 18,
+        "tree_nodes_created": 7,
+        "best_node_depth": 6,
+        "best_node_value": 9.579178056683498
+      },
+      "mcts_tree": {
+        "nodes": [
+          {
+            "id": "0",
+            "parent_id": null,
+            "depth": 0,
+            "action_name": null,
+            "action_args_preview": "",
+            "visits": 18,
+            "mean_value": 8.13,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0",
+            "parent_id": "0",
+            "depth": 1,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"app/utils/names.py\", \"start_line\": 1, \"end_line\": 200}",
+            "visits": 18,
+            "mean_value": 8.13,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0",
+            "parent_id": "0.0",
+            "depth": 2,
+            "action_name": "bash",
+            "action_args_preview": "{\"command\": \"python scripts/demo_dispatch.py\"}",
+            "visits": 17,
+            "mean_value": 8.61,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0",
+            "parent_id": "0.0.0",
+            "depth": 3,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"scripts/demo_dispatch.py\", \"start_line\": 1, \"end_line\": 200}",
+            "visits": 16,
+            "mean_value": 9.15,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0",
+            "parent_id": "0.0.0.0",
+            "depth": 4,
+            "action_name": "str_replace",
+            "action_args_preview": "{\"path\": \"app/utils/names.py\", \"old_str\": \"def display_contact_name(name: str) -",
+            "visits": 15,
+            "mean_value": 9.76,
+            "submitted": false,
+            "is_branch_point": true,
+            "edit_made": true,
+            "success_checks": 1,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 1,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {
+              "{\"arguments\": {\"new_str\": \"def display_contact_name(name: str) -> str:\\n    parts = [part.strip().lower() for part in name.split(\\\"-\\\")]\\n    parts = [part.title() for part in parts]\\n    return \\\"-\\\".join(parts)\\n\", \"old_str\": \"def display_contact_name(name: str) -> str:\\n    cleaned = \\\"-\\\".join(part.strip().lower() for part in name.split(\\\"-\\\"))\\n    return cleaned[:1].upper() + cleaned[1:]\\n\", \"path\": \"app/utils/names.py\"}, \"name\": \"str_replace\"}": 1,
+              "{\"arguments\": {\"new_str\": \"def display_contact_name(name: str) -> str:\\n    import re\\n    # Normalize name: lower case then capitalize after start, hyphen, or apostrophe\\n    lowered = name.lower()\\n    return re.sub(r\\\"(?:^|[-'])([a-z])\\\", lambda m: m.group(0).upper(), lowered)\", \"old_str\": \"def display_contact_name(name: str) -> str:\\n    cleaned = \\\"-\\\".join(part.strip().lower() for part in name.split(\\\"-\\\"))\\n    return cleaned[:1].upper() + cleaned[1:]\", \"path\": \"app/utils/names.py\"}, \"name\": \"str_replace\"}": 1
+            },
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0.0",
+            "parent_id": "0.0.0.0.0",
+            "depth": 5,
+            "action_name": "bash",
+            "action_args_preview": "{\"command\": \"pytest -q\"}",
+            "visits": 14,
+            "mean_value": 9.63,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 1,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 2,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0.0.0",
+            "parent_id": "0.0.0.0.0.0",
+            "depth": 6,
+            "action_name": null,
+            "action_args_preview": "",
+            "visits": 13,
+            "mean_value": 9.58,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 1,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "parse_failure",
+            "vote_counts": {},
+            "on_result_path": true
+          }
+        ],
+        "result_node_id": "0.0.0.0.0.0.0"
+      },
+      "vote_summary": [
+        {
+          "depth": 4,
+          "action": "str_replace",
+          "winner_votes": 1,
+          "total_samples": 2,
+          "unique_candidates": 2
+        }
+      ],
+      "review_feedback": {
+        "decision": "revise",
+        "primary_reason": "The test suite still fails after the change.",
+        "required_changes": [
+          "Update display_contact_name to correctly handle names with both hyphens and apostrophes, preserving original casing and order.",
+          "Add or adjust unit tests to cover the hyphen\u2011apostrophe edge case if missing."
+        ],
+        "validations_to_rerun": [
+          "python -m pytest -q",
+          "python scripts/demo_dispatch.py"
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "turns": [],
+      "patch": "",
+      "submitted": false,
+      "stopped_reason": "parse_failure",
+      "stats": {
+        "input_tokens": 7567,
+        "output_tokens": 1718,
+        "turns": 2,
+        "tool_calls": 3,
+        "iterations": 18,
+        "tree_nodes_created": 3,
+        "best_node_depth": 2,
+        "best_node_value": 0.0
+      },
+      "mcts_tree": {
+        "nodes": [
+          {
+            "id": "0",
+            "parent_id": null,
+            "depth": 0,
+            "action_name": null,
+            "action_args_preview": "",
+            "visits": 18,
+            "mean_value": 0.0,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0",
+            "parent_id": "0",
+            "depth": 1,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"app/utils/names.py\", \"start_line\": 1, \"end_line\": 200}",
+            "visits": 18,
+            "mean_value": 0.0,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0",
+            "parent_id": "0.0",
+            "depth": 2,
+            "action_name": null,
+            "action_args_preview": "",
+            "visits": 17,
+            "mean_value": 0.0,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "parse_failure",
+            "vote_counts": {},
+            "on_result_path": true
+          }
+        ],
+        "result_node_id": "0.0.0"
+      },
+      "vote_summary": [],
+      "review_feedback": {
+        "decision": "revise",
+        "primary_reason": "Patch is empty; no changes were made to the code.",
+        "required_changes": [
+          "Submit a non-empty patch that modifies the appropriate source file (e.g., app/utils/names.py) to fix the name formatting issue."
+        ],
+        "validations_to_rerun": []
+      }
+    }
+  ],
+  "instance_id": "dispatch_preview_001",
+  "duration_seconds": 170.24
+}

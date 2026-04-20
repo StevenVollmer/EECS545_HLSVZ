@@ -1,0 +1,21 @@
+diff --git a/metrics.py b/metrics.py
+index 5c12b28..c329b86 100644
+--- a/metrics.py
++++ b/metrics.py
+@@ -1,8 +1,9 @@
+ def actionable_ratio(alerts):
+-    actionable = [
+-        alert
+-        for alert in alerts
+-        if alert.get("actionable") and not alert.get("archived", False)
+-    ]
+-    actionable_total = [alert for alert in alerts if alert.get("actionable")]
+-    return len(actionable) / len(actionable_total)
++    if not alerts:
++        return 0.0
++    # Count non-null alerts (not archived)
++    non_null_alerts = sum(1 for a in alerts if not a.get('archived'))
++    if non_null_alerts == 0:
++        return 0.0
++    actionable = sum(1 for a in alerts if a.get('actionable') and not a.get('archived'))
++    return actionable / non_null_alerts

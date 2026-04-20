@@ -1,0 +1,13 @@
+diff --git a/app/services/team_digest.py b/app/services/team_digest.py
+index 6847e4e..63f3e56 100644
+--- a/app/services/team_digest.py
++++ b/app/services/team_digest.py
+@@ -12,6 +12,6 @@ class TeamDigest:
+ 
+ def build_team_digest(tasks: list[Task]) -> TeamDigest:
+     open_tasks = [task for task in tasks if not task.done]
+-    action_items = len(open_tasks)
+-    owners = sorted({task.owner for task in open_tasks})
++    action_items = len([task for task in open_tasks if not task.snoozed])
++    owners = sorted({task.owner for task in open_tasks if not task.snoozed})
+     return TeamDigest(open_tasks=len(open_tasks), action_items=action_items, owners=owners)

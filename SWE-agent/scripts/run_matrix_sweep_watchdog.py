@@ -7,16 +7,15 @@ import argparse
 import os
 import signal
 import subprocess
-import sys
 import time
 from pathlib import Path
 
-from matrix_easy_common import default_results_root, repo_root, sweep_names
+from matrix_easy_common import default_python_bin, default_results_root, repo_root, sweep_names
 
 
 def _build_sweep_cmd(args: argparse.Namespace) -> list[str]:
     cmd = [
-        sys.executable,
+        str(default_python_bin()),
         str(repo_root() / "scripts" / "run_matrix_sweep.py"),
         "--sweep",
         args.sweep,
@@ -27,6 +26,8 @@ def _build_sweep_cmd(args: argparse.Namespace) -> list[str]:
         cmd.extend(["--variants", *args.variants])
     if args.instance_slice is not None:
         cmd.extend(["--instance-slice", args.instance_slice])
+    if args.num_workers is not None:
+        cmd.extend(["--num-workers", str(args.num_workers)])
     if args.max_presets is not None:
         cmd.extend(["--max-presets", str(args.max_presets)])
     if args.dry_run:
@@ -109,6 +110,12 @@ def main() -> int:
         type=int,
         default=None,
         help="Optional cap on how many presets from the sweep to run, in listed order.",
+    )
+    parser.add_argument(
+        "--num-workers",
+        type=int,
+        default=None,
+        help="Set run-batch num_workers for each preset run.",
     )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--stop-on-error", action="store_true")

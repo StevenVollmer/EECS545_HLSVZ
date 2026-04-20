@@ -1,0 +1,5 @@
+{
+  "model_name_or_path": "D4_120b_surface",
+  "instance_id": "assignee_board_001",
+  "model_patch": "diff --git a/app/services/board.py b/app/services/board.py\nindex a166ec9..fc96638 100644\n--- a/app/services/board.py\n+++ b/app/services/board.py\n@@ -2,10 +2,12 @@ from app.models.card import Card\n \n \n def visible_owner_names(cards: list[Card]) -> list[str]:\n-    names = {\n-        card.owner\n-        for card in cards\n-        if card.active and card.needs_attention\n-    }\n-    return sorted(names)\n+    seen = set()\n+    names = []\n+    for card in cards:\n+        if card.active and card.needs_attention:\n+            if card.owner not in seen:\n+                seen.add(card.owner)\n+                names.append(card.owner)\n+    return names\n \n"
+}

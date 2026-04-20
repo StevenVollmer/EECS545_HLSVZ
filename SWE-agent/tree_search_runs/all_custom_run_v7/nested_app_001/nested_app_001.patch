@@ -1,0 +1,21 @@
+diff --git a/app/utils/strings.py b/app/utils/strings.py
+index c76158a..37a0cc7 100644
+--- a/app/utils/strings.py
++++ b/app/utils/strings.py
+@@ -1,2 +1,15 @@
+ def title_case_words(value: str) -> str:
+-    return " ".join(word.capitalize() for word in value.split(" "))
++    words = value.split(" ")
++    result = []
++    for word in words:
++        # Capitalize each word but preserve apostrophe casing (e.g., "O'connor" -> "O'connor")
++        if "'" in word:
++            # Find the part before and after apostrophe
++            idx = word.index("'")
++            before = word[:idx]
++            after = word[idx+1:]
++            capitalized = before.capitalize() + "'" + after.capitalize()
++            result.append(capitalized)
++        else:
++            result.append(word.capitalize())
++    return " ".join(result)

@@ -1,0 +1,27 @@
+diff --git a/app/utils/text.py b/app/utils/text.py
+index 0addf0e..29518d0 100644
+--- a/app/utils/text.py
++++ b/app/utils/text.py
+@@ -21,6 +21,22 @@ def _capitalize_fragment(fragment: str) -> str:
+ def _capitalize_word_with_joiners(word: str) -> str:
+     if not word:
+         return word
++    # Preserve punctuation-aware capitalization for compound names
++    if any(c in word for c in "'-/"):
++        # Split on joiners and capitalize each segment
++        segments = []
++        current = ""
++        for c in word:
++            if c in "'-/":
++                if current:
++                    segments.append(_capitalize_fragment(current))
++                    current = ""
++                segments.append(c)
++            else:
++                current += c
++        if current:
++            segments.append(_capitalize_fragment(current))
++        return "".join(segments)
+     return _capitalize_fragment(word)
+ 
+ 

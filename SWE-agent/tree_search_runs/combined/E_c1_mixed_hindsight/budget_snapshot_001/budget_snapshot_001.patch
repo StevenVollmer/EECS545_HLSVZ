@@ -1,0 +1,23 @@
+diff --git a/app/utils/currency.py b/app/utils/currency.py
+index 6c2af37..6bf05ca 100644
+--- a/app/utils/currency.py
++++ b/app/utils/currency.py
+@@ -2,5 +2,5 @@ def abbreviate_currency(amount: float) -> str:
+     if amount >= 1_000_000:
+         return f"${amount / 1_000_000:.1f}M"
+     if amount >= 1_000:
+-        return f"${round(amount / 1_000, 1):.1f}K"
++        return f"${int(amount / 1_000 * 10) / 10:.1f}K"
+     return f"${amount:.0f}"
+diff --git a/tests/test_currency.py b/tests/test_currency.py
+index 8789f0c..7c1ea2a 100644
+--- a/tests/test_currency.py
++++ b/tests/test_currency.py
+@@ -11,3 +11,7 @@ def test_abbreviate_normal_thousands() -> None:
+ 
+ def test_abbreviate_millions() -> None:
+     assert abbreviate_currency(2_500_000) == "$2.5M"
++
++
++def test_abbreviate_edge_case_999_95k() -> None:
++    assert abbreviate_currency(999.95 * 1000) == "$999.9K"

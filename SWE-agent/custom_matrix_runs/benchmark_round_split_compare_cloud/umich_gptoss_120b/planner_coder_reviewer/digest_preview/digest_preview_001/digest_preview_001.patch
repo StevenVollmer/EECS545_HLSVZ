@@ -1,0 +1,19 @@
+diff --git a/app/utils/text.py b/app/utils/text.py
+index 0addf0e..3a4305d 100644
+--- a/app/utils/text.py
++++ b/app/utils/text.py
+@@ -21,7 +21,13 @@ def _capitalize_fragment(fragment: str) -> str:
+ def _capitalize_word_with_joiners(word: str) -> str:
+     if not word:
+         return word
+-    return _capitalize_fragment(word)
++    # Capitalize each fragment separated by known joiners (e.g., hyphen, apostrophe, slash)
++    import re
++    parts = re.split(r'([\-\'/])', word)
++    # parts list includes delimiters at odd indices
++    for i in range(0, len(parts), 2):
++        parts[i] = _capitalize_fragment(parts[i])
++    return ''.join(parts)
+ 
+ 
+ def title_case_words(value: str) -> str:

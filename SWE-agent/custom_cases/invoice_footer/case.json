@@ -1,0 +1,36 @@
+[
+  {
+    "image_name": "python:3.11",
+    "instance_id": "invoice_footer_001",
+    "problem_statement": "An invoice footer renders totals with inconsistent cents, so values like 1280.50 lose a trailing zero. Reproduce the failing tests, fix the correct runtime code, rerun the tests, inspect the diff, and submit.",
+    "repo_path": "repo",
+    "install_commands": ["pip install pytest"],
+    "analysis": {
+      "showcase": "planner",
+      "difficulty": "medium",
+      "likely_fix_paths": [
+        "app/utils/currency.py",
+        "app/presenters/invoice_footer.py"
+      ]
+    },
+    "evaluation": {
+      "baseline_checks": [
+        {
+          "name": "invoice_footer_tests_fail",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 1,
+          "stdout_contains": ["FAILED", "$1,280.5"]
+        }
+      ],
+      "success_checks": [
+        {
+          "name": "invoice_footer_tests_pass",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": ["3 passed"],
+          "stdout_not_contains": ["FAILED"]
+        }
+      ]
+    }
+  }
+]

@@ -1,0 +1,61 @@
+[
+  {
+    "image_name": "python:3.11",
+    "instance_id": "digest_preview_001",
+    "problem_statement": "A client-facing digest preview still renders certain owner names incorrectly. The regression is in the preview/display path and the current automated tests may not cover the exact case. Investigate the codebase, reproduce the bug directly, fix the behavior, add targeted validation only if you need it, inspect the diff, and submit.",
+    "repo_path": "repo",
+    "install_commands": [
+      "pip install pytest"
+    ],
+    "analysis": {
+      "likely_fix_paths": [
+        "app/presenters/report_presenter.py",
+        "app/utils/text.py"
+      ]
+    },
+    "evaluation": {
+      "baseline_checks": [
+        {
+          "name": "existing_tests_still_pass",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "6 passed"
+          ]
+        },
+        {
+          "name": "manual_repro_shows_bad_capitalization",
+          "command": "python scripts/demo_preview.py",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "Good morning, O'connor-smith"
+          ],
+          "stdout_not_contains": [
+            "Good morning, O'Connor-Smith"
+          ]
+        }
+      ],
+      "success_checks": [
+        {
+          "name": "tests_still_pass_after_fix",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "6 passed"
+          ]
+        },
+        {
+          "name": "manual_repro_is_fixed",
+          "command": "python scripts/demo_preview.py",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "Good morning, O'Connor-Smith"
+          ],
+          "stdout_not_contains": [
+            "Good morning, O'connor-smith"
+          ]
+        }
+      ]
+    }
+  }
+]

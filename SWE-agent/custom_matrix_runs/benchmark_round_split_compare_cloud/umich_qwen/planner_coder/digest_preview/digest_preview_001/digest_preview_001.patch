@@ -1,0 +1,27 @@
+diff --git a/app/utils/text.py b/app/utils/text.py
+index 0addf0e..e620918 100644
+--- a/app/utils/text.py
++++ b/app/utils/text.py
+@@ -21,6 +21,22 @@ def _capitalize_fragment(fragment: str) -> str:
+ def _capitalize_word_with_joiners(word: str) -> str:
+     if not word:
+         return word
++    # Preserve capitalization after joiners like apostrophes, hyphens, slashes
++    if any(j in word for j in NAME_JOINERS):
++        # Split on joiners and capitalize each segment
++        segments = []
++        current = ""
++        for char in word:
++            if char in NAME_JOINERS:
++                if current:
++                    segments.append(_capitalize_fragment(current))
++                    current = ""
++                segments.append(char)
++            else:
++                current += char
++        if current:
++            segments.append(_capitalize_fragment(current))
++        return "".join(segments)
+     return _capitalize_fragment(word)
+ 
+ 

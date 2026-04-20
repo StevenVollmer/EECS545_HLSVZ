@@ -1,0 +1,61 @@
+[
+  {
+    "image_name": "python:3.11",
+    "instance_id": "renewal_preview_001",
+    "problem_statement": "A customer-facing renewal preview renders the account holder name in the wrong case. Existing tests still pass, and the export path must keep its uppercase route code behavior. Reproduce the preview bug directly, fix the correct runtime layer without regressing export behavior, run the relevant validations, inspect the diff, and submit.",
+    "repo_path": "repo",
+    "install_commands": ["pip install pytest"],
+    "analysis": {
+      "showcase": "reviewer",
+      "difficulty": "hard",
+      "likely_fix_paths": [
+        "app/presenters/renewal_presenter.py",
+        "app/utils/text.py",
+        "app/exports/renewal_export.py"
+      ]
+    },
+    "evaluation": {
+      "baseline_checks": [
+        {
+          "name": "tests_still_pass",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": ["4 passed"]
+        },
+        {
+          "name": "preview_is_wrong",
+          "command": "python scripts/demo_preview.py",
+          "expect_exit_code": 0,
+          "stdout_contains": ["Renewal for MCINTYRE ROSS [ZX-14]"]
+        },
+        {
+          "name": "export_is_currently_correct",
+          "command": "python scripts/demo_export.py",
+          "expect_exit_code": 0,
+          "stdout_contains": ["route_code=ZX-14"]
+        }
+      ],
+      "success_checks": [
+        {
+          "name": "tests_still_pass_after_fix",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": ["4 passed"]
+        },
+        {
+          "name": "preview_is_fixed",
+          "command": "python scripts/demo_preview.py",
+          "expect_exit_code": 0,
+          "stdout_contains": ["Renewal for Mcintyre Ross [ZX-14]"],
+          "stdout_not_contains": ["Renewal for MCINTYRE ROSS [ZX-14]"]
+        },
+        {
+          "name": "export_is_unchanged",
+          "command": "python scripts/demo_export.py",
+          "expect_exit_code": 0,
+          "stdout_contains": ["route_code=ZX-14"]
+        }
+      ]
+    }
+  }
+]

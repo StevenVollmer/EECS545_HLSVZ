@@ -1,0 +1,5 @@
+{
+  "model_name_or_path": "J_c2_30b_sweSearch",
+  "instance_id": "campaign_header_001",
+  "model_patch": "diff --git a/app/utils/branding.py b/app/utils/branding.py\nindex 7f8713b..c507474 100644\n--- a/app/utils/branding.py\n+++ b/app/utils/branding.py\n@@ -5,5 +5,16 @@ def normalize_campaign_code(name: str) -> str:\n def format_brand_name(name: str) -> str:\n     words = []\n     for word in name.split():\n-        words.append(word[:1].upper() + word[1:].lower())\n+        if word:\n+            # Handle apostrophes and preserve case for non-alphabetic characters\n+            if \"'\" in word:\n+                # Split on apostrophe and capitalize each part\n+                parts = word.split(\"'\")\n+                capitalized_parts = []\n+                for part in parts:\n+                    if part:\n+                        capitalized_parts.append(part[0].upper() + part[1:].lower())\n+                words.append(\"'\".join(capitalized_parts))\n+            else:\n+                words.append(word[0].upper() + word[1:].lower())\n     return \" \".join(words)\n"
+}

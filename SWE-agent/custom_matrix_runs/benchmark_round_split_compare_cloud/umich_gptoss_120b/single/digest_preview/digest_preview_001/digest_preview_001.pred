@@ -1,0 +1,5 @@
+{
+  "model_name_or_path": "umich_gptoss_120b__single__digest_preview",
+  "instance_id": "digest_preview_001",
+  "model_patch": "diff --git a/app/utils/text.py b/app/utils/text.py\nindex 0addf0e..1d002a4 100644\n--- a/app/utils/text.py\n+++ b/app/utils/text.py\n@@ -18,10 +18,16 @@ def _capitalize_fragment(fragment: str) -> str:\n     return fragment[0].upper() + fragment[1:].lower()\n \n \n+import re\n+\n def _capitalize_word_with_joiners(word: str) -> str:\n     if not word:\n         return word\n-    return _capitalize_fragment(word)\n+    # Split word preserving joiner characters\n+    parts = re.split(r'([\\-\\'/])', word)\n+    # Capitalize fragments (non-joiner parts)\n+    capitalized = [_capitalize_fragment(p) if p and p not in \"-'/\" else p for p in parts]\n+    return ''.join(capitalized)\n \n \n def title_case_words(value: str) -> str:\n"
+}

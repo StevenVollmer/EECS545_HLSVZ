@@ -1,0 +1,538 @@
+{
+  "turns": [
+    {
+      "turn": 1,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/utils/branding.py",
+            "start_line": 1,
+            "end_line": 200
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/utils/branding.py",
+            "start_line": 1,
+            "end_line": 200
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/utils/branding.py:\n     1\tdef normalize_campaign_code(name: str) -> str:\n     2\t    return \"_\".join(part.upper() for part in name.split())\n     3\t\n     4\t\n     5\tdef format_brand_name(name: str) -> str:\n     6\t    words = []\n     7\t    for word in name.split():\n     8\t        words.append(word[:1].upper() + word[1:].lower())\n     9\t    return \" \".join(words)",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 2,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/utils/branding.py",
+            "old_str": "def format_brand_name(name: str) -> str:\n    words = []\n    for word in name.split():\n        words.append(word[:1].upper() + word[1:].lower())\n    return \" \".join(words)",
+            "new_str": "def format_brand_name(name: str) -> str:\n    words = []\n    for word in name.split():\n        # Preserve apostrophes by capitalizing each sub-part separated by apostrophes\n        sub_parts = word.split(\"'\")\n        capitalized_parts = []\n        for part in sub_parts:\n            if part:\n                capitalized_parts.append(part[:1].upper() + part[1:].lower())\n            else:\n                capitalized_parts.append('')\n        words.append(\"'\".join(capitalized_parts))\n    return \" \".join(words)"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/utils/branding.py",
+            "old_str": "def format_brand_name(name: str) -> str:\n    words = []\n    for word in name.split():\n        words.append(word[:1].upper() + word[1:].lower())\n    return \" \".join(words)",
+            "new_str": "def format_brand_name(name: str) -> str:\n    words = []\n    for word in name.split():\n        # Preserve apostrophes by capitalizing each sub-part separated by apostrophes\n        sub_parts = word.split(\"'\")\n        capitalized_parts = []\n        for part in sub_parts:\n            if part:\n                capitalized_parts.append(part[:1].upper() + part[1:].lower())\n            else:\n                capitalized_parts.append('')\n        words.append(\"'\".join(capitalized_parts))\n    return \" \".join(words)"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/utils/branding.py:\n     1\tdef normalize_campaign_code(name: str) -> str:\n     2\t    return \"_\".join(part.upper() for part in name.split())\n     3\t\n     4\t\n     5\tdef format_brand_name(name: str) -> str:\n     6\t    words = []\n     7\t    for word in name.split():\n     8\t        # Preserve apostrophes by capitalizing each sub-part separated by apostrophes\n     9\t        sub_parts = word.split(\"'\")\n    10\t        capitalized_parts = []\n    11\t        for part in sub_parts:\n    12\t            if part:\n    13\t                capitalized_parts.append(part[:1].upper() + part[1:].lower())\n    14\t            else:\n    15\t                capitalized_parts.append('')\n    16\t        words.append(\"'\".join(capitalized_parts))\n    17\t    return \" \".join(words)",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    }
+  ],
+  "stats": {
+    "input_tokens": 11567,
+    "output_tokens": 2809,
+    "turns": 2,
+    "tool_calls": 2,
+    "iterations": 18,
+    "tree_nodes_created": 3,
+    "best_node_depth": 2,
+    "best_node_value": 45.163199999999996
+  },
+  "loop_state": {
+    "executable_edit_made": true,
+    "validation_passed": false,
+    "validation_attempted_after_edit": true,
+    "diff_checked": false,
+    "successful_post_edit_commands": [],
+    "satisfied_success_checks": [
+      "manual_repro_is_fixed",
+      "tests_still_pass_after_fix"
+    ],
+    "changed_files": [
+      "app/utils/branding.py"
+    ]
+  },
+  "stopped_reason": "auto_finalized",
+  "submitted": true,
+  "submission_summary": "Auto-finalized: required success checks were satisfied with a non-empty patch.",
+  "patch": "diff --git a/app/utils/branding.py b/app/utils/branding.py\nindex 7f8713b..3bb6215 100644\n--- a/app/utils/branding.py\n+++ b/app/utils/branding.py\n@@ -5,5 +5,13 @@ def normalize_campaign_code(name: str) -> str:\n def format_brand_name(name: str) -> str:\n     words = []\n     for word in name.split():\n-        words.append(word[:1].upper() + word[1:].lower())\n+        # Preserve apostrophes by capitalizing each sub-part separated by apostrophes\n+        sub_parts = word.split(\"'\")\n+        capitalized_parts = []\n+        for part in sub_parts:\n+            if part:\n+                capitalized_parts.append(part[:1].upper() + part[1:].lower())\n+            else:\n+                capitalized_parts.append('')\n+        words.append(\"'\".join(capitalized_parts))\n     return \" \".join(words)\n",
+  "info": {
+    "submission": "diff --git a/app/utils/branding.py b/app/utils/branding.py\nindex 7f8713b..3bb6215 100644\n--- a/app/utils/branding.py\n+++ b/app/utils/branding.py\n@@ -5,5 +5,13 @@ def normalize_campaign_code(name: str) -> str:\n def format_brand_name(name: str) -> str:\n     words = []\n     for word in name.split():\n-        words.append(word[:1].upper() + word[1:].lower())\n+        # Preserve apostrophes by capitalizing each sub-part separated by apostrophes\n+        sub_parts = word.split(\"'\")\n+        capitalized_parts = []\n+        for part in sub_parts:\n+            if part:\n+                capitalized_parts.append(part[:1].upper() + part[1:].lower())\n+            else:\n+                capitalized_parts.append('')\n+        words.append(\"'\".join(capitalized_parts))\n     return \" \".join(words)\n",
+    "submitted": true,
+    "submission_summary": "Auto-finalized: required success checks were satisfied with a non-empty patch.",
+    "stopped_reason": "auto_finalized"
+  },
+  "auto_finalized": true,
+  "mcts_meta": {
+    "model": "openai/openai/gpt-oss-120b",
+    "iterations": 18,
+    "expansion_candidates": 1,
+    "edit_vote_samples": 5,
+    "ucb_c": 1.414,
+    "root_visits": 2,
+    "early_branching": false,
+    "early_branch_depth": 2
+  },
+  "vote_summary": [
+    {
+      "depth": 2,
+      "action": "str_replace",
+      "winner_votes": 1,
+      "total_samples": 4,
+      "unique_candidates": 4
+    }
+  ],
+  "mcts_tree": {
+    "nodes": [
+      {
+        "id": "0",
+        "parent_id": null,
+        "depth": 0,
+        "action_name": null,
+        "action_args_preview": "",
+        "visits": 2,
+        "mean_value": 10.82,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0",
+        "parent_id": "0",
+        "depth": 1,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"app/utils/branding.py\", \"start_line\": 1, \"end_line\": 200}",
+        "visits": 2,
+        "mean_value": 10.82,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0",
+        "parent_id": "0.0",
+        "depth": 2,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"app/utils/branding.py\", \"old_str\": \"def format_brand_name(name: str) -",
+        "visits": 1,
+        "mean_value": 21.64,
+        "submitted": true,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 2,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 1,
+        "has_nonempty_patch": true,
+        "stopped_reason": "auto_finalized",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"def format_brand_name(name: str) -> str:\\n    words = []\\n    for word in name.split():\\n        # Preserve apostrophes by capitalizing each sub-part separated by apostrophes\\n        sub_parts = word.split(\\\"'\\\")\\n        capitalized_parts = []\\n        for part in sub_parts:\\n            if part:\\n                capitalized_parts.append(part[:1].upper() + part[1:].lower())\\n            else:\\n                capitalized_parts.append('')\\n        words.append(\\\"'\\\".join(capitalized_parts))\\n    return \\\" \\\".join(words)\", \"old_str\": \"def format_brand_name(name: str) -> str:\\n    words = []\\n    for word in name.split():\\n        words.append(word[:1].upper() + word[1:].lower())\\n    return \\\" \\\".join(words)\", \"path\": \"app/utils/branding.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"def format_brand_name(name: str) -> str:\\n    words = []\\n    for word in name.split():\\n        # Capitalize each part of the word, handling apostrophes correctly\\n        sub_parts = word.split(\\\"'\\\")\\n        capitalized = [p[:1].upper() + p[1:].lower() if p else \\\"\\\" for p in sub_parts]\\n        words.append(\\\"'\\\".join(capitalized))\\n    return \\\" \\\".join(words)\", \"old_str\": \"def format_brand_name(name: str) -> str:\\n    words = []\\n    for word in name.split():\\n        words.append(word[:1].upper() + word[1:].lower())\\n    return \\\" \\\".join(words)\", \"path\": \"app/utils/branding.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"def format_brand_name(name: str) -> str:\\n    words = []\\n    for word in name.split():\\n        # Preserve apostrophes and capitalize each subpart\\n        sub_parts = word.split(\\\"'\\\")\\n        capitalized = \\\"'\\\".join(part[:1].upper() + part[1:].lower() if part else \\\"\\\" for part in sub_parts)\\n        words.append(capitalized)\\n    return \\\" \\\".join(words)\", \"old_str\": \"def format_brand_name(name: str) -> str:\\n    words = []\\n    for word in name.split():\\n        words.append(word[:1].upper() + word[1:].lower())\\n    return \\\" \\\".join(words)\", \"path\": \"app/utils/branding.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"def format_brand_name(name: str) -> str:\\n    words = []\\n    for word in name.split():\\n        # Preserve apostrophes by capitalizing each subpart\\n        parts = word.split(\\\"'\\\")\\n        capitalized_parts = [p[:1].upper() + p[1:].lower() if p else '' for p in parts]\\n        words.append(\\\"'\\\".join(capitalized_parts))\\n    return \\\" \\\".join(words)\", \"old_str\": \"def format_brand_name(name: str) -> str:\\n    words = []\\n    for word in name.split():\\n        words.append(word[:1].upper() + word[1:].lower())\\n    return \\\" \\\".join(words)\", \"path\": \"app/utils/branding.py\"}, \"name\": \"str_replace\"}": 1
+        },
+        "on_result_path": true
+      }
+    ],
+    "result_node_id": "0.0.0"
+  },
+  "agent_architecture": "planner_coder_reviewer",
+  "architecture": "planner_coder_reviewer",
+  "role_model_stats": {
+    "planner": {
+      "model": "openai/openai/gpt-oss-120b",
+      "tokens_in": 635,
+      "tokens_out": 539,
+      "api_calls": 1
+    },
+    "coder": {
+      "model": "openai/openai/gpt-oss-120b",
+      "input_tokens": 10455,
+      "output_tokens": 2112,
+      "turns": 2,
+      "tool_calls": 2,
+      "iterations": 18,
+      "tree_nodes_created": 3,
+      "best_node_depth": 2,
+      "best_node_value": 45.163199999999996
+    },
+    "reviewer": {
+      "model": "openai/openai/gpt-oss-120b",
+      "tokens_in": 477,
+      "tokens_out": 158,
+      "api_calls": 1
+    }
+  },
+  "planner_handoff": {
+    "problem_summary": "",
+    "root_cause_hypothesis": "branding.get_header_preview strips apostrophes via a regex, causing incorrect preview for names with apostrophes",
+    "files_likely_affected": [
+      "app/utils/branding.py",
+      "app/main.py"
+    ],
+    "target_symbols": [],
+    "discovery_priority": [
+      "app/utils/branding.py",
+      "app/main.py"
+    ],
+    "first_actions": [
+      "Read app/utils/branding.py around the preview formatting function",
+      "Run scripts/demo_header.py with a brand name containing apostrophes to reproduce the bug",
+      "Run pytest -q to ensure existing tests still pass"
+    ],
+    "safe_reproduction_steps": [],
+    "reproduction_notes": [],
+    "required_validations": [
+      "python -c \"from app.utils.branding import get_header_preview; assert \"O'Neil\" in get_header_preview(\\\"O'Neil Campaign\\\")\"",
+      "python -m pytest tests/test_branding_helpers.py tests/test_exports.py"
+    ],
+    "allowed_change_types": [
+      "targeted runtime code fixes"
+    ],
+    "forbidden_edits": [
+      "do not modify any test files",
+      "do not change the export code uppercase logic in main.py"
+    ],
+    "escalation_conditions": [
+      "If the issue is still unclear after targeted inspection and reproduction."
+    ]
+  },
+  "review_feedback": {
+    "decision": "accept",
+    "primary_reason": "All success checks verified (pre-run); skipping model reviewer.",
+    "required_changes": [],
+    "validations_to_rerun": []
+  },
+  "coder_rounds": [
+    {
+      "round": 1,
+      "turns": [],
+      "patch": "",
+      "submitted": false,
+      "stopped_reason": "parse_failure",
+      "stats": {
+        "input_tokens": 14480,
+        "output_tokens": 343,
+        "turns": 4,
+        "tool_calls": 7,
+        "iterations": 18,
+        "tree_nodes_created": 5,
+        "best_node_depth": 4,
+        "best_node_value": 0.0
+      },
+      "mcts_tree": {
+        "nodes": [
+          {
+            "id": "0",
+            "parent_id": null,
+            "depth": 0,
+            "action_name": null,
+            "action_args_preview": "",
+            "visits": 18,
+            "mean_value": 0.0,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0",
+            "parent_id": "0",
+            "depth": 1,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"app/utils/branding.py\", \"start_line\": 1, \"end_line\": 200}",
+            "visits": 18,
+            "mean_value": 0.0,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0",
+            "parent_id": "0.0",
+            "depth": 2,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"app/utils/branding.py\", \"start_line\": 200, \"end_line\": 400}",
+            "visits": 17,
+            "mean_value": 0.0,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0",
+            "parent_id": "0.0.0",
+            "depth": 3,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"app/utils/branding.py\", \"start_line\": 1, \"end_line\": 200}",
+            "visits": 16,
+            "mean_value": 0.0,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0",
+            "parent_id": "0.0.0.0",
+            "depth": 4,
+            "action_name": null,
+            "action_args_preview": "",
+            "visits": 15,
+            "mean_value": 0.0,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "parse_failure",
+            "vote_counts": {},
+            "on_result_path": true
+          }
+        ],
+        "result_node_id": "0.0.0.0.0"
+      },
+      "vote_summary": [],
+      "review_feedback": {
+        "decision": "revise",
+        "primary_reason": "Patch is empty; no code changes were submitted.",
+        "required_changes": [
+          "Submit a non-empty patch that modifies the source code (avoid changes to test files)."
+        ],
+        "validations_to_rerun": []
+      }
+    },
+    {
+      "round": 2,
+      "turns": [
+        {
+          "turn": 1,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "app/utils/branding.py",
+                "start_line": 1,
+                "end_line": 200
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "app/utils/branding.py",
+                "start_line": 1,
+                "end_line": 200
+              },
+              "output": "Here's the result of running `cat -n` on /repo/app/utils/branding.py:\n     1\tdef normalize_campaign_code(name: str) -> str:\n     2\t    return \"_\".join(part.upper() for part in name.split())\n     3\t\n     4\t\n     5\tdef format_brand_name(name: str) -> str:\n     6\t    words = []\n     7\t    for word in name.split():\n     8\t        words.append(word[:1].upper() + word[1:].lower())\n     9\t    return \" \".join(words)",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 2,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "app/utils/branding.py",
+                "old_str": "def format_brand_name(name: str) -> str:\n    words = []\n    for word in name.split():\n        words.append(word[:1].upper() + word[1:].lower())\n    return \" \".join(words)",
+                "new_str": "def format_brand_name(name: str) -> str:\n    words = []\n    for word in name.split():\n        # Preserve apostrophes by capitalizing each sub-part separated by apostrophes\n        sub_parts = word.split(\"'\")\n        capitalized_parts = []\n        for part in sub_parts:\n            if part:\n                capitalized_parts.append(part[:1].upper() + part[1:].lower())\n            else:\n                capitalized_parts.append('')\n        words.append(\"'\".join(capitalized_parts))\n    return \" \".join(words)"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "app/utils/branding.py",
+                "old_str": "def format_brand_name(name: str) -> str:\n    words = []\n    for word in name.split():\n        words.append(word[:1].upper() + word[1:].lower())\n    return \" \".join(words)",
+                "new_str": "def format_brand_name(name: str) -> str:\n    words = []\n    for word in name.split():\n        # Preserve apostrophes by capitalizing each sub-part separated by apostrophes\n        sub_parts = word.split(\"'\")\n        capitalized_parts = []\n        for part in sub_parts:\n            if part:\n                capitalized_parts.append(part[:1].upper() + part[1:].lower())\n            else:\n                capitalized_parts.append('')\n        words.append(\"'\".join(capitalized_parts))\n    return \" \".join(words)"
+              },
+              "output": "Here's the result of running `cat -n` on /repo/app/utils/branding.py:\n     1\tdef normalize_campaign_code(name: str) -> str:\n     2\t    return \"_\".join(part.upper() for part in name.split())\n     3\t\n     4\t\n     5\tdef format_brand_name(name: str) -> str:\n     6\t    words = []\n     7\t    for word in name.split():\n     8\t        # Preserve apostrophes by capitalizing each sub-part separated by apostrophes\n     9\t        sub_parts = word.split(\"'\")\n    10\t        capitalized_parts = []\n    11\t        for part in sub_parts:\n    12\t            if part:\n    13\t                capitalized_parts.append(part[:1].upper() + part[1:].lower())\n    14\t            else:\n    15\t                capitalized_parts.append('')\n    16\t        words.append(\"'\".join(capitalized_parts))\n    17\t    return \" \".join(words)",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        }
+      ],
+      "patch": "diff --git a/app/utils/branding.py b/app/utils/branding.py\nindex 7f8713b..3bb6215 100644\n--- a/app/utils/branding.py\n+++ b/app/utils/branding.py\n@@ -5,5 +5,13 @@ def normalize_campaign_code(name: str) -> str:\n def format_brand_name(name: str) -> str:\n     words = []\n     for word in name.split():\n-        words.append(word[:1].upper() + word[1:].lower())\n+        # Preserve apostrophes by capitalizing each sub-part separated by apostrophes\n+        sub_parts = word.split(\"'\")\n+        capitalized_parts = []\n+        for part in sub_parts:\n+            if part:\n+                capitalized_parts.append(part[:1].upper() + part[1:].lower())\n+            else:\n+                capitalized_parts.append('')\n+        words.append(\"'\".join(capitalized_parts))\n     return \" \".join(words)\n",
+      "submitted": true,
+      "stopped_reason": "auto_finalized",
+      "stats": {
+        "input_tokens": 11567,
+        "output_tokens": 2809,
+        "turns": 2,
+        "tool_calls": 2,
+        "iterations": 18,
+        "tree_nodes_created": 3,
+        "best_node_depth": 2,
+        "best_node_value": 45.163199999999996
+      },
+      "mcts_tree": {
+        "nodes": [
+          {
+            "id": "0",
+            "parent_id": null,
+            "depth": 0,
+            "action_name": null,
+            "action_args_preview": "",
+            "visits": 2,
+            "mean_value": 10.82,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0",
+            "parent_id": "0",
+            "depth": 1,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"app/utils/branding.py\", \"start_line\": 1, \"end_line\": 200}",
+            "visits": 2,
+            "mean_value": 10.82,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0",
+            "parent_id": "0.0",
+            "depth": 2,
+            "action_name": "str_replace",
+            "action_args_preview": "{\"path\": \"app/utils/branding.py\", \"old_str\": \"def format_brand_name(name: str) -",
+            "visits": 1,
+            "mean_value": 21.64,
+            "submitted": true,
+            "is_branch_point": true,
+            "edit_made": true,
+            "success_checks": 2,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 1,
+            "has_nonempty_patch": true,
+            "stopped_reason": "auto_finalized",
+            "vote_counts": {
+              "{\"arguments\": {\"new_str\": \"def format_brand_name(name: str) -> str:\\n    words = []\\n    for word in name.split():\\n        # Preserve apostrophes by capitalizing each sub-part separated by apostrophes\\n        sub_parts = word.split(\\\"'\\\")\\n        capitalized_parts = []\\n        for part in sub_parts:\\n            if part:\\n                capitalized_parts.append(part[:1].upper() + part[1:].lower())\\n            else:\\n                capitalized_parts.append('')\\n        words.append(\\\"'\\\".join(capitalized_parts))\\n    return \\\" \\\".join(words)\", \"old_str\": \"def format_brand_name(name: str) -> str:\\n    words = []\\n    for word in name.split():\\n        words.append(word[:1].upper() + word[1:].lower())\\n    return \\\" \\\".join(words)\", \"path\": \"app/utils/branding.py\"}, \"name\": \"str_replace\"}": 1,
+              "{\"arguments\": {\"new_str\": \"def format_brand_name(name: str) -> str:\\n    words = []\\n    for word in name.split():\\n        # Capitalize each part of the word, handling apostrophes correctly\\n        sub_parts = word.split(\\\"'\\\")\\n        capitalized = [p[:1].upper() + p[1:].lower() if p else \\\"\\\" for p in sub_parts]\\n        words.append(\\\"'\\\".join(capitalized))\\n    return \\\" \\\".join(words)\", \"old_str\": \"def format_brand_name(name: str) -> str:\\n    words = []\\n    for word in name.split():\\n        words.append(word[:1].upper() + word[1:].lower())\\n    return \\\" \\\".join(words)\", \"path\": \"app/utils/branding.py\"}, \"name\": \"str_replace\"}": 1,
+              "{\"arguments\": {\"new_str\": \"def format_brand_name(name: str) -> str:\\n    words = []\\n    for word in name.split():\\n        # Preserve apostrophes and capitalize each subpart\\n        sub_parts = word.split(\\\"'\\\")\\n        capitalized = \\\"'\\\".join(part[:1].upper() + part[1:].lower() if part else \\\"\\\" for part in sub_parts)\\n        words.append(capitalized)\\n    return \\\" \\\".join(words)\", \"old_str\": \"def format_brand_name(name: str) -> str:\\n    words = []\\n    for word in name.split():\\n        words.append(word[:1].upper() + word[1:].lower())\\n    return \\\" \\\".join(words)\", \"path\": \"app/utils/branding.py\"}, \"name\": \"str_replace\"}": 1,
+              "{\"arguments\": {\"new_str\": \"def format_brand_name(name: str) -> str:\\n    words = []\\n    for word in name.split():\\n        # Preserve apostrophes by capitalizing each subpart\\n        parts = word.split(\\\"'\\\")\\n        capitalized_parts = [p[:1].upper() + p[1:].lower() if p else '' for p in parts]\\n        words.append(\\\"'\\\".join(capitalized_parts))\\n    return \\\" \\\".join(words)\", \"old_str\": \"def format_brand_name(name: str) -> str:\\n    words = []\\n    for word in name.split():\\n        words.append(word[:1].upper() + word[1:].lower())\\n    return \\\" \\\".join(words)\", \"path\": \"app/utils/branding.py\"}, \"name\": \"str_replace\"}": 1
+            },
+            "on_result_path": true
+          }
+        ],
+        "result_node_id": "0.0.0"
+      },
+      "vote_summary": [
+        {
+          "depth": 2,
+          "action": "str_replace",
+          "winner_votes": 1,
+          "total_samples": 4,
+          "unique_candidates": 4
+        }
+      ],
+      "review_feedback": {
+        "decision": "accept",
+        "primary_reason": "All success checks verified (pre-run); skipping model reviewer.",
+        "required_changes": [],
+        "validations_to_rerun": []
+      }
+    }
+  ],
+  "instance_id": "campaign_header_001",
+  "duration_seconds": 138.36
+}

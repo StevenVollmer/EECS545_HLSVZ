@@ -1,0 +1,34 @@
+diff --git a/app/ui/presenter.py b/app/ui/presenter.py
+index f888aed..54f987e 100644
+--- a/app/ui/presenter.py
++++ b/app/ui/presenter.py
+@@ -1,5 +1,5 @@
+-from app.utils.strings import title_case_words
++from app.utils.strings import title_case_preserve_apostrophes
+ 
+ 
+ def present_name(name: str) -> str:
+-    return title_case_words(name)
++    return title_case_preserve_apostrophes(name)
+diff --git a/app/utils/strings.py b/app/utils/strings.py
+index c76158a..84177e7 100644
+--- a/app/utils/strings.py
++++ b/app/utils/strings.py
+@@ -1,2 +1,17 @@
+ def title_case_words(value: str) -> str:
+     return " ".join(word.capitalize() for word in value.split(" "))
++
++
++def title_case_preserve_apostrophes(value: str) -> str:
++    words = value.split(" ")
++    result = []
++    for word in words:
++        if "'" in word:
++            parts = word.split("'")
++            if len(parts) == 2:
++                result.append(parts[0].capitalize() + "'" + parts[1].capitalize())
++            else:
++                result.append(word.capitalize())
++        else:
++            result.append(word.capitalize())
++    return " ".join(result)

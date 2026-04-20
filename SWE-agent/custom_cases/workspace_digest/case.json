@@ -1,0 +1,46 @@
+[
+  {
+    "image_name": "python:3.11",
+    "instance_id": "workspace_digest_001",
+    "problem_statement": "The workspace digest shows the wrong attention count for some customer workspaces. The problem is somewhere in the rollup/display pipeline, not necessarily at the top-level entrypoint. Reproduce with the relevant tests, inspect the pipeline, fix the behavior in the right layer, run validation, inspect the diff, and submit.",
+    "repo_path": "repo",
+    "install_commands": [
+      "pip install pytest"
+    ],
+    "analysis": {
+      "showcase": "planner",
+      "difficulty": "medium",
+      "likely_fix_paths": [
+        "app/services/digest_builder.py",
+        "app/utils/filters.py",
+        "app/presenters/dashboard_presenter.py"
+      ]
+    },
+    "evaluation": {
+      "baseline_checks": [
+        {
+          "name": "workspace_digest_badge_test_fails",
+          "command": "python -m pytest -q tests/test_dashboard_presenter.py",
+          "expect_exit_code": 1,
+          "stdout_contains": [
+            "FAILED",
+            "test_attention_count_excludes_snoozed_items"
+          ]
+        }
+      ],
+      "success_checks": [
+        {
+          "name": "workspace_digest_tests_pass",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "5 passed"
+          ],
+          "stdout_not_contains": [
+            "FAILED"
+          ]
+        }
+      ]
+    }
+  }
+]
