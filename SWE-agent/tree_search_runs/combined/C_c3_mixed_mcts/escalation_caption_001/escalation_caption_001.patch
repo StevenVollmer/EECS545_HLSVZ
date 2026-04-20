@@ -1,0 +1,30 @@
+diff --git a/app/utils/text.py b/app/utils/text.py
+index 476256a..0c64edf 100644
+--- a/app/utils/text.py
++++ b/app/utils/text.py
+@@ -3,5 +3,23 @@ def normalize_channel(channel: str) -> str:
+ 
+ 
+ def format_owner_name(owner: str) -> str:
+-    cleaned = '-'.join(part.strip().lower() for part in owner.split('-'))
+-    return cleaned[:1].upper() + cleaned[1:]
++    parts = [part.strip() for part in owner.split('-')]
++    formatted_parts = []
++    for part in parts:
++        # Preserve apostrophes and capitalize first letter of each part
++        formatted = ''
++        capitalize_next = True
++        for char in part:
++            if char == "'":
++                formatted += char
++                capitalize_next = True
++            elif char == '-' and capitalize_next:
++                formatted += char
++                capitalize_next = True
++            elif capitalize_next:
++                formatted += char.upper()
++                capitalize_next = False
++            else:
++                formatted += char.lower()
++        formatted_parts.append(formatted)
++    return '-'.join(formatted_parts)

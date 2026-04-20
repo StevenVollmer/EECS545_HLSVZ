@@ -1,0 +1,23 @@
+diff --git a/app/utils/text.py b/app/utils/text.py
+index 2305d36..8b10b0d 100644
+--- a/app/utils/text.py
++++ b/app/utils/text.py
+@@ -6,6 +6,17 @@ def format_display_name(name: str) -> str:
+     parts = []
+     for part in name.split("-"):
+         stripped = part.strip()
+-        parts.append(stripped[:1].upper() + stripped[1:].lower())
++        # Handle apostrophes: capitalize character after apostrophe if it's part of a proper name
++        if "'" in stripped:
++            # Split on apostrophe and capitalize each segment appropriately
++            segments = stripped.split("'")
++            formatted_segments = []
++            for i, seg in enumerate(segments):
++                if seg:
++                    formatted_segments.append(seg[:1].upper() + seg[1:].lower())
++            formatted = "'".join(formatted_segments)
++        else:
++            formatted = stripped[:1].upper() + stripped[1:].lower()
++        parts.append(formatted)
+     return "-".join(parts)
+ 

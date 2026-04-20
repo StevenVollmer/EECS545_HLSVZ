@@ -1,0 +1,18 @@
+diff --git a/app/utils/branding.py b/app/utils/branding.py
+index 7f8713b..626132c 100644
+--- a/app/utils/branding.py
++++ b/app/utils/branding.py
+@@ -5,5 +5,12 @@ def normalize_campaign_code(name: str) -> str:
+ def format_brand_name(name: str) -> str:
+     words = []
+     for word in name.split():
+-        words.append(word[:1].upper() + word[1:].lower())
++        # Capitalize first letter of each word, preserving case after apostrophes
++        formatted_word = []
++        for i, char in enumerate(word):
++            if i == 0 or (i > 0 and word[i-1] == "'"):
++                formatted_word.append(char.upper())
++            else:
++                formatted_word.append(char.lower())
++        words.append("".join(formatted_word))
+     return " ".join(words)

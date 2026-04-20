@@ -1,0 +1,2563 @@
+{
+  "turns": [
+    {
+      "turn": 1,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "headline.py",
+            "start_line": 1,
+            "end_line": 100
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "headline.py",
+            "start_line": 1,
+            "end_line": 100
+          },
+          "output": "Here's the result of running `cat -n` on /repo/headline.py:\n     1\tdef format_headline(slug: str) -> str:\n     2\t    return \" \".join(part.capitalize() for part in slug.split(\"_\"))",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 2,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "test_headline.py",
+            "start_line": 1,
+            "end_line": 100
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "test_headline.py",
+            "start_line": 1,
+            "end_line": 100
+          },
+          "output": "Here's the result of running `cat -n` on /repo/test_headline.py:\n     1\tfrom headline import format_headline\n     2\t\n     3\t\n     4\tdef test_format_headline_keeps_api_uppercase() -> None:\n     5\t    assert format_headline(\"api_status\") == \"API Status\"\n     6\t\n     7\t\n     8\tdef test_format_headline_basic_slug() -> None:\n     9\t    assert format_headline(\"release_notes\") == \"Release Notes\"",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 3,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q test_headline.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q test_headline.py"
+          },
+          "output": "F.                                                                       [100%]\n=================================== FAILURES ===================================\n___________________ test_format_headline_keeps_api_uppercase ___________________\n\n    def test_format_headline_keeps_api_uppercase() -> None:\n>       assert format_headline(\"api_status\") == \"API Status\"\nE       AssertionError: assert 'Api Status' == 'API Status'\nE         \nE         - API Status\nE         ?  ^^\nE         + Api Status\nE         ?  ^^\n\ntest_headline.py:5: AssertionError\n=========================== short test summary info ============================\nFAILED test_headline.py::test_format_headline_keeps_api_uppercase - AssertionError: assert 'Api Status' == 'API Status'\n1 failed, 1 passed in 0.09s",
+          "is_error": true,
+          "exit_code": 1
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 4,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "headline.py",
+            "old_str": "def format_headline(slug: str) -> str:\n    return \" \".join(part.capitalize() for part in slug.split(\"_\"))",
+            "new_str": "def format_headline(slug: str) -> str:\n    parts = slug.split(\"_\")\n    if parts and parts[0].isupper():\n        # First part is all-caps acronym, keep it as-is\n        return parts[0] + \" \" + \" \".join(part.capitalize() for part in parts[1:])\n    return \" \".join(part.capitalize() for part in parts)"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "headline.py",
+            "old_str": "def format_headline(slug: str) -> str:\n    return \" \".join(part.capitalize() for part in slug.split(\"_\"))",
+            "new_str": "def format_headline(slug: str) -> str:\n    parts = slug.split(\"_\")\n    if parts and parts[0].isupper():\n        # First part is all-caps acronym, keep it as-is\n        return parts[0] + \" \" + \" \".join(part.capitalize() for part in parts[1:])\n    return \" \".join(part.capitalize() for part in parts)"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/headline.py:\n     1\tdef format_headline(slug: str) -> str:\n     2\t    parts = slug.split(\"_\")\n     3\t    if parts and parts[0].isupper():\n     4\t        # First part is all-caps acronym, keep it as-is\n     5\t        return parts[0] + \" \" + \" \".join(part.capitalize() for part in parts[1:])\n     6\t    return \" \".join(part.capitalize() for part in parts)",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 5,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q test_headline.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q test_headline.py"
+          },
+          "output": "F.                                                                       [100%]\n=================================== FAILURES ===================================\n___________________ test_format_headline_keeps_api_uppercase ___________________\n\n    def test_format_headline_keeps_api_uppercase() -> None:\n>       assert format_headline(\"api_status\") == \"API Status\"\nE       AssertionError: assert 'Api Status' == 'API Status'\nE         \nE         - API Status\nE         ?  ^^\nE         + Api Status\nE         ?  ^^\n\ntest_headline.py:5: AssertionError\n=========================== short test summary info ============================\nFAILED test_headline.py::test_format_headline_keeps_api_uppercase - AssertionError: assert 'Api Status' == 'API Status'\n1 failed, 1 passed in 0.09s",
+          "is_error": true,
+          "exit_code": 1
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 6,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "headline.py",
+            "start_line": 1,
+            "end_line": 10
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "headline.py",
+            "start_line": 1,
+            "end_line": 10
+          },
+          "output": "Here's the result of running `cat -n` on /repo/headline.py:\n     1\tdef format_headline(slug: str) -> str:\n     2\t    parts = slug.split(\"_\")\n     3\t    if parts and parts[0].isupper():\n     4\t        # First part is all-caps acronym, keep it as-is\n     5\t        return parts[0] + \" \" + \" \".join(part.capitalize() for part in parts[1:])\n     6\t    return \" \".join(part.capitalize() for part in parts)",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 7,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -c \"print('api_status'.split('_')[0].isupper())\""
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -c \"print('api_status'.split('_')[0].isupper())\""
+          },
+          "output": "False",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 8,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "headline.py",
+            "old_str": "def format_headline(slug: str) -> str:\n    parts = slug.split(\"_\")\n    if parts and parts[0].isupper():\n        # First part is all-caps acronym, keep it as-is\n        return parts[0] + \" \" + \" \".join(part.capitalize() for part in parts[1:])\n    return \" \".join(part.capitalize() for part in parts)",
+            "new_str": "def format_headline(slug: str) -> str:\n    parts = slug.split(\"_\")\n    if parts and parts[0].isupper() and parts[0].isalpha():\n        # First part is all-caps acronym, keep it as-is\n        return parts[0] + \" \" + \" \".join(part.capitalize() for part in parts[1:])\n    return \" \".join(part.capitalize() for part in parts)"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "headline.py",
+            "old_str": "def format_headline(slug: str) -> str:\n    parts = slug.split(\"_\")\n    if parts and parts[0].isupper():\n        # First part is all-caps acronym, keep it as-is\n        return parts[0] + \" \" + \" \".join(part.capitalize() for part in parts[1:])\n    return \" \".join(part.capitalize() for part in parts)",
+            "new_str": "def format_headline(slug: str) -> str:\n    parts = slug.split(\"_\")\n    if parts and parts[0].isupper() and parts[0].isalpha():\n        # First part is all-caps acronym, keep it as-is\n        return parts[0] + \" \" + \" \".join(part.capitalize() for part in parts[1:])\n    return \" \".join(part.capitalize() for part in parts)"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/headline.py:\n     1\tdef format_headline(slug: str) -> str:\n     2\t    parts = slug.split(\"_\")\n     3\t    if parts and parts[0].isupper() and parts[0].isalpha():\n     4\t        # First part is all-caps acronym, keep it as-is\n     5\t        return parts[0] + \" \" + \" \".join(part.capitalize() for part in parts[1:])\n     6\t    return \" \".join(part.capitalize() for part in parts)",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 9,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q test_headline.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q test_headline.py"
+          },
+          "output": "F.                                                                       [100%]\n=================================== FAILURES ===================================\n___________________ test_format_headline_keeps_api_uppercase ___________________\n\n    def test_format_headline_keeps_api_uppercase() -> None:\n>       assert format_headline(\"api_status\") == \"API Status\"\nE       AssertionError: assert 'Api Status' == 'API Status'\nE         \nE         - API Status\nE         ?  ^^\nE         + Api Status\nE         ?  ^^\n\ntest_headline.py:5: AssertionError\n=========================== short test summary info ============================\nFAILED test_headline.py::test_format_headline_keeps_api_uppercase - AssertionError: assert 'Api Status' == 'API Status'\n1 failed, 1 passed in 0.09s",
+          "is_error": true,
+          "exit_code": 1
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 10,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "test_headline.py",
+            "start_line": 1,
+            "end_line": 50
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "test_headline.py",
+            "start_line": 1,
+            "end_line": 50
+          },
+          "output": "Here's the result of running `cat -n` on /repo/test_headline.py:\n     1\tfrom headline import format_headline\n     2\t\n     3\t\n     4\tdef test_format_headline_keeps_api_uppercase() -> None:\n     5\t    assert format_headline(\"api_status\") == \"API Status\"\n     6\t\n     7\t\n     8\tdef test_format_headline_basic_slug() -> None:\n     9\t    assert format_headline(\"release_notes\") == \"Release Notes\"",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 11,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "headline.py",
+            "old_str": "def format_headline(slug: str) -> str:\n    parts = slug.split(\"_\")\n    if parts and parts[0].isupper() and parts[0].isalpha():\n        # First part is all-caps acronym, keep it as-is\n        return parts[0] + \" \" + \" \".join(part.capitalize() for part in parts[1:])\n    return \" \".join(part.capitalize() for part in parts)",
+            "new_str": "def format_headline(slug: str) -> str:\n    parts = slug.split(\"_\")\n    if parts and all(c.isupper() for c in parts[0]) and parts[0].isalpha():\n        # First part is all-caps acronym, keep it as-is\n        return parts[0] + \" \" + \" \".join(part.capitalize() for part in parts[1:])\n    return \" \".join(part.capitalize() for part in parts)"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "headline.py",
+            "old_str": "def format_headline(slug: str) -> str:\n    parts = slug.split(\"_\")\n    if parts and parts[0].isupper() and parts[0].isalpha():\n        # First part is all-caps acronym, keep it as-is\n        return parts[0] + \" \" + \" \".join(part.capitalize() for part in parts[1:])\n    return \" \".join(part.capitalize() for part in parts)",
+            "new_str": "def format_headline(slug: str) -> str:\n    parts = slug.split(\"_\")\n    if parts and all(c.isupper() for c in parts[0]) and parts[0].isalpha():\n        # First part is all-caps acronym, keep it as-is\n        return parts[0] + \" \" + \" \".join(part.capitalize() for part in parts[1:])\n    return \" \".join(part.capitalize() for part in parts)"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/headline.py:\n     1\tdef format_headline(slug: str) -> str:\n     2\t    parts = slug.split(\"_\")\n     3\t    if parts and all(c.isupper() for c in parts[0]) and parts[0].isalpha():\n     4\t        # First part is all-caps acronym, keep it as-is\n     5\t        return parts[0] + \" \" + \" \".join(part.capitalize() for part in parts[1:])\n     6\t    return \" \".join(part.capitalize() for part in parts)",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 12,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q test_headline.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q test_headline.py"
+          },
+          "output": "F.                                                                       [100%]\n=================================== FAILURES ===================================\n___________________ test_format_headline_keeps_api_uppercase ___________________\n\n    def test_format_headline_keeps_api_uppercase() -> None:\n>       assert format_headline(\"api_status\") == \"API Status\"\nE       AssertionError: assert 'Api Status' == 'API Status'\nE         \nE         - API Status\nE         ?  ^^\nE         + Api Status\nE         ?  ^^\n\ntest_headline.py:5: AssertionError\n=========================== short test summary info ============================\nFAILED test_headline.py::test_format_headline_keeps_api_uppercase - AssertionError: assert 'Api Status' == 'API Status'\n1 failed, 1 passed in 0.09s",
+          "is_error": true,
+          "exit_code": 1
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    }
+  ],
+  "stats": {
+    "input_tokens": 142128,
+    "output_tokens": 5928,
+    "turns": 12,
+    "tool_calls": 18,
+    "iterations": 18,
+    "tree_nodes_created": 21,
+    "best_node_depth": 12,
+    "best_node_value": 0.0,
+    "value_fn_tokens_in": 0,
+    "value_fn_tokens_out": 0
+  },
+  "loop_state": {
+    "executable_edit_made": true,
+    "validation_passed": false,
+    "validation_attempted_after_edit": true,
+    "diff_checked": false,
+    "successful_post_edit_commands": [
+      "python -c \"print('api_status'.split('_')[0].isupper())\""
+    ],
+    "satisfied_success_checks": [],
+    "changed_files": [
+      "headline.py"
+    ]
+  },
+  "stopped_reason": "reviewer_rejected",
+  "submitted": false,
+  "submission_summary": "",
+  "patch": "diff --git a/headline.py b/headline.py\nindex d230eea..213ce62 100644\n--- a/headline.py\n+++ b/headline.py\n@@ -1,2 +1,6 @@\n def format_headline(slug: str) -> str:\n-    return \" \".join(part.capitalize() for part in slug.split(\"_\"))\n+    parts = slug.split(\"_\")\n+    if parts and all(c.isupper() for c in parts[0]) and parts[0].isalpha():\n+        # First part is all-caps acronym, keep it as-is\n+        return parts[0] + \" \" + \" \".join(part.capitalize() for part in parts[1:])\n+    return \" \".join(part.capitalize() for part in parts)\n",
+  "info": {
+    "submission": "",
+    "submitted": false,
+    "submission_summary": "",
+    "stopped_reason": "max_iterations"
+  },
+  "auto_finalized": false,
+  "mcts_meta": {
+    "model": "ollama/qwen3.5:9b",
+    "value_model": null,
+    "hindsight_feedback": true,
+    "dead_branch_feedback_count": 0,
+    "iterations": 18,
+    "expansion_candidates": 1,
+    "edit_vote_samples": 5,
+    "ucb_c": 1.414,
+    "root_visits": 20,
+    "early_branching": false,
+    "early_branch_depth": 2
+  },
+  "vote_summary": [
+    {
+      "depth": 4,
+      "action": "str_replace",
+      "winner_votes": 1,
+      "total_samples": 5,
+      "unique_candidates": 5
+    },
+    {
+      "depth": 8,
+      "action": "str_replace",
+      "winner_votes": 2,
+      "total_samples": 7,
+      "unique_candidates": 5
+    },
+    {
+      "depth": 11,
+      "action": "str_replace",
+      "winner_votes": 5,
+      "total_samples": 7,
+      "unique_candidates": 2
+    }
+  ],
+  "mcts_tree": {
+    "nodes": [
+      {
+        "id": "0",
+        "parent_id": null,
+        "depth": 0,
+        "action_name": null,
+        "action_args_preview": "",
+        "visits": 20,
+        "mean_value": 0.26,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0",
+        "parent_id": "0",
+        "depth": 1,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"headline.py\", \"start_line\": 1, \"end_line\": 100}",
+        "visits": 20,
+        "mean_value": 0.26,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0",
+        "parent_id": "0.0",
+        "depth": 2,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"test_headline.py\", \"start_line\": 1, \"end_line\": 100}",
+        "visits": 19,
+        "mean_value": 0.27,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0",
+        "parent_id": "0.0.0",
+        "depth": 3,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q test_headline.py\"}",
+        "visits": 18,
+        "mean_value": 0.29,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0",
+        "parent_id": "0.0.0.0",
+        "depth": 4,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"headline.py\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    ",
+        "visits": 17,
+        "mean_value": 0.31,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 1,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and parts[0].isupper():\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    return \\\" \\\".join(part.capitalize() for part in slug.split(\\\"_\\\"))\", \"path\": \"headline.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    # Check if first part is all-caps acronym (length > 1)\\n    if len(parts) > 0 and len(parts[0]) > 1 and parts[0].isupper():\\n        # First part is all-caps, keep it as is\\n        result = [parts[0]]\\n        # Capitalize first letter of remaining parts\\n        for part in parts[1:]:\\n            result.append(part.capitalize())\\n        return \\\" \\\".join(result)\\n    else:\\n        return \\\" \\\".join(part.capitalize() for part in parts)\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    return \\\" \\\".join(part.capitalize() for part in slug.split(\\\"_\\\"))\", \"path\": \"headline.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    # Check if the first part is all uppercase (acronym)\\n    if parts and parts[0].isupper():\\n        # Keep acronym uppercase, capitalize rest\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    return \\\" \\\".join(part.capitalize() for part in slug.split(\\\"_\\\"))\", \"path\": \"headline.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    # Check if the first part is an all-caps acronym (length > 1)\\n    if len(parts) > 0 and len(parts[0]) > 1 and parts[0].isupper():\\n        # First part is all-caps acronym, keep it as-is\\n        # Capitalize remaining parts\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    else:\\n        # Standard capitalization\\n        return \\\" \\\".join(part.capitalize() for part in parts)\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    return \\\" \\\".join(part.capitalize() for part in slug.split(\\\"_\\\"))\", \"path\": \"headline.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and parts[0].isupper() and parts[0].isalpha():\\n        return \\\" \\\".join(parts)\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    return \\\" \\\".join(part.capitalize() for part in slug.split(\\\"_\\\"))\", \"path\": \"headline.py\"}, \"name\": \"str_replace\"}": 1
+        },
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0",
+        "depth": 5,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q test_headline.py\"}",
+        "visits": 16,
+        "mean_value": 0.16,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 2,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0",
+        "depth": 6,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"headline.py\", \"start_line\": 1, \"end_line\": 10}",
+        "visits": 15,
+        "mean_value": 0.06,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 3,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0",
+        "depth": 7,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -c \\\"print('api_status'.split('_')[0].isupper())\\\"\"}",
+        "visits": 14,
+        "mean_value": 0.0,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 4,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0",
+        "depth": 8,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"headline.py\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    ",
+        "visits": 7,
+        "mean_value": 0.0,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 5,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and parts[0].isupper() and parts[0].isalpha():\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and parts[0].isupper():\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"path\": \"headline.py\"}, \"name\": \"str_replace\"}": 2,
+          "{\"arguments\": {\"new_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and parts[0].isupper():\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.upper() if part.isupper() else part.capitalize() for part in parts)\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and parts[0].isupper():\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"path\": \"headline.py\"}, \"name\": \"str_replace\"}": 2,
+          "{\"arguments\": {\"new_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and parts[0].isupper():\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and parts[0].isupper():\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"path\": \"headline.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and parts[0].isupper() and parts[0] == parts[0].upper():\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and parts[0].isupper():\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"path\": \"headline.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and all(c.isupper() for c in parts[0]):\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and parts[0].isupper():\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"path\": \"headline.py\"}, \"name\": \"str_replace\"}": 1
+        },
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0",
+        "depth": 9,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q test_headline.py\"}",
+        "visits": 6,
+        "mean_value": 0.0,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 6,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0",
+        "depth": 10,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"test_headline.py\", \"start_line\": 1, \"end_line\": 50}",
+        "visits": 5,
+        "mean_value": 0.0,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 7,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0.0",
+        "depth": 11,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"headline.py\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    ",
+        "visits": 2,
+        "mean_value": 0.0,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 8,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and parts[0].isupper() and parts[0].isalpha():\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and parts[0].isupper() and parts[0].isalpha():\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"path\": \"headline.py\"}, \"name\": \"str_replace\"}": 2,
+          "{\"arguments\": {\"new_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and all(c.isupper() for c in parts[0]) and parts[0].isalpha():\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and parts[0].isupper() and parts[0].isalpha():\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"path\": \"headline.py\"}, \"name\": \"str_replace\"}": 5
+        },
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0.0.0",
+        "depth": 12,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q test_headline.py\"}",
+        "visits": 1,
+        "mean_value": 0.0,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 9,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0.1",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0.0",
+        "depth": 11,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"headline.py\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    ",
+        "visits": 2,
+        "mean_value": 0.0,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 8,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": false
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0.1.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0.0.1",
+        "depth": 12,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q test_headline.py\"}",
+        "visits": 1,
+        "mean_value": 0.0,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 9,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": false
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.1",
+        "parent_id": "0.0.0.0.0.0.0.0",
+        "depth": 8,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"headline.py\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    ",
+        "visits": 6,
+        "mean_value": 0.0,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 5,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": false
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.1.0",
+        "parent_id": "0.0.0.0.0.0.0.0.1",
+        "depth": 9,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q test_headline.py\"}",
+        "visits": 5,
+        "mean_value": 0.0,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 6,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": false
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.1.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.1.0",
+        "depth": 10,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -c \\\"print('API'.isupper())\\\"\"}",
+        "visits": 4,
+        "mean_value": 0.0,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 7,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": false
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.1.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.1.0.0",
+        "depth": 11,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"headline.py\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    ",
+        "visits": 3,
+        "mean_value": 0.0,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 8,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and parts[0].isupper():\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and all(c.isupper() or c.isdigit() for c in parts[0]):\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"path\": \"headline.py\"}, \"name\": \"str_replace\"}": 2
+        },
+        "on_result_path": false
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.1.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.1.0.0.0",
+        "depth": 12,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q test_headline.py\"}",
+        "visits": 2,
+        "mean_value": 0.0,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 9,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": false
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.1.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.1.0.0.0.0",
+        "depth": 13,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"test_headline.py\", \"start_line\": 1, \"end_line\": 50}",
+        "visits": 1,
+        "mean_value": 0.0,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 10,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": false
+      }
+    ],
+    "result_node_id": "0.0.0.0.0.0.0.0.0.0.0.0.0"
+  },
+  "agent_architecture": "planner_coder_reviewer",
+  "architecture": "planner_coder_reviewer",
+  "role_model_stats": {
+    "planner": {
+      "model": "ollama/qwen3.5:9b",
+      "tokens_in": 561,
+      "tokens_out": 193,
+      "api_calls": 1
+    },
+    "coder": {
+      "model": "ollama/qwen3.5:9b",
+      "input_tokens": 139069,
+      "output_tokens": 5391,
+      "turns": 12,
+      "tool_calls": 18,
+      "iterations": 18,
+      "tree_nodes_created": 21,
+      "best_node_depth": 12,
+      "best_node_value": 0.0,
+      "value_fn_tokens_in": 0,
+      "value_fn_tokens_out": 0
+    },
+    "reviewer": {
+      "model": "ollama/qwen3.5:9b",
+      "tokens_in": 2498,
+      "tokens_out": 344,
+      "api_calls": 2
+    }
+  },
+  "planner_handoff": {
+    "problem_summary": "",
+    "root_cause_hypothesis": "The format_headline function in headline.py likely mishandles slugs starting with an acronym by failing to capitalize the first letter or incorrectly parsing the acronym boundary.",
+    "files_likely_affected": [
+      "headline.py"
+    ],
+    "target_symbols": [],
+    "discovery_priority": [
+      "headline.py"
+    ],
+    "first_actions": [
+      "Read headline.py to locate the format_headline function and its acronym handling logic",
+      "Run pytest test_headline.py to reproduce the failing tests related to acronym-first slugs"
+    ],
+    "safe_reproduction_steps": [],
+    "reproduction_notes": [],
+    "required_validations": [
+      "pytest test_headline.py"
+    ],
+    "allowed_change_types": [
+      "targeted runtime code fixes"
+    ],
+    "forbidden_edits": [
+      "do not modify test_headline.py"
+    ],
+    "escalation_conditions": [
+      "If the issue is still unclear after targeted inspection and reproduction."
+    ]
+  },
+  "review_feedback": {
+    "decision": "revise",
+    "primary_reason": "The test_format_headline_keeps_api_uppercase test is still failing because the patch logic incorrectly handles all-caps acronyms by returning them unchanged, which breaks the expected behavior for headlines containing acronyms.",
+    "required_changes": [
+      "Fix the logic in format_headline to correctly handle all-caps acronyms by capitalizing the first letter of the entire slug if it starts with an acronym, or ensure the test expectations align with the new logic.",
+      "Ensure that the function correctly processes slugs where the first part is an all-caps acronym followed by other parts, maintaining the acronym's uppercase status while capitalizing subsequent parts as needed."
+    ],
+    "validations_to_rerun": [
+      "python -m pytest -q test_headline.py"
+    ]
+  },
+  "coder_rounds": [
+    {
+      "round": 1,
+      "turns": [
+        {
+          "turn": 1,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "headline.py",
+                "start_line": 1,
+                "end_line": 100
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "headline.py",
+                "start_line": 1,
+                "end_line": 100
+              },
+              "output": "Here's the result of running `cat -n` on /repo/headline.py:\n     1\tdef format_headline(slug: str) -> str:\n     2\t    return \" \".join(part.capitalize() for part in slug.split(\"_\"))",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 2,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q test_headline.py"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q test_headline.py"
+              },
+              "output": "F.                                                                       [100%]\n=================================== FAILURES ===================================\n___________________ test_format_headline_keeps_api_uppercase ___________________\n\n    def test_format_headline_keeps_api_uppercase() -> None:\n>       assert format_headline(\"api_status\") == \"API Status\"\nE       AssertionError: assert 'Api Status' == 'API Status'\nE         \nE         - API Status\nE         ?  ^^\nE         + Api Status\nE         ?  ^^\n\ntest_headline.py:5: AssertionError\n=========================== short test summary info ============================\nFAILED test_headline.py::test_format_headline_keeps_api_uppercase - AssertionError: assert 'Api Status' == 'API Status'\n1 failed, 1 passed in 0.08s",
+              "is_error": true,
+              "exit_code": 1
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 3,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "test_headline.py",
+                "start_line": 1,
+                "end_line": 20
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "test_headline.py",
+                "start_line": 1,
+                "end_line": 20
+              },
+              "output": "Here's the result of running `cat -n` on /repo/test_headline.py:\n     1\tfrom headline import format_headline\n     2\t\n     3\t\n     4\tdef test_format_headline_keeps_api_uppercase() -> None:\n     5\t    assert format_headline(\"api_status\") == \"API Status\"\n     6\t\n     7\t\n     8\tdef test_format_headline_basic_slug() -> None:\n     9\t    assert format_headline(\"release_notes\") == \"Release Notes\"",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 4,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "headline.py",
+                "old_str": "def format_headline(slug: str) -> str:\n    return \" \".join(part.capitalize() for part in slug.split(\"_\"))",
+                "new_str": "def format_headline(slug: str) -> str:\n    parts = slug.split(\"_\")\n    result = []\n    for part in parts:\n        if part.isupper():\n            result.append(part)\n        else:\n            result.append(part.capitalize())\n    return \" \".join(result)"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "headline.py",
+                "old_str": "def format_headline(slug: str) -> str:\n    return \" \".join(part.capitalize() for part in slug.split(\"_\"))",
+                "new_str": "def format_headline(slug: str) -> str:\n    parts = slug.split(\"_\")\n    result = []\n    for part in parts:\n        if part.isupper():\n            result.append(part)\n        else:\n            result.append(part.capitalize())\n    return \" \".join(result)"
+              },
+              "output": "Here's the result of running `cat -n` on /repo/headline.py:\n     1\tdef format_headline(slug: str) -> str:\n     2\t    parts = slug.split(\"_\")\n     3\t    result = []\n     4\t    for part in parts:\n     5\t        if part.isupper():\n     6\t            result.append(part)\n     7\t        else:\n     8\t            result.append(part.capitalize())\n     9\t    return \" \".join(result)",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 5,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q test_headline.py"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q test_headline.py"
+              },
+              "output": "F.                                                                       [100%]\n=================================== FAILURES ===================================\n___________________ test_format_headline_keeps_api_uppercase ___________________\n\n    def test_format_headline_keeps_api_uppercase() -> None:\n>       assert format_headline(\"api_status\") == \"API Status\"\nE       AssertionError: assert 'Api Status' == 'API Status'\nE         \nE         - API Status\nE         ?  ^^\nE         + Api Status\nE         ?  ^^\n\ntest_headline.py:5: AssertionError\n=========================== short test summary info ============================\nFAILED test_headline.py::test_format_headline_keeps_api_uppercase - AssertionError: assert 'Api Status' == 'API Status'\n1 failed, 1 passed in 0.08s",
+              "is_error": true,
+              "exit_code": 1
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 6,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "headline.py",
+                "start_line": 1,
+                "end_line": 10
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "headline.py",
+                "start_line": 1,
+                "end_line": 10
+              },
+              "output": "Here's the result of running `cat -n` on /repo/headline.py:\n     1\tdef format_headline(slug: str) -> str:\n     2\t    parts = slug.split(\"_\")\n     3\t    result = []\n     4\t    for part in parts:\n     5\t        if part.isupper():\n     6\t            result.append(part)\n     7\t        else:\n     8\t            result.append(part.capitalize())\n     9\t    return \" \".join(result)",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 7,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "headline.py",
+                "start_line": 1,
+                "end_line": 10
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "headline.py",
+                "start_line": 1,
+                "end_line": 10
+              },
+              "output": "Here's the result of running `cat -n` on /repo/headline.py:\n     1\tdef format_headline(slug: str) -> str:\n     2\t    parts = slug.split(\"_\")\n     3\t    result = []\n     4\t    for part in parts:\n     5\t        if part.isupper():\n     6\t            result.append(part)\n     7\t        else:\n     8\t            result.append(part.capitalize())\n     9\t    return \" \".join(result)",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 8,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "headline.py",
+                "old_str": "def format_headline(slug: str) -> str:\n    parts = slug.split(\"_\")\n    result = []\n    for part in parts:\n        if part.isupper():\n            result.append(part)\n        else:\n            result.append(part.capitalize())\n    return \" \".join(result)",
+                "new_str": "def format_headline(slug: str) -> str:\n    parts = slug.split(\"_\")\n    result = []\n    for part in parts:\n        if part.isupper():\n            result.append(part)\n        elif part.islower():\n            result.append(part.capitalize())\n        else:\n            result.append(part)\n    return \" \".join(result)"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "headline.py",
+                "old_str": "def format_headline(slug: str) -> str:\n    parts = slug.split(\"_\")\n    result = []\n    for part in parts:\n        if part.isupper():\n            result.append(part)\n        else:\n            result.append(part.capitalize())\n    return \" \".join(result)",
+                "new_str": "def format_headline(slug: str) -> str:\n    parts = slug.split(\"_\")\n    result = []\n    for part in parts:\n        if part.isupper():\n            result.append(part)\n        elif part.islower():\n            result.append(part.capitalize())\n        else:\n            result.append(part)\n    return \" \".join(result)"
+              },
+              "output": "Here's the result of running `cat -n` on /repo/headline.py:\n     1\tdef format_headline(slug: str) -> str:\n     2\t    parts = slug.split(\"_\")\n     3\t    result = []\n     4\t    for part in parts:\n     5\t        if part.isupper():\n     6\t            result.append(part)\n     7\t        elif part.islower():\n     8\t            result.append(part.capitalize())\n     9\t        else:\n    10\t            result.append(part)\n    11\t    return \" \".join(result)",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 9,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q test_headline.py"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q test_headline.py"
+              },
+              "output": "F.                                                                       [100%]\n=================================== FAILURES ===================================\n___________________ test_format_headline_keeps_api_uppercase ___________________\n\n    def test_format_headline_keeps_api_uppercase() -> None:\n>       assert format_headline(\"api_status\") == \"API Status\"\nE       AssertionError: assert 'Api Status' == 'API Status'\nE         \nE         - API Status\nE         ?  ^^\nE         + Api Status\nE         ?  ^^\n\ntest_headline.py:5: AssertionError\n=========================== short test summary info ============================\nFAILED test_headline.py::test_format_headline_keeps_api_uppercase - AssertionError: assert 'Api Status' == 'API Status'\n1 failed, 1 passed in 0.08s",
+              "is_error": true,
+              "exit_code": 1
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 10,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "test_headline.py",
+                "start_line": 1,
+                "end_line": 50
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "test_headline.py",
+                "start_line": 1,
+                "end_line": 50
+              },
+              "output": "Here's the result of running `cat -n` on /repo/test_headline.py:\n     1\tfrom headline import format_headline\n     2\t\n     3\t\n     4\tdef test_format_headline_keeps_api_uppercase() -> None:\n     5\t    assert format_headline(\"api_status\") == \"API Status\"\n     6\t\n     7\t\n     8\tdef test_format_headline_basic_slug() -> None:\n     9\t    assert format_headline(\"release_notes\") == \"Release Notes\"",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 11,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "headline.py",
+                "old_str": "def format_headline(slug: str) -> str:\n    parts = slug.split(\"_\")\n    result = []\n    for part in parts:\n        if part.isupper():\n            result.append(part)\n        elif part.islower():\n            result.append(part.capitalize())\n        else:\n            result.append(part)\n    return \" \".join(result)",
+                "new_str": "def format_headline(slug: str) -> str:\n    parts = slug.split(\"_\")\n    result = []\n    for part in parts:\n        if part.isupper():\n            result.append(part)\n        elif part.islower():\n            result.append(part.capitalize())\n        else:\n            result.append(part)\n    return \" \".join(result) if len(parts) > 1 else slug.capitalize()"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "headline.py",
+                "old_str": "def format_headline(slug: str) -> str:\n    parts = slug.split(\"_\")\n    result = []\n    for part in parts:\n        if part.isupper():\n            result.append(part)\n        elif part.islower():\n            result.append(part.capitalize())\n        else:\n            result.append(part)\n    return \" \".join(result)",
+                "new_str": "def format_headline(slug: str) -> str:\n    parts = slug.split(\"_\")\n    result = []\n    for part in parts:\n        if part.isupper():\n            result.append(part)\n        elif part.islower():\n            result.append(part.capitalize())\n        else:\n            result.append(part)\n    return \" \".join(result) if len(parts) > 1 else slug.capitalize()"
+              },
+              "output": "Here's the result of running `cat -n` on /repo/headline.py:\n     1\tdef format_headline(slug: str) -> str:\n     2\t    parts = slug.split(\"_\")\n     3\t    result = []\n     4\t    for part in parts:\n     5\t        if part.isupper():\n     6\t            result.append(part)\n     7\t        elif part.islower():\n     8\t            result.append(part.capitalize())\n     9\t        else:\n    10\t            result.append(part)\n    11\t    return \" \".join(result) if len(parts) > 1 else slug.capitalize()",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 12,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q test_headline.py"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q test_headline.py"
+              },
+              "output": "F.                                                                       [100%]\n=================================== FAILURES ===================================\n___________________ test_format_headline_keeps_api_uppercase ___________________\n\n    def test_format_headline_keeps_api_uppercase() -> None:\n>       assert format_headline(\"api_status\") == \"API Status\"\nE       AssertionError: assert 'Api Status' == 'API Status'\nE         \nE         - API Status\nE         ?  ^^\nE         + Api Status\nE         ?  ^^\n\ntest_headline.py:5: AssertionError\n=========================== short test summary info ============================\nFAILED test_headline.py::test_format_headline_keeps_api_uppercase - AssertionError: assert 'Api Status' == 'API Status'\n1 failed, 1 passed in 0.08s",
+              "is_error": true,
+              "exit_code": 1
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        }
+      ],
+      "patch": "diff --git a/headline.py b/headline.py\nindex d230eea..4ad90ae 100644\n--- a/headline.py\n+++ b/headline.py\n@@ -1,2 +1,11 @@\n def format_headline(slug: str) -> str:\n-    return \" \".join(part.capitalize() for part in slug.split(\"_\"))\n+    parts = slug.split(\"_\")\n+    result = []\n+    for part in parts:\n+        if part.isupper():\n+            result.append(part)\n+        elif part.islower():\n+            result.append(part.capitalize())\n+        else:\n+            result.append(part)\n+    return \" \".join(result) if len(parts) > 1 else slug.capitalize()\n",
+      "submitted": false,
+      "stopped_reason": "max_iterations",
+      "stats": {
+        "input_tokens": 104774,
+        "output_tokens": 3411,
+        "turns": 12,
+        "tool_calls": 20,
+        "iterations": 18,
+        "tree_nodes_created": 21,
+        "best_node_depth": 12,
+        "best_node_value": 0.0,
+        "value_fn_tokens_in": 0,
+        "value_fn_tokens_out": 0
+      },
+      "mcts_tree": {
+        "nodes": [
+          {
+            "id": "0",
+            "parent_id": null,
+            "depth": 0,
+            "action_name": null,
+            "action_args_preview": "",
+            "visits": 20,
+            "mean_value": 0.26,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0",
+            "parent_id": "0",
+            "depth": 1,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"headline.py\", \"start_line\": 1, \"end_line\": 100}",
+            "visits": 20,
+            "mean_value": 0.26,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0",
+            "parent_id": "0.0",
+            "depth": 2,
+            "action_name": "bash",
+            "action_args_preview": "{\"command\": \"python -m pytest -q test_headline.py\"}",
+            "visits": 19,
+            "mean_value": 0.27,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0",
+            "parent_id": "0.0.0",
+            "depth": 3,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"test_headline.py\", \"start_line\": 1, \"end_line\": 20}",
+            "visits": 18,
+            "mean_value": 0.29,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0",
+            "parent_id": "0.0.0.0",
+            "depth": 4,
+            "action_name": "str_replace",
+            "action_args_preview": "{\"path\": \"headline.py\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    ",
+            "visits": 17,
+            "mean_value": 0.31,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": true,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 1,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {
+              "{\"arguments\": {\"new_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    result = []\\n    for part in parts:\\n        if part.isupper():\\n            result.append(part)\\n        else:\\n            result.append(part.capitalize())\\n    return \\\" \\\".join(result)\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    return \\\" \\\".join(part.capitalize() for part in slug.split(\\\"_\\\"))\", \"path\": \"headline.py\"}, \"name\": \"str_replace\"}": 2
+            },
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0.0",
+            "parent_id": "0.0.0.0.0",
+            "depth": 5,
+            "action_name": "bash",
+            "action_args_preview": "{\"command\": \"python -m pytest -q test_headline.py\"}",
+            "visits": 16,
+            "mean_value": 0.16,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 2,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0.0.0",
+            "parent_id": "0.0.0.0.0.0",
+            "depth": 6,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"headline.py\", \"start_line\": 1, \"end_line\": 10}",
+            "visits": 15,
+            "mean_value": 0.06,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 3,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0",
+            "parent_id": "0.0.0.0.0.0.0",
+            "depth": 7,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"headline.py\", \"start_line\": 1, \"end_line\": 10}",
+            "visits": 14,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 4,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.0",
+            "parent_id": "0.0.0.0.0.0.0.0",
+            "depth": 8,
+            "action_name": "str_replace",
+            "action_args_preview": "{\"path\": \"headline.py\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    ",
+            "visits": 7,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": true,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 5,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {
+              "{\"arguments\": {\"new_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    result = []\\n    for part in parts:\\n        if part.isupper():\\n            result.append(part)\\n        elif part.islower():\\n            result.append(part.capitalize())\\n        else:\\n            result.append(part)\\n    return \\\" \\\".join(result)\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    result = []\\n    for part in parts:\\n        if part.isupper():\\n            result.append(part)\\n        else:\\n            result.append(part.capitalize())\\n    return \\\" \\\".join(result)\", \"path\": \"headline.py\"}, \"name\": \"str_replace\"}": 1,
+              "{\"arguments\": {\"new_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    result = []\\n    for part in parts:\\n        if part.isupper() and len(part) > 1:\\n            result.append(part)\\n        else:\\n            result.append(part.capitalize())\\n    return \\\" \\\".join(result)\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    result = []\\n    for part in parts:\\n        if part.isupper():\\n            result.append(part)\\n        else:\\n            result.append(part.capitalize())\\n    return \\\" \\\".join(result)\", \"path\": \"headline.py\"}, \"name\": \"str_replace\"}": 1
+            },
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.0.0",
+            "parent_id": "0.0.0.0.0.0.0.0.0",
+            "depth": 9,
+            "action_name": "bash",
+            "action_args_preview": "{\"command\": \"python -m pytest -q test_headline.py\"}",
+            "visits": 6,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 6,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.0.0.0",
+            "parent_id": "0.0.0.0.0.0.0.0.0.0",
+            "depth": 10,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"test_headline.py\", \"start_line\": 1, \"end_line\": 50}",
+            "visits": 5,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 7,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.0.0.0.0",
+            "parent_id": "0.0.0.0.0.0.0.0.0.0.0",
+            "depth": 11,
+            "action_name": "str_replace",
+            "action_args_preview": "{\"path\": \"headline.py\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    ",
+            "visits": 2,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": true,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 8,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {
+              "{\"arguments\": {\"new_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    result = []\\n    for part in parts:\\n        if part.isupper():\\n            result.append(part)\\n        elif part.islower():\\n            result.append(part.capitalize())\\n        else:\\n            result.append(part)\\n    return \\\" \\\".join(result) if len(parts) > 1 else slug.capitalize()\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    result = []\\n    for part in parts:\\n        if part.isupper():\\n            result.append(part)\\n        elif part.islower():\\n            result.append(part.capitalize())\\n        else:\\n            result.append(part)\\n    return \\\" \\\".join(result)\", \"path\": \"headline.py\"}, \"name\": \"str_replace\"}": 2
+            },
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.0.0.0.0.0",
+            "parent_id": "0.0.0.0.0.0.0.0.0.0.0.0",
+            "depth": 12,
+            "action_name": "bash",
+            "action_args_preview": "{\"command\": \"python -m pytest -q test_headline.py\"}",
+            "visits": 1,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 9,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.0.0.0.1",
+            "parent_id": "0.0.0.0.0.0.0.0.0.0.0",
+            "depth": 11,
+            "action_name": "str_replace",
+            "action_args_preview": "{\"path\": \"headline.py\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    ",
+            "visits": 2,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": true,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 8,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": false
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.0.0.0.1.0",
+            "parent_id": "0.0.0.0.0.0.0.0.0.0.0.1",
+            "depth": 12,
+            "action_name": "bash",
+            "action_args_preview": "{\"command\": \"python -m pytest -q test_headline.py\"}",
+            "visits": 1,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 9,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": false
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.1",
+            "parent_id": "0.0.0.0.0.0.0.0",
+            "depth": 8,
+            "action_name": "str_replace",
+            "action_args_preview": "{\"path\": \"headline.py\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    ",
+            "visits": 6,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": true,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 5,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": false
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.1.0",
+            "parent_id": "0.0.0.0.0.0.0.0.1",
+            "depth": 9,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"test_headline.py\", \"start_line\": 1, \"end_line\": 50}",
+            "visits": 5,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 6,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": false
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.1.0.0",
+            "parent_id": "0.0.0.0.0.0.0.0.1.0",
+            "depth": 10,
+            "action_name": "str_replace",
+            "action_args_preview": "{\"path\": \"headline.py\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    ",
+            "visits": 4,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": true,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 7,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {
+              "{\"arguments\": {\"new_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    result = []\\n    for part in parts:\\n        if part.isupper():\\n            result.append(part)\\n        else:\\n            result.append(part.capitalize())\\n    return \\\" \\\".join(result)\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    result = []\\n    for part in parts:\\n        if part.isupper():\\n            result.append(part)\\n        else:\\n            result.append(part.capitalize())\\n    return \\\" \\\".join(result)\", \"path\": \"headline.py\"}, \"name\": \"str_replace\"}": 2
+            },
+            "on_result_path": false
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.1.0.0.0",
+            "parent_id": "0.0.0.0.0.0.0.0.1.0.0",
+            "depth": 11,
+            "action_name": "bash",
+            "action_args_preview": "{\"command\": \"python -c \\\"from headline import format_headline; print(format_head",
+            "visits": 3,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 8,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": false
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.1.0.0.0.0",
+            "parent_id": "0.0.0.0.0.0.0.0.1.0.0.0",
+            "depth": 12,
+            "action_name": "bash",
+            "action_args_preview": "{\"command\": \"python -c \\\"from headline import format_headline; print(format_head",
+            "visits": 2,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 9,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": false
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.1.0.0.0.0.0",
+            "parent_id": "0.0.0.0.0.0.0.0.1.0.0.0.0",
+            "depth": 13,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"headline.py\", \"start_line\": 1, \"end_line\": 10}",
+            "visits": 1,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 10,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": false
+          }
+        ],
+        "result_node_id": "0.0.0.0.0.0.0.0.0.0.0.0.0"
+      },
+      "vote_summary": [
+        {
+          "depth": 4,
+          "action": "str_replace",
+          "winner_votes": 2,
+          "total_samples": 2,
+          "unique_candidates": 1
+        },
+        {
+          "depth": 8,
+          "action": "str_replace",
+          "winner_votes": 1,
+          "total_samples": 2,
+          "unique_candidates": 2
+        },
+        {
+          "depth": 11,
+          "action": "str_replace",
+          "winner_votes": 2,
+          "total_samples": 2,
+          "unique_candidates": 1
+        }
+      ],
+      "review_feedback": {
+        "decision": "revise",
+        "primary_reason": "The test_format_headline_keeps_api_uppercase test is still failing because the patch logic incorrectly handles all-caps acronyms by returning them unchanged, which breaks the expected behavior for headlines containing acronyms.",
+        "required_changes": [
+          "Fix the logic in format_headline to correctly handle all-caps acronyms by capitalizing the first letter of the entire slug if it starts with an acronym, or ensure the test expectations align with the new logic.",
+          "Ensure that the function correctly processes slugs where the first part is an all-caps acronym followed by other parts, maintaining the acronym's uppercase status while capitalizing subsequent parts as needed."
+        ],
+        "validations_to_rerun": [
+          "python -m pytest -q test_headline.py"
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "turns": [
+        {
+          "turn": 1,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "headline.py",
+                "start_line": 1,
+                "end_line": 100
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "headline.py",
+                "start_line": 1,
+                "end_line": 100
+              },
+              "output": "Here's the result of running `cat -n` on /repo/headline.py:\n     1\tdef format_headline(slug: str) -> str:\n     2\t    return \" \".join(part.capitalize() for part in slug.split(\"_\"))",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 2,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "test_headline.py",
+                "start_line": 1,
+                "end_line": 100
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "test_headline.py",
+                "start_line": 1,
+                "end_line": 100
+              },
+              "output": "Here's the result of running `cat -n` on /repo/test_headline.py:\n     1\tfrom headline import format_headline\n     2\t\n     3\t\n     4\tdef test_format_headline_keeps_api_uppercase() -> None:\n     5\t    assert format_headline(\"api_status\") == \"API Status\"\n     6\t\n     7\t\n     8\tdef test_format_headline_basic_slug() -> None:\n     9\t    assert format_headline(\"release_notes\") == \"Release Notes\"",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 3,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q test_headline.py"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q test_headline.py"
+              },
+              "output": "F.                                                                       [100%]\n=================================== FAILURES ===================================\n___________________ test_format_headline_keeps_api_uppercase ___________________\n\n    def test_format_headline_keeps_api_uppercase() -> None:\n>       assert format_headline(\"api_status\") == \"API Status\"\nE       AssertionError: assert 'Api Status' == 'API Status'\nE         \nE         - API Status\nE         ?  ^^\nE         + Api Status\nE         ?  ^^\n\ntest_headline.py:5: AssertionError\n=========================== short test summary info ============================\nFAILED test_headline.py::test_format_headline_keeps_api_uppercase - AssertionError: assert 'Api Status' == 'API Status'\n1 failed, 1 passed in 0.09s",
+              "is_error": true,
+              "exit_code": 1
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 4,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "headline.py",
+                "old_str": "def format_headline(slug: str) -> str:\n    return \" \".join(part.capitalize() for part in slug.split(\"_\"))",
+                "new_str": "def format_headline(slug: str) -> str:\n    parts = slug.split(\"_\")\n    if parts and parts[0].isupper():\n        # First part is all-caps acronym, keep it as-is\n        return parts[0] + \" \" + \" \".join(part.capitalize() for part in parts[1:])\n    return \" \".join(part.capitalize() for part in parts)"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "headline.py",
+                "old_str": "def format_headline(slug: str) -> str:\n    return \" \".join(part.capitalize() for part in slug.split(\"_\"))",
+                "new_str": "def format_headline(slug: str) -> str:\n    parts = slug.split(\"_\")\n    if parts and parts[0].isupper():\n        # First part is all-caps acronym, keep it as-is\n        return parts[0] + \" \" + \" \".join(part.capitalize() for part in parts[1:])\n    return \" \".join(part.capitalize() for part in parts)"
+              },
+              "output": "Here's the result of running `cat -n` on /repo/headline.py:\n     1\tdef format_headline(slug: str) -> str:\n     2\t    parts = slug.split(\"_\")\n     3\t    if parts and parts[0].isupper():\n     4\t        # First part is all-caps acronym, keep it as-is\n     5\t        return parts[0] + \" \" + \" \".join(part.capitalize() for part in parts[1:])\n     6\t    return \" \".join(part.capitalize() for part in parts)",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 5,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q test_headline.py"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q test_headline.py"
+              },
+              "output": "F.                                                                       [100%]\n=================================== FAILURES ===================================\n___________________ test_format_headline_keeps_api_uppercase ___________________\n\n    def test_format_headline_keeps_api_uppercase() -> None:\n>       assert format_headline(\"api_status\") == \"API Status\"\nE       AssertionError: assert 'Api Status' == 'API Status'\nE         \nE         - API Status\nE         ?  ^^\nE         + Api Status\nE         ?  ^^\n\ntest_headline.py:5: AssertionError\n=========================== short test summary info ============================\nFAILED test_headline.py::test_format_headline_keeps_api_uppercase - AssertionError: assert 'Api Status' == 'API Status'\n1 failed, 1 passed in 0.09s",
+              "is_error": true,
+              "exit_code": 1
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 6,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "headline.py",
+                "start_line": 1,
+                "end_line": 10
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "headline.py",
+                "start_line": 1,
+                "end_line": 10
+              },
+              "output": "Here's the result of running `cat -n` on /repo/headline.py:\n     1\tdef format_headline(slug: str) -> str:\n     2\t    parts = slug.split(\"_\")\n     3\t    if parts and parts[0].isupper():\n     4\t        # First part is all-caps acronym, keep it as-is\n     5\t        return parts[0] + \" \" + \" \".join(part.capitalize() for part in parts[1:])\n     6\t    return \" \".join(part.capitalize() for part in parts)",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 7,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -c \"print('api_status'.split('_')[0].isupper())\""
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -c \"print('api_status'.split('_')[0].isupper())\""
+              },
+              "output": "False",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 8,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "headline.py",
+                "old_str": "def format_headline(slug: str) -> str:\n    parts = slug.split(\"_\")\n    if parts and parts[0].isupper():\n        # First part is all-caps acronym, keep it as-is\n        return parts[0] + \" \" + \" \".join(part.capitalize() for part in parts[1:])\n    return \" \".join(part.capitalize() for part in parts)",
+                "new_str": "def format_headline(slug: str) -> str:\n    parts = slug.split(\"_\")\n    if parts and parts[0].isupper() and parts[0].isalpha():\n        # First part is all-caps acronym, keep it as-is\n        return parts[0] + \" \" + \" \".join(part.capitalize() for part in parts[1:])\n    return \" \".join(part.capitalize() for part in parts)"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "headline.py",
+                "old_str": "def format_headline(slug: str) -> str:\n    parts = slug.split(\"_\")\n    if parts and parts[0].isupper():\n        # First part is all-caps acronym, keep it as-is\n        return parts[0] + \" \" + \" \".join(part.capitalize() for part in parts[1:])\n    return \" \".join(part.capitalize() for part in parts)",
+                "new_str": "def format_headline(slug: str) -> str:\n    parts = slug.split(\"_\")\n    if parts and parts[0].isupper() and parts[0].isalpha():\n        # First part is all-caps acronym, keep it as-is\n        return parts[0] + \" \" + \" \".join(part.capitalize() for part in parts[1:])\n    return \" \".join(part.capitalize() for part in parts)"
+              },
+              "output": "Here's the result of running `cat -n` on /repo/headline.py:\n     1\tdef format_headline(slug: str) -> str:\n     2\t    parts = slug.split(\"_\")\n     3\t    if parts and parts[0].isupper() and parts[0].isalpha():\n     4\t        # First part is all-caps acronym, keep it as-is\n     5\t        return parts[0] + \" \" + \" \".join(part.capitalize() for part in parts[1:])\n     6\t    return \" \".join(part.capitalize() for part in parts)",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 9,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q test_headline.py"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q test_headline.py"
+              },
+              "output": "F.                                                                       [100%]\n=================================== FAILURES ===================================\n___________________ test_format_headline_keeps_api_uppercase ___________________\n\n    def test_format_headline_keeps_api_uppercase() -> None:\n>       assert format_headline(\"api_status\") == \"API Status\"\nE       AssertionError: assert 'Api Status' == 'API Status'\nE         \nE         - API Status\nE         ?  ^^\nE         + Api Status\nE         ?  ^^\n\ntest_headline.py:5: AssertionError\n=========================== short test summary info ============================\nFAILED test_headline.py::test_format_headline_keeps_api_uppercase - AssertionError: assert 'Api Status' == 'API Status'\n1 failed, 1 passed in 0.09s",
+              "is_error": true,
+              "exit_code": 1
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 10,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "test_headline.py",
+                "start_line": 1,
+                "end_line": 50
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "test_headline.py",
+                "start_line": 1,
+                "end_line": 50
+              },
+              "output": "Here's the result of running `cat -n` on /repo/test_headline.py:\n     1\tfrom headline import format_headline\n     2\t\n     3\t\n     4\tdef test_format_headline_keeps_api_uppercase() -> None:\n     5\t    assert format_headline(\"api_status\") == \"API Status\"\n     6\t\n     7\t\n     8\tdef test_format_headline_basic_slug() -> None:\n     9\t    assert format_headline(\"release_notes\") == \"Release Notes\"",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 11,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "headline.py",
+                "old_str": "def format_headline(slug: str) -> str:\n    parts = slug.split(\"_\")\n    if parts and parts[0].isupper() and parts[0].isalpha():\n        # First part is all-caps acronym, keep it as-is\n        return parts[0] + \" \" + \" \".join(part.capitalize() for part in parts[1:])\n    return \" \".join(part.capitalize() for part in parts)",
+                "new_str": "def format_headline(slug: str) -> str:\n    parts = slug.split(\"_\")\n    if parts and all(c.isupper() for c in parts[0]) and parts[0].isalpha():\n        # First part is all-caps acronym, keep it as-is\n        return parts[0] + \" \" + \" \".join(part.capitalize() for part in parts[1:])\n    return \" \".join(part.capitalize() for part in parts)"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "headline.py",
+                "old_str": "def format_headline(slug: str) -> str:\n    parts = slug.split(\"_\")\n    if parts and parts[0].isupper() and parts[0].isalpha():\n        # First part is all-caps acronym, keep it as-is\n        return parts[0] + \" \" + \" \".join(part.capitalize() for part in parts[1:])\n    return \" \".join(part.capitalize() for part in parts)",
+                "new_str": "def format_headline(slug: str) -> str:\n    parts = slug.split(\"_\")\n    if parts and all(c.isupper() for c in parts[0]) and parts[0].isalpha():\n        # First part is all-caps acronym, keep it as-is\n        return parts[0] + \" \" + \" \".join(part.capitalize() for part in parts[1:])\n    return \" \".join(part.capitalize() for part in parts)"
+              },
+              "output": "Here's the result of running `cat -n` on /repo/headline.py:\n     1\tdef format_headline(slug: str) -> str:\n     2\t    parts = slug.split(\"_\")\n     3\t    if parts and all(c.isupper() for c in parts[0]) and parts[0].isalpha():\n     4\t        # First part is all-caps acronym, keep it as-is\n     5\t        return parts[0] + \" \" + \" \".join(part.capitalize() for part in parts[1:])\n     6\t    return \" \".join(part.capitalize() for part in parts)",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 12,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q test_headline.py"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q test_headline.py"
+              },
+              "output": "F.                                                                       [100%]\n=================================== FAILURES ===================================\n___________________ test_format_headline_keeps_api_uppercase ___________________\n\n    def test_format_headline_keeps_api_uppercase() -> None:\n>       assert format_headline(\"api_status\") == \"API Status\"\nE       AssertionError: assert 'Api Status' == 'API Status'\nE         \nE         - API Status\nE         ?  ^^\nE         + Api Status\nE         ?  ^^\n\ntest_headline.py:5: AssertionError\n=========================== short test summary info ============================\nFAILED test_headline.py::test_format_headline_keeps_api_uppercase - AssertionError: assert 'Api Status' == 'API Status'\n1 failed, 1 passed in 0.09s",
+              "is_error": true,
+              "exit_code": 1
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        }
+      ],
+      "patch": "diff --git a/headline.py b/headline.py\nindex d230eea..213ce62 100644\n--- a/headline.py\n+++ b/headline.py\n@@ -1,2 +1,6 @@\n def format_headline(slug: str) -> str:\n-    return \" \".join(part.capitalize() for part in slug.split(\"_\"))\n+    parts = slug.split(\"_\")\n+    if parts and all(c.isupper() for c in parts[0]) and parts[0].isalpha():\n+        # First part is all-caps acronym, keep it as-is\n+        return parts[0] + \" \" + \" \".join(part.capitalize() for part in parts[1:])\n+    return \" \".join(part.capitalize() for part in parts)\n",
+      "submitted": false,
+      "stopped_reason": "max_iterations",
+      "stats": {
+        "input_tokens": 142128,
+        "output_tokens": 5928,
+        "turns": 12,
+        "tool_calls": 18,
+        "iterations": 18,
+        "tree_nodes_created": 21,
+        "best_node_depth": 12,
+        "best_node_value": 0.0,
+        "value_fn_tokens_in": 0,
+        "value_fn_tokens_out": 0
+      },
+      "mcts_tree": {
+        "nodes": [
+          {
+            "id": "0",
+            "parent_id": null,
+            "depth": 0,
+            "action_name": null,
+            "action_args_preview": "",
+            "visits": 20,
+            "mean_value": 0.26,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0",
+            "parent_id": "0",
+            "depth": 1,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"headline.py\", \"start_line\": 1, \"end_line\": 100}",
+            "visits": 20,
+            "mean_value": 0.26,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0",
+            "parent_id": "0.0",
+            "depth": 2,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"test_headline.py\", \"start_line\": 1, \"end_line\": 100}",
+            "visits": 19,
+            "mean_value": 0.27,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0",
+            "parent_id": "0.0.0",
+            "depth": 3,
+            "action_name": "bash",
+            "action_args_preview": "{\"command\": \"python -m pytest -q test_headline.py\"}",
+            "visits": 18,
+            "mean_value": 0.29,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0",
+            "parent_id": "0.0.0.0",
+            "depth": 4,
+            "action_name": "str_replace",
+            "action_args_preview": "{\"path\": \"headline.py\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    ",
+            "visits": 17,
+            "mean_value": 0.31,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": true,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 1,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {
+              "{\"arguments\": {\"new_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and parts[0].isupper():\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    return \\\" \\\".join(part.capitalize() for part in slug.split(\\\"_\\\"))\", \"path\": \"headline.py\"}, \"name\": \"str_replace\"}": 1,
+              "{\"arguments\": {\"new_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    # Check if first part is all-caps acronym (length > 1)\\n    if len(parts) > 0 and len(parts[0]) > 1 and parts[0].isupper():\\n        # First part is all-caps, keep it as is\\n        result = [parts[0]]\\n        # Capitalize first letter of remaining parts\\n        for part in parts[1:]:\\n            result.append(part.capitalize())\\n        return \\\" \\\".join(result)\\n    else:\\n        return \\\" \\\".join(part.capitalize() for part in parts)\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    return \\\" \\\".join(part.capitalize() for part in slug.split(\\\"_\\\"))\", \"path\": \"headline.py\"}, \"name\": \"str_replace\"}": 1,
+              "{\"arguments\": {\"new_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    # Check if the first part is all uppercase (acronym)\\n    if parts and parts[0].isupper():\\n        # Keep acronym uppercase, capitalize rest\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    return \\\" \\\".join(part.capitalize() for part in slug.split(\\\"_\\\"))\", \"path\": \"headline.py\"}, \"name\": \"str_replace\"}": 1,
+              "{\"arguments\": {\"new_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    # Check if the first part is an all-caps acronym (length > 1)\\n    if len(parts) > 0 and len(parts[0]) > 1 and parts[0].isupper():\\n        # First part is all-caps acronym, keep it as-is\\n        # Capitalize remaining parts\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    else:\\n        # Standard capitalization\\n        return \\\" \\\".join(part.capitalize() for part in parts)\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    return \\\" \\\".join(part.capitalize() for part in slug.split(\\\"_\\\"))\", \"path\": \"headline.py\"}, \"name\": \"str_replace\"}": 1,
+              "{\"arguments\": {\"new_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and parts[0].isupper() and parts[0].isalpha():\\n        return \\\" \\\".join(parts)\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    return \\\" \\\".join(part.capitalize() for part in slug.split(\\\"_\\\"))\", \"path\": \"headline.py\"}, \"name\": \"str_replace\"}": 1
+            },
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0.0",
+            "parent_id": "0.0.0.0.0",
+            "depth": 5,
+            "action_name": "bash",
+            "action_args_preview": "{\"command\": \"python -m pytest -q test_headline.py\"}",
+            "visits": 16,
+            "mean_value": 0.16,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 2,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0.0.0",
+            "parent_id": "0.0.0.0.0.0",
+            "depth": 6,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"headline.py\", \"start_line\": 1, \"end_line\": 10}",
+            "visits": 15,
+            "mean_value": 0.06,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 3,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0",
+            "parent_id": "0.0.0.0.0.0.0",
+            "depth": 7,
+            "action_name": "bash",
+            "action_args_preview": "{\"command\": \"python -c \\\"print('api_status'.split('_')[0].isupper())\\\"\"}",
+            "visits": 14,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 4,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.0",
+            "parent_id": "0.0.0.0.0.0.0.0",
+            "depth": 8,
+            "action_name": "str_replace",
+            "action_args_preview": "{\"path\": \"headline.py\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    ",
+            "visits": 7,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": true,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 5,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {
+              "{\"arguments\": {\"new_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and parts[0].isupper() and parts[0].isalpha():\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and parts[0].isupper():\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"path\": \"headline.py\"}, \"name\": \"str_replace\"}": 2,
+              "{\"arguments\": {\"new_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and parts[0].isupper():\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.upper() if part.isupper() else part.capitalize() for part in parts)\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and parts[0].isupper():\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"path\": \"headline.py\"}, \"name\": \"str_replace\"}": 2,
+              "{\"arguments\": {\"new_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and parts[0].isupper():\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and parts[0].isupper():\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"path\": \"headline.py\"}, \"name\": \"str_replace\"}": 1,
+              "{\"arguments\": {\"new_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and parts[0].isupper() and parts[0] == parts[0].upper():\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and parts[0].isupper():\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"path\": \"headline.py\"}, \"name\": \"str_replace\"}": 1,
+              "{\"arguments\": {\"new_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and all(c.isupper() for c in parts[0]):\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and parts[0].isupper():\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"path\": \"headline.py\"}, \"name\": \"str_replace\"}": 1
+            },
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.0.0",
+            "parent_id": "0.0.0.0.0.0.0.0.0",
+            "depth": 9,
+            "action_name": "bash",
+            "action_args_preview": "{\"command\": \"python -m pytest -q test_headline.py\"}",
+            "visits": 6,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 6,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.0.0.0",
+            "parent_id": "0.0.0.0.0.0.0.0.0.0",
+            "depth": 10,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"test_headline.py\", \"start_line\": 1, \"end_line\": 50}",
+            "visits": 5,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 7,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.0.0.0.0",
+            "parent_id": "0.0.0.0.0.0.0.0.0.0.0",
+            "depth": 11,
+            "action_name": "str_replace",
+            "action_args_preview": "{\"path\": \"headline.py\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    ",
+            "visits": 2,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": true,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 8,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {
+              "{\"arguments\": {\"new_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and parts[0].isupper() and parts[0].isalpha():\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and parts[0].isupper() and parts[0].isalpha():\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"path\": \"headline.py\"}, \"name\": \"str_replace\"}": 2,
+              "{\"arguments\": {\"new_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and all(c.isupper() for c in parts[0]) and parts[0].isalpha():\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and parts[0].isupper() and parts[0].isalpha():\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"path\": \"headline.py\"}, \"name\": \"str_replace\"}": 5
+            },
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.0.0.0.0.0",
+            "parent_id": "0.0.0.0.0.0.0.0.0.0.0.0",
+            "depth": 12,
+            "action_name": "bash",
+            "action_args_preview": "{\"command\": \"python -m pytest -q test_headline.py\"}",
+            "visits": 1,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 9,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.0.0.0.1",
+            "parent_id": "0.0.0.0.0.0.0.0.0.0.0",
+            "depth": 11,
+            "action_name": "str_replace",
+            "action_args_preview": "{\"path\": \"headline.py\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    ",
+            "visits": 2,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": true,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 8,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": false
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.0.0.0.1.0",
+            "parent_id": "0.0.0.0.0.0.0.0.0.0.0.1",
+            "depth": 12,
+            "action_name": "bash",
+            "action_args_preview": "{\"command\": \"python -m pytest -q test_headline.py\"}",
+            "visits": 1,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 9,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": false
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.1",
+            "parent_id": "0.0.0.0.0.0.0.0",
+            "depth": 8,
+            "action_name": "str_replace",
+            "action_args_preview": "{\"path\": \"headline.py\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    ",
+            "visits": 6,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": true,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 5,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": false
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.1.0",
+            "parent_id": "0.0.0.0.0.0.0.0.1",
+            "depth": 9,
+            "action_name": "bash",
+            "action_args_preview": "{\"command\": \"python -m pytest -q test_headline.py\"}",
+            "visits": 5,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 6,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": false
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.1.0.0",
+            "parent_id": "0.0.0.0.0.0.0.0.1.0",
+            "depth": 10,
+            "action_name": "bash",
+            "action_args_preview": "{\"command\": \"python -c \\\"print('API'.isupper())\\\"\"}",
+            "visits": 4,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 7,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": false
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.1.0.0.0",
+            "parent_id": "0.0.0.0.0.0.0.0.1.0.0",
+            "depth": 11,
+            "action_name": "str_replace",
+            "action_args_preview": "{\"path\": \"headline.py\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    ",
+            "visits": 3,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": true,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 8,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {
+              "{\"arguments\": {\"new_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and parts[0].isupper():\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"old_str\": \"def format_headline(slug: str) -> str:\\n    parts = slug.split(\\\"_\\\")\\n    if parts and all(c.isupper() or c.isdigit() for c in parts[0]):\\n        # First part is all-caps acronym, keep it as-is\\n        return parts[0] + \\\" \\\" + \\\" \\\".join(part.capitalize() for part in parts[1:])\\n    return \\\" \\\".join(part.capitalize() for part in parts)\", \"path\": \"headline.py\"}, \"name\": \"str_replace\"}": 2
+            },
+            "on_result_path": false
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.1.0.0.0.0",
+            "parent_id": "0.0.0.0.0.0.0.0.1.0.0.0",
+            "depth": 12,
+            "action_name": "bash",
+            "action_args_preview": "{\"command\": \"python -m pytest -q test_headline.py\"}",
+            "visits": 2,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 9,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": false
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.1.0.0.0.0.0",
+            "parent_id": "0.0.0.0.0.0.0.0.1.0.0.0.0",
+            "depth": 13,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"test_headline.py\", \"start_line\": 1, \"end_line\": 50}",
+            "visits": 1,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 10,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": false
+          }
+        ],
+        "result_node_id": "0.0.0.0.0.0.0.0.0.0.0.0.0"
+      },
+      "vote_summary": [
+        {
+          "depth": 4,
+          "action": "str_replace",
+          "winner_votes": 1,
+          "total_samples": 5,
+          "unique_candidates": 5
+        },
+        {
+          "depth": 8,
+          "action": "str_replace",
+          "winner_votes": 2,
+          "total_samples": 7,
+          "unique_candidates": 5
+        },
+        {
+          "depth": 11,
+          "action": "str_replace",
+          "winner_votes": 5,
+          "total_samples": 7,
+          "unique_candidates": 2
+        }
+      ],
+      "review_feedback": {
+        "decision": "revise",
+        "primary_reason": "The test_format_headline_keeps_api_uppercase test is still failing because the patch logic incorrectly handles all-caps acronyms by returning them unchanged, which breaks the expected behavior for headlines containing acronyms.",
+        "required_changes": [
+          "Fix the logic in format_headline to correctly handle all-caps acronyms by capitalizing the first letter of the entire slug if it starts with an acronym, or ensure the test expectations align with the new logic.",
+          "Ensure that the function correctly processes slugs where the first part is an all-caps acronym followed by other parts, maintaining the acronym's uppercase status while capitalizing subsequent parts as needed."
+        ],
+        "validations_to_rerun": [
+          "python -m pytest -q test_headline.py"
+        ]
+      }
+    }
+  ],
+  "instance_id": "headline_api_001",
+  "duration_seconds": 702.66
+}

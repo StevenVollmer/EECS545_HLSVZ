@@ -1,0 +1,5 @@
+{
+  "model_name_or_path": "G_c2_9b_hindsight",
+  "instance_id": "profile_preview_001",
+  "model_patch": "diff --git a/app/utils/text.py b/app/utils/text.py\nindex 2305d36..8b10b0d 100644\n--- a/app/utils/text.py\n+++ b/app/utils/text.py\n@@ -6,6 +6,17 @@ def format_display_name(name: str) -> str:\n     parts = []\n     for part in name.split(\"-\"):\n         stripped = part.strip()\n-        parts.append(stripped[:1].upper() + stripped[1:].lower())\n+        # Handle apostrophes: capitalize character after apostrophe if it's part of a proper name\n+        if \"'\" in stripped:\n+            # Split on apostrophe and capitalize each segment appropriately\n+            segments = stripped.split(\"'\")\n+            formatted_segments = []\n+            for i, seg in enumerate(segments):\n+                if seg:\n+                    formatted_segments.append(seg[:1].upper() + seg[1:].lower())\n+            formatted = \"'\".join(formatted_segments)\n+        else:\n+            formatted = stripped[:1].upper() + stripped[1:].lower()\n+        parts.append(formatted)\n     return \"-\".join(parts)\n \n"
+}

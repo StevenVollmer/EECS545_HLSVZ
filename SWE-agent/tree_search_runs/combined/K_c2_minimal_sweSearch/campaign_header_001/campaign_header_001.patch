@@ -1,0 +1,27 @@
+diff --git a/app/utils/branding.py b/app/utils/branding.py
+index 7f8713b..e54c466 100644
+--- a/app/utils/branding.py
++++ b/app/utils/branding.py
+@@ -1,9 +1,20 @@
+ def normalize_campaign_code(name: str) -> str:
+-    return "_".join(part.upper() for part in name.split())
++    parts = []
++    for part in name.split():
++        if "'" in part:
++            idx = part.index("'")
++            parts.append(part[:idx].upper() + "'" + part[idx+1:].upper())
++        else:
++            parts.append(part.upper())
++    return "_".join(parts)
+ 
+ 
+ def format_brand_name(name: str) -> str:
+     words = []
+     for word in name.split():
+-        words.append(word[:1].upper() + word[1:].lower())
++        if "'" in word:
++            idx = word.index("'")
++            words.append(word[:idx].upper() + "'" + word[idx+1:].lower())
++        else:
++            words.append(word[:1].upper() + word[1:].lower())
+     return " ".join(words)

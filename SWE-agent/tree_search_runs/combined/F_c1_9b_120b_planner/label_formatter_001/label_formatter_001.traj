@@ -1,0 +1,1545 @@
+{
+  "turns": [
+    {
+      "turn": 1,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "README.md",
+            "start_line": 1,
+            "end_line": 50
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "README.md",
+            "start_line": 1,
+            "end_line": 50
+          },
+          "output": "Here's the result of running `cat -n` on /repo/README.md:\n     1\t# Label Formatter Repo\n     2\t\n     3\tSmall repo for a less explicit custom runner smoke test.\n     4\t\n     5\tThe bug is not described directly in the issue text. The implementation currently\n     6\tnormalizes internal whitespace too aggressively.",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 2,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "formatter.py",
+            "start_line": 1,
+            "end_line": 100
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "formatter.py",
+            "start_line": 1,
+            "end_line": 100
+          },
+          "output": "Here's the result of running `cat -n` on /repo/formatter.py:\n     1\tdef normalize_label(value: str) -> str:\n     2\t    \"\"\"Prepare a user-facing label for display.\"\"\"\n     3\t    parts = value.split()\n     4\t    return \" \".join(parts)",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 3,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "test_formatter.py",
+            "start_line": 1,
+            "end_line": 100
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "test_formatter.py",
+            "start_line": 1,
+            "end_line": 100
+          },
+          "output": "Here's the result of running `cat -n` on /repo/test_formatter.py:\n     1\tfrom formatter import normalize_label\n     2\t\n     3\t\n     4\tdef test_trims_edges_only():\n     5\t    assert normalize_label(\"  Hello world  \") == \"Hello world\"\n     6\t\n     7\t\n     8\tdef test_preserves_internal_spacing():\n     9\t    assert normalize_label(\"Order   #42\") == \"Order   #42\"\n    10\t\n    11\t\n    12\tdef test_preserves_tabs_inside_text():\n    13\t    assert normalize_label(\"Field\\tValue\") == \"Field\\tValue\"",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 4,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q test_formatter.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q test_formatter.py"
+          },
+          "output": ".FF                                                                      [100%]\n=================================== FAILURES ===================================\n_______________________ test_preserves_internal_spacing ________________________\n\n    def test_preserves_internal_spacing():\n>       assert normalize_label(\"Order   #42\") == \"Order   #42\"\nE       AssertionError: assert 'Order #42' == 'Order   #42'\nE         \nE         - Order   #42\nE         ?       --\nE         + Order #42\n\ntest_formatter.py:9: AssertionError\n_______________________ test_preserves_tabs_inside_text ________________________\n\n    def test_preserves_tabs_inside_text():\n>       assert normalize_label(\"Field\\tValue\") == \"Field\\tValue\"\nE       AssertionError: assert 'Field Value' == 'Field\\tValue'\nE         \nE         - Field\tValue\nE         ?      ^\nE         + Field Value\nE         ?      ^\n\ntest_formatter.py:13: AssertionError\n=========================== short test summary info ============================\nFAILED test_formatter.py::test_preserves_internal_spacing - AssertionError: assert 'Order #42' == 'Order   #42'\nFAILED test_formatter.py::test_preserves_tabs_inside_text - AssertionError: assert 'Field Value' == 'Field\\tValue'\n2 failed, 1 passed in 0.10s",
+          "is_error": true,
+          "exit_code": 1
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 5,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "formatter.py",
+            "old_str": "def normalize_label(value: str) -> str:\n    \"\"\"Prepare a user-facing label for display.\"\"\"\n    parts = value.split()\n    return \" \".join(parts)",
+            "new_str": "def normalize_label(value: str) -> str:\n    \"\"\"Prepare a user-facing label for display.\"\"\"\n    return \" \".join(value.split())"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "formatter.py",
+            "old_str": "def normalize_label(value: str) -> str:\n    \"\"\"Prepare a user-facing label for display.\"\"\"\n    parts = value.split()\n    return \" \".join(parts)",
+            "new_str": "def normalize_label(value: str) -> str:\n    \"\"\"Prepare a user-facing label for display.\"\"\"\n    return \" \".join(value.split())"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/formatter.py:\n     1\tdef normalize_label(value: str) -> str:\n     2\t    \"\"\"Prepare a user-facing label for display.\"\"\"\n     3\t    return \" \".join(value.split())",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 6,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q test_formatter.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q test_formatter.py"
+          },
+          "output": ".FF                                                                      [100%]\n=================================== FAILURES ===================================\n_______________________ test_preserves_internal_spacing ________________________\n\n    def test_preserves_internal_spacing():\n>       assert normalize_label(\"Order   #42\") == \"Order   #42\"\nE       AssertionError: assert 'Order #42' == 'Order   #42'\nE         \nE         - Order   #42\nE         ?       --\nE         + Order #42\n\ntest_formatter.py:9: AssertionError\n_______________________ test_preserves_tabs_inside_text ________________________\n\n    def test_preserves_tabs_inside_text():\n>       assert normalize_label(\"Field\\tValue\") == \"Field\\tValue\"\nE       AssertionError: assert 'Field Value' == 'Field\\tValue'\nE         \nE         - Field\tValue\nE         ?      ^\nE         + Field Value\nE         ?      ^\n\ntest_formatter.py:13: AssertionError\n=========================== short test summary info ============================\nFAILED test_formatter.py::test_preserves_internal_spacing - AssertionError: assert 'Order #42' == 'Order   #42'\nFAILED test_formatter.py::test_preserves_tabs_inside_text - AssertionError: assert 'Field Value' == 'Field\\tValue'\n2 failed, 1 passed in 0.09s",
+          "is_error": true,
+          "exit_code": 1
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 7,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "formatter.py",
+            "start_line": 1,
+            "end_line": 10
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "formatter.py",
+            "start_line": 1,
+            "end_line": 10
+          },
+          "output": "Here's the result of running `cat -n` on /repo/formatter.py:\n     1\tdef normalize_label(value: str) -> str:\n     2\t    \"\"\"Prepare a user-facing label for display.\"\"\"\n     3\t    return \" \".join(value.split())",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 8,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "formatter.py",
+            "old_str": "def normalize_label(value: str) -> str:\n    \"\"\"Prepare a user-facing label for display.\"\"\"\n    return \" \".join(value.split())",
+            "new_str": "def normalize_label(value: str) -> str:\n    \"\"\"Prepare a user-facing label for display.\"\"\"\n    # Strip leading/trailing whitespace, then normalize internal whitespace to single spaces\n    parts = value.split()\n    return \" \".join(parts)"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "formatter.py",
+            "old_str": "def normalize_label(value: str) -> str:\n    \"\"\"Prepare a user-facing label for display.\"\"\"\n    return \" \".join(value.split())",
+            "new_str": "def normalize_label(value: str) -> str:\n    \"\"\"Prepare a user-facing label for display.\"\"\"\n    # Strip leading/trailing whitespace, then normalize internal whitespace to single spaces\n    parts = value.split()\n    return \" \".join(parts)"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/formatter.py:\n     1\tdef normalize_label(value: str) -> str:\n     2\t    \"\"\"Prepare a user-facing label for display.\"\"\"\n     3\t    # Strip leading/trailing whitespace, then normalize internal whitespace to single spaces\n     4\t    parts = value.split()\n     5\t    return \" \".join(parts)",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 9,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q test_formatter.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q test_formatter.py"
+          },
+          "output": ".FF                                                                      [100%]\n=================================== FAILURES ===================================\n_______________________ test_preserves_internal_spacing ________________________\n\n    def test_preserves_internal_spacing():\n>       assert normalize_label(\"Order   #42\") == \"Order   #42\"\nE       AssertionError: assert 'Order #42' == 'Order   #42'\nE         \nE         - Order   #42\nE         ?       --\nE         + Order #42\n\ntest_formatter.py:9: AssertionError\n_______________________ test_preserves_tabs_inside_text ________________________\n\n    def test_preserves_tabs_inside_text():\n>       assert normalize_label(\"Field\\tValue\") == \"Field\\tValue\"\nE       AssertionError: assert 'Field Value' == 'Field\\tValue'\nE         \nE         - Field\tValue\nE         ?      ^\nE         + Field Value\nE         ?      ^\n\ntest_formatter.py:13: AssertionError\n=========================== short test summary info ============================\nFAILED test_formatter.py::test_preserves_internal_spacing - AssertionError: assert 'Order #42' == 'Order   #42'\nFAILED test_formatter.py::test_preserves_tabs_inside_text - AssertionError: assert 'Field Value' == 'Field\\tValue'\n2 failed, 1 passed in 0.11s",
+          "is_error": true,
+          "exit_code": 1
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 10,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "test_formatter.py",
+            "start_line": 1,
+            "end_line": 30
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "test_formatter.py",
+            "start_line": 1,
+            "end_line": 30
+          },
+          "output": "Here's the result of running `cat -n` on /repo/test_formatter.py:\n     1\tfrom formatter import normalize_label\n     2\t\n     3\t\n     4\tdef test_trims_edges_only():\n     5\t    assert normalize_label(\"  Hello world  \") == \"Hello world\"\n     6\t\n     7\t\n     8\tdef test_preserves_internal_spacing():\n     9\t    assert normalize_label(\"Order   #42\") == \"Order   #42\"\n    10\t\n    11\t\n    12\tdef test_preserves_tabs_inside_text():\n    13\t    assert normalize_label(\"Field\\tValue\") == \"Field\\tValue\"",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 11,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "formatter.py",
+            "old_str": "def normalize_label(value: str) -> str:\n    \"\"\"Prepare a user-facing label for display.\"\"\"\n    # Strip leading/trailing whitespace, then normalize internal whitespace to single spaces\n    parts = value.split()\n    return \" \".join(parts)",
+            "new_str": "def normalize_label(value: str) -> str:\n    \"\"\"Prepare a user-facing label for display.\"\"\"\n    # Strip leading/trailing whitespace only\n    return value.strip()"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "formatter.py",
+            "old_str": "def normalize_label(value: str) -> str:\n    \"\"\"Prepare a user-facing label for display.\"\"\"\n    # Strip leading/trailing whitespace, then normalize internal whitespace to single spaces\n    parts = value.split()\n    return \" \".join(parts)",
+            "new_str": "def normalize_label(value: str) -> str:\n    \"\"\"Prepare a user-facing label for display.\"\"\"\n    # Strip leading/trailing whitespace only\n    return value.strip()"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/formatter.py:\n     1\tdef normalize_label(value: str) -> str:\n     2\t    \"\"\"Prepare a user-facing label for display.\"\"\"\n     3\t    # Strip leading/trailing whitespace only\n     4\t    return value.strip()",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    }
+  ],
+  "stats": {
+    "input_tokens": 107872,
+    "output_tokens": 5022,
+    "turns": 11,
+    "tool_calls": 14,
+    "iterations": 18,
+    "tree_nodes_created": 18,
+    "best_node_depth": 11,
+    "best_node_value": 27.18145331734705,
+    "value_fn_tokens_in": 0,
+    "value_fn_tokens_out": 0
+  },
+  "loop_state": {
+    "executable_edit_made": true,
+    "validation_passed": false,
+    "validation_attempted_after_edit": true,
+    "diff_checked": false,
+    "successful_post_edit_commands": [],
+    "satisfied_success_checks": [
+      "spacing_tests_pass"
+    ],
+    "changed_files": [
+      "formatter.py"
+    ]
+  },
+  "stopped_reason": "auto_finalized",
+  "submitted": true,
+  "submission_summary": "Auto-finalized: required success checks were satisfied with a non-empty patch.",
+  "patch": "diff --git a/formatter.py b/formatter.py\nindex e749038..d591d00 100644\n--- a/formatter.py\n+++ b/formatter.py\n@@ -1,4 +1,4 @@\n def normalize_label(value: str) -> str:\n     \"\"\"Prepare a user-facing label for display.\"\"\"\n-    parts = value.split()\n-    return \" \".join(parts)\n+    # Strip leading/trailing whitespace only\n+    return value.strip()\n",
+  "info": {
+    "submission": "diff --git a/formatter.py b/formatter.py\nindex e749038..d591d00 100644\n--- a/formatter.py\n+++ b/formatter.py\n@@ -1,4 +1,4 @@\n def normalize_label(value: str) -> str:\n     \"\"\"Prepare a user-facing label for display.\"\"\"\n-    parts = value.split()\n-    return \" \".join(parts)\n+    # Strip leading/trailing whitespace only\n+    return value.strip()\n",
+    "submitted": true,
+    "submission_summary": "Auto-finalized: required success checks were satisfied with a non-empty patch.",
+    "stopped_reason": "auto_finalized"
+  },
+  "auto_finalized": true,
+  "mcts_meta": {
+    "model": "ollama/qwen3.5:9b",
+    "value_model": null,
+    "hindsight_feedback": false,
+    "dead_branch_feedback_count": 0,
+    "iterations": 18,
+    "expansion_candidates": 1,
+    "edit_vote_samples": 5,
+    "ucb_c": 1.414,
+    "root_visits": 17,
+    "early_branching": false,
+    "early_branch_depth": 2
+  },
+  "vote_summary": [
+    {
+      "depth": 5,
+      "action": "str_replace",
+      "winner_votes": 2,
+      "total_samples": 2,
+      "unique_candidates": 1
+    },
+    {
+      "depth": 11,
+      "action": "str_replace",
+      "winner_votes": 2,
+      "total_samples": 6,
+      "unique_candidates": 4
+    }
+  ],
+  "mcts_tree": {
+    "nodes": [
+      {
+        "id": "0",
+        "parent_id": null,
+        "depth": 0,
+        "action_name": null,
+        "action_args_preview": "",
+        "visits": 17,
+        "mean_value": 1.39,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0",
+        "parent_id": "0",
+        "depth": 1,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"README.md\", \"start_line\": 1, \"end_line\": 50}",
+        "visits": 17,
+        "mean_value": 1.39,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0",
+        "parent_id": "0.0",
+        "depth": 2,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"formatter.py\", \"start_line\": 1, \"end_line\": 100}",
+        "visits": 16,
+        "mean_value": 1.48,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0",
+        "parent_id": "0.0.0",
+        "depth": 3,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"test_formatter.py\", \"start_line\": 1, \"end_line\": 100}",
+        "visits": 15,
+        "mean_value": 1.58,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0",
+        "parent_id": "0.0.0.0",
+        "depth": 4,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q test_formatter.py\"}",
+        "visits": 14,
+        "mean_value": 1.69,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0",
+        "depth": 5,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"formatter.py\", \"old_str\": \"def normalize_label(value: str) -> str:\\n  ",
+        "visits": 13,
+        "mean_value": 1.82,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 1,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    return \\\" \\\".join(value.split())\", \"old_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    parts = value.split()\\n    return \\\" \\\".join(parts)\", \"path\": \"formatter.py\"}, \"name\": \"str_replace\"}": 2
+        },
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0",
+        "depth": 6,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q test_formatter.py\"}",
+        "visits": 12,
+        "mean_value": 1.76,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 2,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0",
+        "depth": 7,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"formatter.py\", \"start_line\": 1, \"end_line\": 10}",
+        "visits": 11,
+        "mean_value": 1.76,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 3,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0",
+        "depth": 8,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"formatter.py\", \"old_str\": \"def normalize_label(value: str) -> str:\\n  ",
+        "visits": 5,
+        "mean_value": 0.0,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 4,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Strip leading/trailing whitespace, but preserve internal spacing\\n    value = value.strip()\\n    # Split only on whitespace sequences, then rejoin with single spaces\\n    # This preserves internal spacing patterns like multiple spaces or tabs\\n    parts = value.split()\\n    return \\\" \\\".join(parts)\", \"old_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    return \\\" \\\".join(value.split())\", \"path\": \"formatter.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Split on any whitespace, then rejoin with single spaces\\n    # But preserve multiple spaces between words as-is\\n    # Use a regex split that captures whitespace groups\\n    import re\\n    # Split on whitespace but keep the whitespace groups\\n    parts = re.split(r'(\\\\s+)', value)\\n    # Filter out empty strings from leading/trailing whitespace\\n    parts = [p for p in parts if p]\\n    return \\\"\\\".join(parts)\", \"old_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    return \\\" \\\".join(value.split())\", \"path\": \"formatter.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Strip leading/trailing whitespace, but preserve internal spacing\\n    value = value.strip()\\n    # Split only on whitespace sequences to preserve internal spacing\\n    parts = value.split()\\n    return \\\" \\\".join(parts)\", \"old_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    return \\\" \\\".join(value.split())\", \"path\": \"formatter.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    parts = value.split(\\\" \\\", keepends=True)\\n    return \\\" \\\".join(parts)\", \"old_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    return \\\" \\\".join(value.split())\", \"path\": \"formatter.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Strip leading/trailing whitespace, but preserve internal spacing\\n    value = value.strip()\\n    if not value:\\n        return value\\n    # Split on any whitespace, then rejoin with single spaces\\n    parts = value.split()\\n    return \\\" \\\".join(parts)\", \"old_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    return \\\" \\\".join(value.split())\", \"path\": \"formatter.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Strip leading/trailing whitespace, but preserve internal spacing\\n    value = value.strip()\\n    # Split on any whitespace and rejoin with single spaces\\n    parts = value.split()\\n    return \\\" \\\".join(parts)\", \"old_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    return \\\" \\\".join(value.split())\", \"path\": \"formatter.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Split on any whitespace, but preserve internal spacing by using split() then rejoining with single spaces\\n    # This preserves the intent of the tests which expect internal spacing to be preserved\\n    return \\\" \\\".join(value.split())\", \"old_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    return \\\" \\\".join(value.split())\", \"path\": \"formatter.py\"}, \"name\": \"str_replace\"}": 1
+        },
+        "on_result_path": false
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0",
+        "depth": 9,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q test_formatter.py\"}",
+        "visits": 4,
+        "mean_value": 0.0,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 5,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": false
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0",
+        "depth": 10,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"test_formatter.py\", \"start_line\": 1, \"end_line\": 30}",
+        "visits": 3,
+        "mean_value": 0.0,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 6,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": false
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0.0",
+        "depth": 11,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"formatter.py\", \"old_str\": \"def normalize_label(value: str) -> str:\\n  ",
+        "visits": 1,
+        "mean_value": 0.0,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 7,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Strip leading/trailing whitespace, but preserve internal spacing\\n    value = value.strip()\\n    # Split only on whitespace sequences, then rejoin with single spaces\\n    # This preserves internal spacing patterns like multiple spaces or tabs\\n    parts = value.split()\\n    return \\\" \\\".join(parts)\", \"old_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Strip leading/trailing whitespace, but preserve internal spacing\\n    value = value.strip()\\n    # Split only on whitespace sequences, then rejoin with single spaces\\n    # This preserves internal spacing patterns like multiple spaces or tabs\\n    parts = value.split()\\n    return \\\" \\\".join(parts)\", \"path\": \"formatter.py\"}, \"name\": \"str_replace\"}": 2
+        },
+        "on_result_path": false
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0.1",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0.0",
+        "depth": 11,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"formatter.py\", \"old_str\": \"def normalize_label(value: str) -> str:\\n  ",
+        "visits": 1,
+        "mean_value": 0.0,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 7,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": false
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.1",
+        "parent_id": "0.0.0.0.0.0.0.0",
+        "depth": 8,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"formatter.py\", \"old_str\": \"def normalize_label(value: str) -> str:\\n  ",
+        "visits": 5,
+        "mean_value": 3.72,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 4,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.1.0",
+        "parent_id": "0.0.0.0.0.0.0.0.1",
+        "depth": 9,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q test_formatter.py\"}",
+        "visits": 4,
+        "mean_value": 4.65,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 5,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.1.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.1.0",
+        "depth": 10,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"test_formatter.py\", \"start_line\": 1, \"end_line\": 30}",
+        "visits": 3,
+        "mean_value": 6.2,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 6,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.1.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.1.0.0",
+        "depth": 11,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"formatter.py\", \"old_str\": \"def normalize_label(value: str) -> str:\\n  ",
+        "visits": 1,
+        "mean_value": 9.3,
+        "llm_value": null,
+        "submitted": true,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 7,
+        "has_nonempty_patch": true,
+        "stopped_reason": "auto_finalized",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Strip leading/trailing whitespace only\\n    return value.strip()\", \"old_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Strip leading/trailing whitespace, then normalize internal whitespace to single spaces\\n    parts = value.split()\\n    return \\\" \\\".join(parts)\", \"path\": \"formatter.py\"}, \"name\": \"str_replace\"}": 2,
+          "{\"arguments\": {\"new_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Strip leading/trailing whitespace only\\n    value = value.strip()\\n    return value\", \"old_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Strip leading/trailing whitespace, then normalize internal whitespace to single spaces\\n    parts = value.split()\\n    return \\\" \\\".join(parts)\", \"path\": \"formatter.py\"}, \"name\": \"str_replace\"}": 2,
+          "{\"arguments\": {\"new_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Strip leading/trailing whitespace, preserve internal spacing and tabs\\n    value = value.strip()\\n    # Split on any whitespace but rejoin with original spacing preserved\\n    import re\\n    # Find all non-whitespace tokens and their original spacing\\n    tokens = re.findall(r'\\\\S+', value)\\n    # Find all whitespace sequences between tokens\\n    if len(tokens) < 2:\\n        return value\\n    # Reconstruct with original whitespace preserved\\n    result = tokens[0]\\n    for i in range(len(tokens) - 1):\\n        # Find the whitespace between current token and next\\n        idx = value.find(tokens[i]) + len(tokens[i])\\n        next_idx = value.find(tokens[i+1])\\n        whitespace = value[idx:next_idx]\\n        result += whitespace + tokens[i+1]\\n    return result\", \"old_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Strip leading/trailing whitespace, then normalize internal whitespace to single spaces\\n    parts = value.split()\\n    return \\\" \\\".join(parts)\", \"path\": \"formatter.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Strip leading/trailing whitespace only, preserve internal spacing\\n    value = value.strip()\\n    return value\", \"old_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Strip leading/trailing whitespace, then normalize internal whitespace to single spaces\\n    parts = value.split()\\n    return \\\" \\\".join(parts)\", \"path\": \"formatter.py\"}, \"name\": \"str_replace\"}": 1
+        },
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.1.0.0.1",
+        "parent_id": "0.0.0.0.0.0.0.0.1.0.0",
+        "depth": 11,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"formatter.py\", \"old_str\": \"def normalize_label(value: str) -> str:\\n  ",
+        "visits": 1,
+        "mean_value": 9.3,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 7,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": false
+      }
+    ],
+    "result_node_id": "0.0.0.0.0.0.0.0.1.0.0.0"
+  },
+  "agent_architecture": "planner_coder_reviewer",
+  "architecture": "planner_coder_reviewer",
+  "role_model_stats": {
+    "planner": {
+      "model": "openai/openai/gpt-oss-120b",
+      "tokens_in": 1271,
+      "tokens_out": 1024,
+      "api_calls": 2
+    },
+    "coder": {
+      "model": "ollama/qwen3.5:9b",
+      "input_tokens": 106601,
+      "output_tokens": 3998,
+      "turns": 11,
+      "tool_calls": 14,
+      "iterations": 18,
+      "tree_nodes_created": 18,
+      "best_node_depth": 11,
+      "best_node_value": 27.18145331734705,
+      "value_fn_tokens_in": 0,
+      "value_fn_tokens_out": 0
+    }
+  },
+  "planner_handoff": {
+    "problem_summary": "",
+    "root_cause_hypothesis": "Planner output could not be parsed cleanly. Reproduce first and inspect the most likely runtime files from the repository context.",
+    "files_likely_affected": [],
+    "target_symbols": [],
+    "discovery_priority": [],
+    "first_actions": [
+      "Run one high-signal reproduction or targeted validation command.",
+      "Inspect the most likely runtime files from the startup context before editing."
+    ],
+    "safe_reproduction_steps": [],
+    "reproduction_notes": [],
+    "required_validations": [],
+    "allowed_change_types": [
+      "targeted runtime code fixes"
+    ],
+    "forbidden_edits": [
+      "broad refactors without evidence"
+    ],
+    "escalation_conditions": [
+      "If the issue is still unclear after targeted inspection and reproduction."
+    ]
+  },
+  "review_feedback": {
+    "decision": "accept",
+    "primary_reason": "All success checks verified (pre-run); skipping model reviewer.",
+    "required_changes": [],
+    "validations_to_rerun": []
+  },
+  "coder_rounds": [
+    {
+      "round": 1,
+      "turns": [
+        {
+          "turn": 1,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "README.md",
+                "start_line": 1,
+                "end_line": 50
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "README.md",
+                "start_line": 1,
+                "end_line": 50
+              },
+              "output": "Here's the result of running `cat -n` on /repo/README.md:\n     1\t# Label Formatter Repo\n     2\t\n     3\tSmall repo for a less explicit custom runner smoke test.\n     4\t\n     5\tThe bug is not described directly in the issue text. The implementation currently\n     6\tnormalizes internal whitespace too aggressively.",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 2,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "formatter.py",
+                "start_line": 1,
+                "end_line": 100
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "formatter.py",
+                "start_line": 1,
+                "end_line": 100
+              },
+              "output": "Here's the result of running `cat -n` on /repo/formatter.py:\n     1\tdef normalize_label(value: str) -> str:\n     2\t    \"\"\"Prepare a user-facing label for display.\"\"\"\n     3\t    parts = value.split()\n     4\t    return \" \".join(parts)",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 3,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "test_formatter.py",
+                "start_line": 1,
+                "end_line": 100
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "test_formatter.py",
+                "start_line": 1,
+                "end_line": 100
+              },
+              "output": "Here's the result of running `cat -n` on /repo/test_formatter.py:\n     1\tfrom formatter import normalize_label\n     2\t\n     3\t\n     4\tdef test_trims_edges_only():\n     5\t    assert normalize_label(\"  Hello world  \") == \"Hello world\"\n     6\t\n     7\t\n     8\tdef test_preserves_internal_spacing():\n     9\t    assert normalize_label(\"Order   #42\") == \"Order   #42\"\n    10\t\n    11\t\n    12\tdef test_preserves_tabs_inside_text():\n    13\t    assert normalize_label(\"Field\\tValue\") == \"Field\\tValue\"",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 4,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q test_formatter.py"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q test_formatter.py"
+              },
+              "output": ".FF                                                                      [100%]\n=================================== FAILURES ===================================\n_______________________ test_preserves_internal_spacing ________________________\n\n    def test_preserves_internal_spacing():\n>       assert normalize_label(\"Order   #42\") == \"Order   #42\"\nE       AssertionError: assert 'Order #42' == 'Order   #42'\nE         \nE         - Order   #42\nE         ?       --\nE         + Order #42\n\ntest_formatter.py:9: AssertionError\n_______________________ test_preserves_tabs_inside_text ________________________\n\n    def test_preserves_tabs_inside_text():\n>       assert normalize_label(\"Field\\tValue\") == \"Field\\tValue\"\nE       AssertionError: assert 'Field Value' == 'Field\\tValue'\nE         \nE         - Field\tValue\nE         ?      ^\nE         + Field Value\nE         ?      ^\n\ntest_formatter.py:13: AssertionError\n=========================== short test summary info ============================\nFAILED test_formatter.py::test_preserves_internal_spacing - AssertionError: assert 'Order #42' == 'Order   #42'\nFAILED test_formatter.py::test_preserves_tabs_inside_text - AssertionError: assert 'Field Value' == 'Field\\tValue'\n2 failed, 1 passed in 0.10s",
+              "is_error": true,
+              "exit_code": 1
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 5,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "formatter.py",
+                "old_str": "def normalize_label(value: str) -> str:\n    \"\"\"Prepare a user-facing label for display.\"\"\"\n    parts = value.split()\n    return \" \".join(parts)",
+                "new_str": "def normalize_label(value: str) -> str:\n    \"\"\"Prepare a user-facing label for display.\"\"\"\n    return \" \".join(value.split())"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "formatter.py",
+                "old_str": "def normalize_label(value: str) -> str:\n    \"\"\"Prepare a user-facing label for display.\"\"\"\n    parts = value.split()\n    return \" \".join(parts)",
+                "new_str": "def normalize_label(value: str) -> str:\n    \"\"\"Prepare a user-facing label for display.\"\"\"\n    return \" \".join(value.split())"
+              },
+              "output": "Here's the result of running `cat -n` on /repo/formatter.py:\n     1\tdef normalize_label(value: str) -> str:\n     2\t    \"\"\"Prepare a user-facing label for display.\"\"\"\n     3\t    return \" \".join(value.split())",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 6,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q test_formatter.py"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q test_formatter.py"
+              },
+              "output": ".FF                                                                      [100%]\n=================================== FAILURES ===================================\n_______________________ test_preserves_internal_spacing ________________________\n\n    def test_preserves_internal_spacing():\n>       assert normalize_label(\"Order   #42\") == \"Order   #42\"\nE       AssertionError: assert 'Order #42' == 'Order   #42'\nE         \nE         - Order   #42\nE         ?       --\nE         + Order #42\n\ntest_formatter.py:9: AssertionError\n_______________________ test_preserves_tabs_inside_text ________________________\n\n    def test_preserves_tabs_inside_text():\n>       assert normalize_label(\"Field\\tValue\") == \"Field\\tValue\"\nE       AssertionError: assert 'Field Value' == 'Field\\tValue'\nE         \nE         - Field\tValue\nE         ?      ^\nE         + Field Value\nE         ?      ^\n\ntest_formatter.py:13: AssertionError\n=========================== short test summary info ============================\nFAILED test_formatter.py::test_preserves_internal_spacing - AssertionError: assert 'Order #42' == 'Order   #42'\nFAILED test_formatter.py::test_preserves_tabs_inside_text - AssertionError: assert 'Field Value' == 'Field\\tValue'\n2 failed, 1 passed in 0.09s",
+              "is_error": true,
+              "exit_code": 1
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 7,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "formatter.py",
+                "start_line": 1,
+                "end_line": 10
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "formatter.py",
+                "start_line": 1,
+                "end_line": 10
+              },
+              "output": "Here's the result of running `cat -n` on /repo/formatter.py:\n     1\tdef normalize_label(value: str) -> str:\n     2\t    \"\"\"Prepare a user-facing label for display.\"\"\"\n     3\t    return \" \".join(value.split())",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 8,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "formatter.py",
+                "old_str": "def normalize_label(value: str) -> str:\n    \"\"\"Prepare a user-facing label for display.\"\"\"\n    return \" \".join(value.split())",
+                "new_str": "def normalize_label(value: str) -> str:\n    \"\"\"Prepare a user-facing label for display.\"\"\"\n    # Strip leading/trailing whitespace, then normalize internal whitespace to single spaces\n    parts = value.split()\n    return \" \".join(parts)"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "formatter.py",
+                "old_str": "def normalize_label(value: str) -> str:\n    \"\"\"Prepare a user-facing label for display.\"\"\"\n    return \" \".join(value.split())",
+                "new_str": "def normalize_label(value: str) -> str:\n    \"\"\"Prepare a user-facing label for display.\"\"\"\n    # Strip leading/trailing whitespace, then normalize internal whitespace to single spaces\n    parts = value.split()\n    return \" \".join(parts)"
+              },
+              "output": "Here's the result of running `cat -n` on /repo/formatter.py:\n     1\tdef normalize_label(value: str) -> str:\n     2\t    \"\"\"Prepare a user-facing label for display.\"\"\"\n     3\t    # Strip leading/trailing whitespace, then normalize internal whitespace to single spaces\n     4\t    parts = value.split()\n     5\t    return \" \".join(parts)",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 9,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q test_formatter.py"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q test_formatter.py"
+              },
+              "output": ".FF                                                                      [100%]\n=================================== FAILURES ===================================\n_______________________ test_preserves_internal_spacing ________________________\n\n    def test_preserves_internal_spacing():\n>       assert normalize_label(\"Order   #42\") == \"Order   #42\"\nE       AssertionError: assert 'Order #42' == 'Order   #42'\nE         \nE         - Order   #42\nE         ?       --\nE         + Order #42\n\ntest_formatter.py:9: AssertionError\n_______________________ test_preserves_tabs_inside_text ________________________\n\n    def test_preserves_tabs_inside_text():\n>       assert normalize_label(\"Field\\tValue\") == \"Field\\tValue\"\nE       AssertionError: assert 'Field Value' == 'Field\\tValue'\nE         \nE         - Field\tValue\nE         ?      ^\nE         + Field Value\nE         ?      ^\n\ntest_formatter.py:13: AssertionError\n=========================== short test summary info ============================\nFAILED test_formatter.py::test_preserves_internal_spacing - AssertionError: assert 'Order #42' == 'Order   #42'\nFAILED test_formatter.py::test_preserves_tabs_inside_text - AssertionError: assert 'Field Value' == 'Field\\tValue'\n2 failed, 1 passed in 0.11s",
+              "is_error": true,
+              "exit_code": 1
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 10,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "test_formatter.py",
+                "start_line": 1,
+                "end_line": 30
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "test_formatter.py",
+                "start_line": 1,
+                "end_line": 30
+              },
+              "output": "Here's the result of running `cat -n` on /repo/test_formatter.py:\n     1\tfrom formatter import normalize_label\n     2\t\n     3\t\n     4\tdef test_trims_edges_only():\n     5\t    assert normalize_label(\"  Hello world  \") == \"Hello world\"\n     6\t\n     7\t\n     8\tdef test_preserves_internal_spacing():\n     9\t    assert normalize_label(\"Order   #42\") == \"Order   #42\"\n    10\t\n    11\t\n    12\tdef test_preserves_tabs_inside_text():\n    13\t    assert normalize_label(\"Field\\tValue\") == \"Field\\tValue\"",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 11,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "formatter.py",
+                "old_str": "def normalize_label(value: str) -> str:\n    \"\"\"Prepare a user-facing label for display.\"\"\"\n    # Strip leading/trailing whitespace, then normalize internal whitespace to single spaces\n    parts = value.split()\n    return \" \".join(parts)",
+                "new_str": "def normalize_label(value: str) -> str:\n    \"\"\"Prepare a user-facing label for display.\"\"\"\n    # Strip leading/trailing whitespace only\n    return value.strip()"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "formatter.py",
+                "old_str": "def normalize_label(value: str) -> str:\n    \"\"\"Prepare a user-facing label for display.\"\"\"\n    # Strip leading/trailing whitespace, then normalize internal whitespace to single spaces\n    parts = value.split()\n    return \" \".join(parts)",
+                "new_str": "def normalize_label(value: str) -> str:\n    \"\"\"Prepare a user-facing label for display.\"\"\"\n    # Strip leading/trailing whitespace only\n    return value.strip()"
+              },
+              "output": "Here's the result of running `cat -n` on /repo/formatter.py:\n     1\tdef normalize_label(value: str) -> str:\n     2\t    \"\"\"Prepare a user-facing label for display.\"\"\"\n     3\t    # Strip leading/trailing whitespace only\n     4\t    return value.strip()",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        }
+      ],
+      "patch": "diff --git a/formatter.py b/formatter.py\nindex e749038..d591d00 100644\n--- a/formatter.py\n+++ b/formatter.py\n@@ -1,4 +1,4 @@\n def normalize_label(value: str) -> str:\n     \"\"\"Prepare a user-facing label for display.\"\"\"\n-    parts = value.split()\n-    return \" \".join(parts)\n+    # Strip leading/trailing whitespace only\n+    return value.strip()\n",
+      "submitted": true,
+      "stopped_reason": "auto_finalized",
+      "stats": {
+        "input_tokens": 107872,
+        "output_tokens": 5022,
+        "turns": 11,
+        "tool_calls": 14,
+        "iterations": 18,
+        "tree_nodes_created": 18,
+        "best_node_depth": 11,
+        "best_node_value": 27.18145331734705,
+        "value_fn_tokens_in": 0,
+        "value_fn_tokens_out": 0
+      },
+      "mcts_tree": {
+        "nodes": [
+          {
+            "id": "0",
+            "parent_id": null,
+            "depth": 0,
+            "action_name": null,
+            "action_args_preview": "",
+            "visits": 17,
+            "mean_value": 1.39,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0",
+            "parent_id": "0",
+            "depth": 1,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"README.md\", \"start_line\": 1, \"end_line\": 50}",
+            "visits": 17,
+            "mean_value": 1.39,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0",
+            "parent_id": "0.0",
+            "depth": 2,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"formatter.py\", \"start_line\": 1, \"end_line\": 100}",
+            "visits": 16,
+            "mean_value": 1.48,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0",
+            "parent_id": "0.0.0",
+            "depth": 3,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"test_formatter.py\", \"start_line\": 1, \"end_line\": 100}",
+            "visits": 15,
+            "mean_value": 1.58,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0",
+            "parent_id": "0.0.0.0",
+            "depth": 4,
+            "action_name": "bash",
+            "action_args_preview": "{\"command\": \"python -m pytest -q test_formatter.py\"}",
+            "visits": 14,
+            "mean_value": 1.69,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0.0",
+            "parent_id": "0.0.0.0.0",
+            "depth": 5,
+            "action_name": "str_replace",
+            "action_args_preview": "{\"path\": \"formatter.py\", \"old_str\": \"def normalize_label(value: str) -> str:\\n  ",
+            "visits": 13,
+            "mean_value": 1.82,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": true,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 1,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {
+              "{\"arguments\": {\"new_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    return \\\" \\\".join(value.split())\", \"old_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    parts = value.split()\\n    return \\\" \\\".join(parts)\", \"path\": \"formatter.py\"}, \"name\": \"str_replace\"}": 2
+            },
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0.0.0",
+            "parent_id": "0.0.0.0.0.0",
+            "depth": 6,
+            "action_name": "bash",
+            "action_args_preview": "{\"command\": \"python -m pytest -q test_formatter.py\"}",
+            "visits": 12,
+            "mean_value": 1.76,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 2,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0",
+            "parent_id": "0.0.0.0.0.0.0",
+            "depth": 7,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"formatter.py\", \"start_line\": 1, \"end_line\": 10}",
+            "visits": 11,
+            "mean_value": 1.76,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 3,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.0",
+            "parent_id": "0.0.0.0.0.0.0.0",
+            "depth": 8,
+            "action_name": "str_replace",
+            "action_args_preview": "{\"path\": \"formatter.py\", \"old_str\": \"def normalize_label(value: str) -> str:\\n  ",
+            "visits": 5,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": true,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 4,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {
+              "{\"arguments\": {\"new_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Strip leading/trailing whitespace, but preserve internal spacing\\n    value = value.strip()\\n    # Split only on whitespace sequences, then rejoin with single spaces\\n    # This preserves internal spacing patterns like multiple spaces or tabs\\n    parts = value.split()\\n    return \\\" \\\".join(parts)\", \"old_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    return \\\" \\\".join(value.split())\", \"path\": \"formatter.py\"}, \"name\": \"str_replace\"}": 1,
+              "{\"arguments\": {\"new_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Split on any whitespace, then rejoin with single spaces\\n    # But preserve multiple spaces between words as-is\\n    # Use a regex split that captures whitespace groups\\n    import re\\n    # Split on whitespace but keep the whitespace groups\\n    parts = re.split(r'(\\\\s+)', value)\\n    # Filter out empty strings from leading/trailing whitespace\\n    parts = [p for p in parts if p]\\n    return \\\"\\\".join(parts)\", \"old_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    return \\\" \\\".join(value.split())\", \"path\": \"formatter.py\"}, \"name\": \"str_replace\"}": 1,
+              "{\"arguments\": {\"new_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Strip leading/trailing whitespace, but preserve internal spacing\\n    value = value.strip()\\n    # Split only on whitespace sequences to preserve internal spacing\\n    parts = value.split()\\n    return \\\" \\\".join(parts)\", \"old_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    return \\\" \\\".join(value.split())\", \"path\": \"formatter.py\"}, \"name\": \"str_replace\"}": 1,
+              "{\"arguments\": {\"new_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    parts = value.split(\\\" \\\", keepends=True)\\n    return \\\" \\\".join(parts)\", \"old_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    return \\\" \\\".join(value.split())\", \"path\": \"formatter.py\"}, \"name\": \"str_replace\"}": 1,
+              "{\"arguments\": {\"new_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Strip leading/trailing whitespace, but preserve internal spacing\\n    value = value.strip()\\n    if not value:\\n        return value\\n    # Split on any whitespace, then rejoin with single spaces\\n    parts = value.split()\\n    return \\\" \\\".join(parts)\", \"old_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    return \\\" \\\".join(value.split())\", \"path\": \"formatter.py\"}, \"name\": \"str_replace\"}": 1,
+              "{\"arguments\": {\"new_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Strip leading/trailing whitespace, but preserve internal spacing\\n    value = value.strip()\\n    # Split on any whitespace and rejoin with single spaces\\n    parts = value.split()\\n    return \\\" \\\".join(parts)\", \"old_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    return \\\" \\\".join(value.split())\", \"path\": \"formatter.py\"}, \"name\": \"str_replace\"}": 1,
+              "{\"arguments\": {\"new_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Split on any whitespace, but preserve internal spacing by using split() then rejoining with single spaces\\n    # This preserves the intent of the tests which expect internal spacing to be preserved\\n    return \\\" \\\".join(value.split())\", \"old_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    return \\\" \\\".join(value.split())\", \"path\": \"formatter.py\"}, \"name\": \"str_replace\"}": 1
+            },
+            "on_result_path": false
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.0.0",
+            "parent_id": "0.0.0.0.0.0.0.0.0",
+            "depth": 9,
+            "action_name": "bash",
+            "action_args_preview": "{\"command\": \"python -m pytest -q test_formatter.py\"}",
+            "visits": 4,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 5,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": false
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.0.0.0",
+            "parent_id": "0.0.0.0.0.0.0.0.0.0",
+            "depth": 10,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"test_formatter.py\", \"start_line\": 1, \"end_line\": 30}",
+            "visits": 3,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 6,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": false
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.0.0.0.0",
+            "parent_id": "0.0.0.0.0.0.0.0.0.0.0",
+            "depth": 11,
+            "action_name": "str_replace",
+            "action_args_preview": "{\"path\": \"formatter.py\", \"old_str\": \"def normalize_label(value: str) -> str:\\n  ",
+            "visits": 1,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": true,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 7,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {
+              "{\"arguments\": {\"new_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Strip leading/trailing whitespace, but preserve internal spacing\\n    value = value.strip()\\n    # Split only on whitespace sequences, then rejoin with single spaces\\n    # This preserves internal spacing patterns like multiple spaces or tabs\\n    parts = value.split()\\n    return \\\" \\\".join(parts)\", \"old_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Strip leading/trailing whitespace, but preserve internal spacing\\n    value = value.strip()\\n    # Split only on whitespace sequences, then rejoin with single spaces\\n    # This preserves internal spacing patterns like multiple spaces or tabs\\n    parts = value.split()\\n    return \\\" \\\".join(parts)\", \"path\": \"formatter.py\"}, \"name\": \"str_replace\"}": 2
+            },
+            "on_result_path": false
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.0.0.0.1",
+            "parent_id": "0.0.0.0.0.0.0.0.0.0.0",
+            "depth": 11,
+            "action_name": "str_replace",
+            "action_args_preview": "{\"path\": \"formatter.py\", \"old_str\": \"def normalize_label(value: str) -> str:\\n  ",
+            "visits": 1,
+            "mean_value": 0.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": true,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 7,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": false
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.1",
+            "parent_id": "0.0.0.0.0.0.0.0",
+            "depth": 8,
+            "action_name": "str_replace",
+            "action_args_preview": "{\"path\": \"formatter.py\", \"old_str\": \"def normalize_label(value: str) -> str:\\n  ",
+            "visits": 5,
+            "mean_value": 3.72,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": true,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 4,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.1.0",
+            "parent_id": "0.0.0.0.0.0.0.0.1",
+            "depth": 9,
+            "action_name": "bash",
+            "action_args_preview": "{\"command\": \"python -m pytest -q test_formatter.py\"}",
+            "visits": 4,
+            "mean_value": 4.65,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 5,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.1.0.0",
+            "parent_id": "0.0.0.0.0.0.0.0.1.0",
+            "depth": 10,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"test_formatter.py\", \"start_line\": 1, \"end_line\": 30}",
+            "visits": 3,
+            "mean_value": 6.2,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 6,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.1.0.0.0",
+            "parent_id": "0.0.0.0.0.0.0.0.1.0.0",
+            "depth": 11,
+            "action_name": "str_replace",
+            "action_args_preview": "{\"path\": \"formatter.py\", \"old_str\": \"def normalize_label(value: str) -> str:\\n  ",
+            "visits": 1,
+            "mean_value": 9.3,
+            "llm_value": null,
+            "submitted": true,
+            "is_branch_point": true,
+            "edit_made": true,
+            "success_checks": 1,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 7,
+            "has_nonempty_patch": true,
+            "stopped_reason": "auto_finalized",
+            "vote_counts": {
+              "{\"arguments\": {\"new_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Strip leading/trailing whitespace only\\n    return value.strip()\", \"old_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Strip leading/trailing whitespace, then normalize internal whitespace to single spaces\\n    parts = value.split()\\n    return \\\" \\\".join(parts)\", \"path\": \"formatter.py\"}, \"name\": \"str_replace\"}": 2,
+              "{\"arguments\": {\"new_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Strip leading/trailing whitespace only\\n    value = value.strip()\\n    return value\", \"old_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Strip leading/trailing whitespace, then normalize internal whitespace to single spaces\\n    parts = value.split()\\n    return \\\" \\\".join(parts)\", \"path\": \"formatter.py\"}, \"name\": \"str_replace\"}": 2,
+              "{\"arguments\": {\"new_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Strip leading/trailing whitespace, preserve internal spacing and tabs\\n    value = value.strip()\\n    # Split on any whitespace but rejoin with original spacing preserved\\n    import re\\n    # Find all non-whitespace tokens and their original spacing\\n    tokens = re.findall(r'\\\\S+', value)\\n    # Find all whitespace sequences between tokens\\n    if len(tokens) < 2:\\n        return value\\n    # Reconstruct with original whitespace preserved\\n    result = tokens[0]\\n    for i in range(len(tokens) - 1):\\n        # Find the whitespace between current token and next\\n        idx = value.find(tokens[i]) + len(tokens[i])\\n        next_idx = value.find(tokens[i+1])\\n        whitespace = value[idx:next_idx]\\n        result += whitespace + tokens[i+1]\\n    return result\", \"old_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Strip leading/trailing whitespace, then normalize internal whitespace to single spaces\\n    parts = value.split()\\n    return \\\" \\\".join(parts)\", \"path\": \"formatter.py\"}, \"name\": \"str_replace\"}": 1,
+              "{\"arguments\": {\"new_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Strip leading/trailing whitespace only, preserve internal spacing\\n    value = value.strip()\\n    return value\", \"old_str\": \"def normalize_label(value: str) -> str:\\n    \\\"\\\"\\\"Prepare a user-facing label for display.\\\"\\\"\\\"\\n    # Strip leading/trailing whitespace, then normalize internal whitespace to single spaces\\n    parts = value.split()\\n    return \\\" \\\".join(parts)\", \"path\": \"formatter.py\"}, \"name\": \"str_replace\"}": 1
+            },
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0.0.0.0.1.0.0.1",
+            "parent_id": "0.0.0.0.0.0.0.0.1.0.0",
+            "depth": 11,
+            "action_name": "str_replace",
+            "action_args_preview": "{\"path\": \"formatter.py\", \"old_str\": \"def normalize_label(value: str) -> str:\\n  ",
+            "visits": 1,
+            "mean_value": 9.3,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": true,
+            "edit_made": true,
+            "success_checks": 1,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 7,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": false
+          }
+        ],
+        "result_node_id": "0.0.0.0.0.0.0.0.1.0.0.0"
+      },
+      "vote_summary": [
+        {
+          "depth": 5,
+          "action": "str_replace",
+          "winner_votes": 2,
+          "total_samples": 2,
+          "unique_candidates": 1
+        },
+        {
+          "depth": 11,
+          "action": "str_replace",
+          "winner_votes": 2,
+          "total_samples": 6,
+          "unique_candidates": 4
+        }
+      ],
+      "review_feedback": {
+        "decision": "accept",
+        "primary_reason": "All success checks verified (pre-run); skipping model reviewer.",
+        "required_changes": [],
+        "validations_to_rerun": []
+      }
+    }
+  ],
+  "instance_id": "label_formatter_001",
+  "duration_seconds": 1154.53
+}

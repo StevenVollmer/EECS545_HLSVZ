@@ -1,0 +1,5 @@
+{
+  "model_name_or_path": "G_c2_9b_hindsight",
+  "instance_id": "campaign_header_001",
+  "model_patch": "diff --git a/app/utils/branding.py b/app/utils/branding.py\nindex 7f8713b..ec4bcfa 100644\n--- a/app/utils/branding.py\n+++ b/app/utils/branding.py\n@@ -5,5 +5,16 @@ def normalize_campaign_code(name: str) -> str:\n def format_brand_name(name: str) -> str:\n     words = []\n     for word in name.split():\n-        words.append(word[:1].upper() + word[1:].lower())\n+        # Handle apostrophes by keeping them in place\n+        if \"'\" in word:\n+            parts = word.split(\"'\")\n+            result = \"\"\n+            for i, part in enumerate(parts):\n+                if part:\n+                    result += part[:1].upper() + part[1:].lower()\n+                if i < len(parts) - 1:\n+                    result += \"'\"\n+            words.append(result)\n+        else:\n+            words.append(word[:1].upper() + word[1:].lower())\n     return \" \".join(words)\n"
+}

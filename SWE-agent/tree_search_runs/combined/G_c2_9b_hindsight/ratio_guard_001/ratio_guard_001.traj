@@ -1,0 +1,599 @@
+{
+  "turns": [
+    {
+      "turn": 1,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "metrics.py",
+            "start_line": 1,
+            "end_line": 100
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "metrics.py",
+            "start_line": 1,
+            "end_line": 100
+          },
+          "output": "Here's the result of running `cat -n` on /repo/metrics.py:\n     1\tdef actionable_ratio(alerts):\n     2\t    actionable = [\n     3\t        alert\n     4\t        for alert in alerts\n     5\t        if alert.get(\"actionable\") and not alert.get(\"archived\", False)\n     6\t    ]\n     7\t    actionable_total = [alert for alert in alerts if alert.get(\"actionable\")]\n     8\t    return len(actionable) / len(actionable_total)",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 2,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q test_metrics.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q test_metrics.py"
+          },
+          "output": "FF                                                                       [100%]\n=================================== FAILURES ===================================\n________________ test_actionable_ratio_ignores_archived_alerts _________________\n\n    def test_actionable_ratio_ignores_archived_alerts() -> None:\n        alerts = [\n            {\"actionable\": True, \"archived\": False},\n            {\"actionable\": True, \"archived\": False},\n            {\"actionable\": False, \"archived\": False},\n            {\"actionable\": True, \"archived\": True},\n        ]\n>       assert actionable_ratio(alerts) == 0.5\nE       AssertionError: assert 0.6666666666666666 == 0.5\nE        +  where 0.6666666666666666 = actionable_ratio([{'actionable': True, 'archived': False}, {'actionable': True, 'archived': False}, {'actionable': False, 'archived': False}, {'actionable': True, 'archived': True}])\n\ntest_metrics.py:11: AssertionError\n_______________ test_actionable_ratio_zero_when_none_actionable ________________\n\n    def test_actionable_ratio_zero_when_none_actionable() -> None:\n        alerts = [\n            {\"actionable\": False, \"archived\": False},\n            {\"actionable\": False, \"archived\": True},\n        ]\n>       assert actionable_ratio(alerts) == 0.0\n               ^^^^^^^^^^^^^^^^^^^^^^^^\n\ntest_metrics.py:19: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nalerts = [{'actionable': False, 'archived': False}, {'actionable': False, 'archived': True}]\n\n    def actionable_ratio(alerts):\n        actionable = [\n            alert\n            for alert in alerts\n            if alert.get(\"actionable\") and not alert.get(\"archived\", False)\n        ]\n        actionable_total = [alert for alert in alerts if alert.get(\"actionable\")]\n>       return len(actionable) / len(actionable_total)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE       ZeroDivisionError: division by zero\n\nmetrics.py:8: ZeroDivisionError\n=========================== short test summary info ============================\nFAILED test_metrics.py::test_actionable_ratio_ignores_archived_alerts - AssertionError: assert 0.6666666666666666 == 0.5\nFAILED test_metrics.py::test_actionable_ratio_zero_when_none_actionable - ZeroDivisionError: division by zero\n2 failed in 0.09s",
+          "is_error": true,
+          "exit_code": 1
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 3,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "metrics.py",
+            "start_line": 1,
+            "end_line": 10
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "metrics.py",
+            "start_line": 1,
+            "end_line": 10
+          },
+          "output": "Here's the result of running `cat -n` on /repo/metrics.py:\n     1\tdef actionable_ratio(alerts):\n     2\t    actionable = [\n     3\t        alert\n     4\t        for alert in alerts\n     5\t        if alert.get(\"actionable\") and not alert.get(\"archived\", False)\n     6\t    ]\n     7\t    actionable_total = [alert for alert in alerts if alert.get(\"actionable\")]\n     8\t    return len(actionable) / len(actionable_total)",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 4,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "metrics.py",
+            "old_str": "def actionable_ratio(alerts):\n    actionable = [\n        alert\n        for alert in alerts\n        if alert.get(\"actionable\") and not alert.get(\"archived\", False)\n    ]\n    actionable_total = [alert for alert in alerts if alert.get(\"actionable\")]\n    return len(actionable) / len(actionable_total)",
+            "new_str": "def actionable_ratio(alerts):\n    actionable = [\n        alert\n        for alert in alerts\n        if alert.get(\"actionable\") and not alert.get(\"archived\", False)\n    ]\n    total = len(alerts)\n    return len(actionable) / total if total > 0 else 0.0"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "metrics.py",
+            "old_str": "def actionable_ratio(alerts):\n    actionable = [\n        alert\n        for alert in alerts\n        if alert.get(\"actionable\") and not alert.get(\"archived\", False)\n    ]\n    actionable_total = [alert for alert in alerts if alert.get(\"actionable\")]\n    return len(actionable) / len(actionable_total)",
+            "new_str": "def actionable_ratio(alerts):\n    actionable = [\n        alert\n        for alert in alerts\n        if alert.get(\"actionable\") and not alert.get(\"archived\", False)\n    ]\n    total = len(alerts)\n    return len(actionable) / total if total > 0 else 0.0"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/metrics.py:\n     1\tdef actionable_ratio(alerts):\n     2\t    actionable = [\n     3\t        alert\n     4\t        for alert in alerts\n     5\t        if alert.get(\"actionable\") and not alert.get(\"archived\", False)\n     6\t    ]\n     7\t    total = len(alerts)\n     8\t    return len(actionable) / total if total > 0 else 0.0",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    }
+  ],
+  "stats": {
+    "input_tokens": 21175,
+    "output_tokens": 1250,
+    "turns": 4,
+    "tool_calls": 4,
+    "iterations": 18,
+    "tree_nodes_created": 5,
+    "best_node_depth": 4,
+    "best_node_value": 42.49405487999999,
+    "value_fn_tokens_in": 0,
+    "value_fn_tokens_out": 0
+  },
+  "loop_state": {
+    "executable_edit_made": true,
+    "validation_passed": false,
+    "validation_attempted_after_edit": true,
+    "diff_checked": false,
+    "successful_post_edit_commands": [],
+    "satisfied_success_checks": [
+      "ratio_tests_pass"
+    ],
+    "changed_files": [
+      "metrics.py"
+    ]
+  },
+  "stopped_reason": "auto_finalized",
+  "submitted": true,
+  "submission_summary": "Auto-finalized: required success checks were satisfied with a non-empty patch.",
+  "patch": "diff --git a/metrics.py b/metrics.py\nindex 5c12b28..4d003ce 100644\n--- a/metrics.py\n+++ b/metrics.py\n@@ -4,5 +4,5 @@ def actionable_ratio(alerts):\n         for alert in alerts\n         if alert.get(\"actionable\") and not alert.get(\"archived\", False)\n     ]\n-    actionable_total = [alert for alert in alerts if alert.get(\"actionable\")]\n-    return len(actionable) / len(actionable_total)\n+    total = len(alerts)\n+    return len(actionable) / total if total > 0 else 0.0\n",
+  "info": {
+    "submission": "diff --git a/metrics.py b/metrics.py\nindex 5c12b28..4d003ce 100644\n--- a/metrics.py\n+++ b/metrics.py\n@@ -4,5 +4,5 @@ def actionable_ratio(alerts):\n         for alert in alerts\n         if alert.get(\"actionable\") and not alert.get(\"archived\", False)\n     ]\n-    actionable_total = [alert for alert in alerts if alert.get(\"actionable\")]\n-    return len(actionable) / len(actionable_total)\n+    total = len(alerts)\n+    return len(actionable) / total if total > 0 else 0.0\n",
+    "submitted": true,
+    "submission_summary": "Auto-finalized: required success checks were satisfied with a non-empty patch.",
+    "stopped_reason": "auto_finalized"
+  },
+  "auto_finalized": true,
+  "mcts_meta": {
+    "model": "ollama/qwen3.5:9b",
+    "value_model": null,
+    "hindsight_feedback": true,
+    "dead_branch_feedback_count": 0,
+    "iterations": 18,
+    "expansion_candidates": 1,
+    "edit_vote_samples": 5,
+    "ucb_c": 1.414,
+    "root_visits": 4,
+    "early_branching": false,
+    "early_branch_depth": 2
+  },
+  "vote_summary": [
+    {
+      "depth": 4,
+      "action": "str_replace",
+      "winner_votes": 2,
+      "total_samples": 3,
+      "unique_candidates": 2
+    }
+  ],
+  "mcts_tree": {
+    "nodes": [
+      {
+        "id": "0",
+        "parent_id": null,
+        "depth": 0,
+        "action_name": null,
+        "action_args_preview": "",
+        "visits": 4,
+        "mean_value": 5.09,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0",
+        "parent_id": "0",
+        "depth": 1,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"metrics.py\", \"start_line\": 1, \"end_line\": 100}",
+        "visits": 4,
+        "mean_value": 5.09,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0",
+        "parent_id": "0.0",
+        "depth": 2,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q test_metrics.py\"}",
+        "visits": 3,
+        "mean_value": 6.79,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0",
+        "parent_id": "0.0.0",
+        "depth": 3,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"metrics.py\", \"start_line\": 1, \"end_line\": 10}",
+        "visits": 2,
+        "mean_value": 10.18,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0",
+        "parent_id": "0.0.0.0",
+        "depth": 4,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"metrics.py\", \"old_str\": \"def actionable_ratio(alerts):\\n    actionable",
+        "visits": 1,
+        "mean_value": 20.36,
+        "llm_value": null,
+        "submitted": true,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 1,
+        "has_nonempty_patch": true,
+        "stopped_reason": "auto_finalized",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"def actionable_ratio(alerts):\\n    actionable = [\\n        alert\\n        for alert in alerts\\n        if alert.get(\\\"actionable\\\") and not alert.get(\\\"archived\\\", False)\\n    ]\\n    total = len(alerts)\\n    return len(actionable) / total if total > 0 else 0.0\", \"old_str\": \"def actionable_ratio(alerts):\\n    actionable = [\\n        alert\\n        for alert in alerts\\n        if alert.get(\\\"actionable\\\") and not alert.get(\\\"archived\\\", False)\\n    ]\\n    actionable_total = [alert for alert in alerts if alert.get(\\\"actionable\\\")]\\n    return len(actionable) / len(actionable_total)\", \"path\": \"metrics.py\"}, \"name\": \"str_replace\"}": 2,
+          "{\"arguments\": {\"new_str\": \"def actionable_ratio(alerts):\\n    actionable = [\\n        alert\\n        for alert in alerts\\n        if alert.get(\\\"actionable\\\") and not alert.get(\\\"archived\\\", False)\\n    ]\\n    actionable_total = [\\n        alert\\n        for alert in alerts\\n        if alert.get(\\\"actionable\\\") and not alert.get(\\\"archived\\\", False)\\n    ]\\n    return len(actionable) / len(actionable_total)\", \"old_str\": \"def actionable_ratio(alerts):\\n    actionable = [\\n        alert\\n        for alert in alerts\\n        if alert.get(\\\"actionable\\\") and not alert.get(\\\"archived\\\", False)\\n    ]\\n    actionable_total = [alert for alert in alerts if alert.get(\\\"actionable\\\")]\\n    return len(actionable) / len(actionable_total)\", \"path\": \"metrics.py\"}, \"name\": \"str_replace\"}": 1
+        },
+        "on_result_path": true
+      }
+    ],
+    "result_node_id": "0.0.0.0.0"
+  },
+  "agent_architecture": "planner_coder_reviewer",
+  "architecture": "planner_coder_reviewer",
+  "role_model_stats": {
+    "planner": {
+      "model": "ollama/qwen3.5:9b",
+      "tokens_in": 564,
+      "tokens_out": 145,
+      "api_calls": 1
+    },
+    "coder": {
+      "model": "ollama/qwen3.5:9b",
+      "input_tokens": 20611,
+      "output_tokens": 1105,
+      "turns": 4,
+      "tool_calls": 4,
+      "iterations": 18,
+      "tree_nodes_created": 5,
+      "best_node_depth": 4,
+      "best_node_value": 42.49405487999999,
+      "value_fn_tokens_in": 0,
+      "value_fn_tokens_out": 0
+    }
+  },
+  "planner_handoff": {
+    "problem_summary": "",
+    "root_cause_hypothesis": "The denominator in actionable_ratio() incorrectly excludes non-actionable alerts or uses a wrong count instead of the total alert count.",
+    "files_likely_affected": [
+      "metrics.py"
+    ],
+    "target_symbols": [],
+    "discovery_priority": [
+      "metrics.py"
+    ],
+    "first_actions": [
+      "Read metrics.py to locate the actionable_ratio function and inspect the denominator logic",
+      "Run pytest test_metrics.py to reproduce the failing tests"
+    ],
+    "safe_reproduction_steps": [],
+    "reproduction_notes": [],
+    "required_validations": [
+      "python -m pytest test_metrics.py"
+    ],
+    "allowed_change_types": [
+      "targeted runtime code fixes"
+    ],
+    "forbidden_edits": [
+      "do not modify test files"
+    ],
+    "escalation_conditions": [
+      "If the issue is still unclear after targeted inspection and reproduction."
+    ]
+  },
+  "review_feedback": {
+    "decision": "accept",
+    "primary_reason": "All success checks verified (pre-run); skipping model reviewer.",
+    "required_changes": [],
+    "validations_to_rerun": []
+  },
+  "coder_rounds": [
+    {
+      "round": 1,
+      "turns": [
+        {
+          "turn": 1,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "metrics.py",
+                "start_line": 1,
+                "end_line": 100
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "metrics.py",
+                "start_line": 1,
+                "end_line": 100
+              },
+              "output": "Here's the result of running `cat -n` on /repo/metrics.py:\n     1\tdef actionable_ratio(alerts):\n     2\t    actionable = [\n     3\t        alert\n     4\t        for alert in alerts\n     5\t        if alert.get(\"actionable\") and not alert.get(\"archived\", False)\n     6\t    ]\n     7\t    actionable_total = [alert for alert in alerts if alert.get(\"actionable\")]\n     8\t    return len(actionable) / len(actionable_total)",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 2,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q test_metrics.py"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q test_metrics.py"
+              },
+              "output": "FF                                                                       [100%]\n=================================== FAILURES ===================================\n________________ test_actionable_ratio_ignores_archived_alerts _________________\n\n    def test_actionable_ratio_ignores_archived_alerts() -> None:\n        alerts = [\n            {\"actionable\": True, \"archived\": False},\n            {\"actionable\": True, \"archived\": False},\n            {\"actionable\": False, \"archived\": False},\n            {\"actionable\": True, \"archived\": True},\n        ]\n>       assert actionable_ratio(alerts) == 0.5\nE       AssertionError: assert 0.6666666666666666 == 0.5\nE        +  where 0.6666666666666666 = actionable_ratio([{'actionable': True, 'archived': False}, {'actionable': True, 'archived': False}, {'actionable': False, 'archived': False}, {'actionable': True, 'archived': True}])\n\ntest_metrics.py:11: AssertionError\n_______________ test_actionable_ratio_zero_when_none_actionable ________________\n\n    def test_actionable_ratio_zero_when_none_actionable() -> None:\n        alerts = [\n            {\"actionable\": False, \"archived\": False},\n            {\"actionable\": False, \"archived\": True},\n        ]\n>       assert actionable_ratio(alerts) == 0.0\n               ^^^^^^^^^^^^^^^^^^^^^^^^\n\ntest_metrics.py:19: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nalerts = [{'actionable': False, 'archived': False}, {'actionable': False, 'archived': True}]\n\n    def actionable_ratio(alerts):\n        actionable = [\n            alert\n            for alert in alerts\n            if alert.get(\"actionable\") and not alert.get(\"archived\", False)\n        ]\n        actionable_total = [alert for alert in alerts if alert.get(\"actionable\")]\n>       return len(actionable) / len(actionable_total)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE       ZeroDivisionError: division by zero\n\nmetrics.py:8: ZeroDivisionError\n=========================== short test summary info ============================\nFAILED test_metrics.py::test_actionable_ratio_ignores_archived_alerts - AssertionError: assert 0.6666666666666666 == 0.5\nFAILED test_metrics.py::test_actionable_ratio_zero_when_none_actionable - ZeroDivisionError: division by zero\n2 failed in 0.09s",
+              "is_error": true,
+              "exit_code": 1
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 3,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "metrics.py",
+                "start_line": 1,
+                "end_line": 10
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "metrics.py",
+                "start_line": 1,
+                "end_line": 10
+              },
+              "output": "Here's the result of running `cat -n` on /repo/metrics.py:\n     1\tdef actionable_ratio(alerts):\n     2\t    actionable = [\n     3\t        alert\n     4\t        for alert in alerts\n     5\t        if alert.get(\"actionable\") and not alert.get(\"archived\", False)\n     6\t    ]\n     7\t    actionable_total = [alert for alert in alerts if alert.get(\"actionable\")]\n     8\t    return len(actionable) / len(actionable_total)",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 4,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "metrics.py",
+                "old_str": "def actionable_ratio(alerts):\n    actionable = [\n        alert\n        for alert in alerts\n        if alert.get(\"actionable\") and not alert.get(\"archived\", False)\n    ]\n    actionable_total = [alert for alert in alerts if alert.get(\"actionable\")]\n    return len(actionable) / len(actionable_total)",
+                "new_str": "def actionable_ratio(alerts):\n    actionable = [\n        alert\n        for alert in alerts\n        if alert.get(\"actionable\") and not alert.get(\"archived\", False)\n    ]\n    total = len(alerts)\n    return len(actionable) / total if total > 0 else 0.0"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "metrics.py",
+                "old_str": "def actionable_ratio(alerts):\n    actionable = [\n        alert\n        for alert in alerts\n        if alert.get(\"actionable\") and not alert.get(\"archived\", False)\n    ]\n    actionable_total = [alert for alert in alerts if alert.get(\"actionable\")]\n    return len(actionable) / len(actionable_total)",
+                "new_str": "def actionable_ratio(alerts):\n    actionable = [\n        alert\n        for alert in alerts\n        if alert.get(\"actionable\") and not alert.get(\"archived\", False)\n    ]\n    total = len(alerts)\n    return len(actionable) / total if total > 0 else 0.0"
+              },
+              "output": "Here's the result of running `cat -n` on /repo/metrics.py:\n     1\tdef actionable_ratio(alerts):\n     2\t    actionable = [\n     3\t        alert\n     4\t        for alert in alerts\n     5\t        if alert.get(\"actionable\") and not alert.get(\"archived\", False)\n     6\t    ]\n     7\t    total = len(alerts)\n     8\t    return len(actionable) / total if total > 0 else 0.0",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        }
+      ],
+      "patch": "diff --git a/metrics.py b/metrics.py\nindex 5c12b28..4d003ce 100644\n--- a/metrics.py\n+++ b/metrics.py\n@@ -4,5 +4,5 @@ def actionable_ratio(alerts):\n         for alert in alerts\n         if alert.get(\"actionable\") and not alert.get(\"archived\", False)\n     ]\n-    actionable_total = [alert for alert in alerts if alert.get(\"actionable\")]\n-    return len(actionable) / len(actionable_total)\n+    total = len(alerts)\n+    return len(actionable) / total if total > 0 else 0.0\n",
+      "submitted": true,
+      "stopped_reason": "auto_finalized",
+      "stats": {
+        "input_tokens": 21175,
+        "output_tokens": 1250,
+        "turns": 4,
+        "tool_calls": 4,
+        "iterations": 18,
+        "tree_nodes_created": 5,
+        "best_node_depth": 4,
+        "best_node_value": 42.49405487999999,
+        "value_fn_tokens_in": 0,
+        "value_fn_tokens_out": 0
+      },
+      "mcts_tree": {
+        "nodes": [
+          {
+            "id": "0",
+            "parent_id": null,
+            "depth": 0,
+            "action_name": null,
+            "action_args_preview": "",
+            "visits": 4,
+            "mean_value": 5.09,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0",
+            "parent_id": "0",
+            "depth": 1,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"metrics.py\", \"start_line\": 1, \"end_line\": 100}",
+            "visits": 4,
+            "mean_value": 5.09,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0",
+            "parent_id": "0.0",
+            "depth": 2,
+            "action_name": "bash",
+            "action_args_preview": "{\"command\": \"python -m pytest -q test_metrics.py\"}",
+            "visits": 3,
+            "mean_value": 6.79,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0",
+            "parent_id": "0.0.0",
+            "depth": 3,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"metrics.py\", \"start_line\": 1, \"end_line\": 10}",
+            "visits": 2,
+            "mean_value": 10.18,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0",
+            "parent_id": "0.0.0.0",
+            "depth": 4,
+            "action_name": "str_replace",
+            "action_args_preview": "{\"path\": \"metrics.py\", \"old_str\": \"def actionable_ratio(alerts):\\n    actionable",
+            "visits": 1,
+            "mean_value": 20.36,
+            "llm_value": null,
+            "submitted": true,
+            "is_branch_point": true,
+            "edit_made": true,
+            "success_checks": 1,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 1,
+            "has_nonempty_patch": true,
+            "stopped_reason": "auto_finalized",
+            "vote_counts": {
+              "{\"arguments\": {\"new_str\": \"def actionable_ratio(alerts):\\n    actionable = [\\n        alert\\n        for alert in alerts\\n        if alert.get(\\\"actionable\\\") and not alert.get(\\\"archived\\\", False)\\n    ]\\n    total = len(alerts)\\n    return len(actionable) / total if total > 0 else 0.0\", \"old_str\": \"def actionable_ratio(alerts):\\n    actionable = [\\n        alert\\n        for alert in alerts\\n        if alert.get(\\\"actionable\\\") and not alert.get(\\\"archived\\\", False)\\n    ]\\n    actionable_total = [alert for alert in alerts if alert.get(\\\"actionable\\\")]\\n    return len(actionable) / len(actionable_total)\", \"path\": \"metrics.py\"}, \"name\": \"str_replace\"}": 2,
+              "{\"arguments\": {\"new_str\": \"def actionable_ratio(alerts):\\n    actionable = [\\n        alert\\n        for alert in alerts\\n        if alert.get(\\\"actionable\\\") and not alert.get(\\\"archived\\\", False)\\n    ]\\n    actionable_total = [\\n        alert\\n        for alert in alerts\\n        if alert.get(\\\"actionable\\\") and not alert.get(\\\"archived\\\", False)\\n    ]\\n    return len(actionable) / len(actionable_total)\", \"old_str\": \"def actionable_ratio(alerts):\\n    actionable = [\\n        alert\\n        for alert in alerts\\n        if alert.get(\\\"actionable\\\") and not alert.get(\\\"archived\\\", False)\\n    ]\\n    actionable_total = [alert for alert in alerts if alert.get(\\\"actionable\\\")]\\n    return len(actionable) / len(actionable_total)\", \"path\": \"metrics.py\"}, \"name\": \"str_replace\"}": 1
+            },
+            "on_result_path": true
+          }
+        ],
+        "result_node_id": "0.0.0.0.0"
+      },
+      "vote_summary": [
+        {
+          "depth": 4,
+          "action": "str_replace",
+          "winner_votes": 2,
+          "total_samples": 3,
+          "unique_candidates": 2
+        }
+      ],
+      "review_feedback": {
+        "decision": "accept",
+        "primary_reason": "All success checks verified (pre-run); skipping model reviewer.",
+        "required_changes": [],
+        "validations_to_rerun": []
+      }
+    }
+  ],
+  "instance_id": "ratio_guard_001",
+  "duration_seconds": 117.11
+}

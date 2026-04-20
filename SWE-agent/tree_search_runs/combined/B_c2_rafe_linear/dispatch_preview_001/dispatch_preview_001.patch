@@ -1,0 +1,30 @@
+diff --git a/app/utils/names.py b/app/utils/names.py
+index 5e98495..1c40bd7 100644
+--- a/app/utils/names.py
++++ b/app/utils/names.py
+@@ -3,6 +3,12 @@ def normalize_route_code(name: str) -> str:
+ 
+ 
+ def display_contact_name(name: str) -> str:
+-    cleaned = "-".join(part.strip().lower() for part in name.split("-"))
+-    return cleaned[:1].upper() + cleaned[1:]
++    parts = [part.strip() for part in name.split('-')]
++    capitalized_parts = []
++    for part in parts:
++        if "'" in part:
++            capitalized_parts.append(part)
++        else:
++            capitalized_parts.append(part.capitalize())
++    return '-'.join(capitalized_parts)
+ 
+diff --git a/tests/test_name_helpers.py b/tests/test_name_helpers.py
+index 40a0829..b1257ba 100644
+--- a/tests/test_name_helpers.py
++++ b/tests/test_name_helpers.py
+@@ -6,5 +6,5 @@ def test_display_contact_name_simple_case() -> None:
+ 
+ 
+ def test_display_contact_name_hyphen_without_apostrophe() -> None:
+-    assert display_contact_name("mina-west") == "Mina-west"
++    assert display_contact_name("mina-west") == "Mina-West"
+ 

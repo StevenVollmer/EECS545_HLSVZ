@@ -1,0 +1,22 @@
+diff --git a/app/utils/names.py b/app/utils/names.py
+index 5e98495..5e2dd77 100644
+--- a/app/utils/names.py
++++ b/app/utils/names.py
+@@ -3,6 +3,15 @@ def normalize_route_code(name: str) -> str:
+ 
+ 
+ def display_contact_name(name: str) -> str:
+-    cleaned = "-".join(part.strip().lower() for part in name.split("-"))
+-    return cleaned[:1].upper() + cleaned[1:]
++    parts = [part.strip() for part in name.split("-")]
++    # Capitalize first letter of each part, handling apostrophes correctly
++    capitalized = []
++    for part in parts:
++        if part:
++            # Handle apostrophes by capitalizing after them
++            capitalized_part = part[0].upper() + part[1:]
++            # Ensure any apostrophe followed by lowercase is capitalized
++            capitalized_part = capitalized_part.replace("'", "'")
++            capitalized.append(capitalized_part)
++    return "-".join(capitalized)
+ 
