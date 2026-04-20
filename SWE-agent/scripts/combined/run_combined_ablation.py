@@ -317,6 +317,8 @@ def build_runs(output_root: Path, resume: bool) -> list[tuple[str, list[str], st
     add("F_c2_9b_120b_planner",     _F_FLAGS, C2)
 
     # Pure-local 9b runs (no remote LLM — safe after VPN drops)
+    add("A_c1_9b_mcts",             _A_FLAGS, C1)
+    add("A_c2_9b_mcts",             _A_FLAGS, C2)
     add("A_c3_9b_mcts",             _A_FLAGS, C3)
     add("G_c1_9b_hindsight",        _G_FLAGS, C1)
     add("G_c2_9b_hindsight",        _G_FLAGS, C2)
@@ -328,6 +330,7 @@ def build_runs(output_root: Path, resume: bool) -> list[tuple[str, list[str], st
     add("K_c2_minimal_sweSearch",   _K_FLAGS, C2)
 
     # ── Remote group (pure cluster, no local GPU) ─────────────────────────
+    add("B_c1_rafe_linear",         _B_FLAGS, C1)
     add("B_c2_rafe_linear",         _B_FLAGS, C2)
     add("B_c3_rafe_linear",         _B_FLAGS, C3)
     add("C_c1_mixed_mcts",          _C_FLAGS, C1)
@@ -490,14 +493,19 @@ def main() -> None:
         _summarize(args.output_root)
         return
 
-    # Determine which run IDs to include
-    only_ids: set[str] | None = None
+    # Determine which run IDs to include.
+    # --group and --only can be combined:
+    #   - group applies by variant prefix letter (A/B/C...)
+    #   - only applies by run_id prefix (e.g. C_c1)
+    explicit_only: set[str] | None = None
     if args.only:
-        only_ids = {s.strip() for s in args.only.split(",")}
-    elif args.group == "local":
-        only_ids = LOCAL_PREFIXES   # matched as run_id.split("_")[0] below
+        explicit_only = {s.strip() for s in args.only.split(",") if s.strip()}
+
+    group_prefixes: set[str] | None = None
+    if args.group == "local":
+        group_prefixes = LOCAL_PREFIXES
     elif args.group == "remote":
-        only_ids = REMOTE_PREFIXES
+        group_prefixes = REMOTE_PREFIXES
 
     runs = build_runs(args.output_root, args.resume)
 
@@ -509,16 +517,12 @@ def main() -> None:
     print("-" * 110)
 
     for run_id, cmd, instances_path in runs:
-        if only_ids:
-            # For --group, match by first letter (variant prefix); for --only, match full prefix
-            if args.group:
-                if run_id.split("_")[0] not in only_ids:
-                    print(f"{run_id:<40}  {'[skipped]':<22}")
-                    continue
-            else:
-                if not any(run_id.startswith(oid) for oid in only_ids):
-                    print(f"{run_id:<40}  {'[skipped]':<22}")
-                    continue
+        if group_prefixes and run_id.split("_")[0] not in group_prefixes:
+            print(f"{run_id:<40}  {'[skipped]':<22}")
+            continue
+        if explicit_only and not any(run_id.startswith(oid) for oid in explicit_only):
+            print(f"{run_id:<40}  {'[skipped]':<22}")
+            continue
 
         run_dir = args.output_root / run_id
         done = _count_trajs(run_dir)

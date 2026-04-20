@@ -33,12 +33,19 @@
   - coder/value function on smaller/cheaper model(s).
 - **Ablation orchestration**: `run_combined_ablation.py` (variants C–K on c1/c2; c3 held out for final checks).
 
-### D. Combined variant families (from ablations)
+### D. Combined variant glossary (A through K, explicit)
 
-- **Baselines**: A (9b MCTS), B (linear split model), K (minimal swe-search).
-- **Our mixed-role search variants**: C, D, E.
-- **9b technique variants**: F, G, H, I.
-- **30b swe-search variant**: J.
+- **A — 9b MCTS baseline (ours):** 9b planner/coder/reviewer with MCTS and our custom controls; no hindsight/value-fn extras.
+- **B — Rafe linear split baseline:** 120b planner/reviewer + 30b coder, effectively linearized search behavior.
+- **C — Mixed-size MCTS (ours):** 120b planner/reviewer + 30b coder with our MCTS configuration.
+- **D — C + 30b value function:** mixed-size MCTS plus LLM value scoring.
+- **E — D + hindsight feedback:** mixed-size MCTS + value scoring + dead-branch hindsight hints.
+- **F — 9b coder + 120b planner/reviewer:** isolates planner/reviewer strength with a smaller coder.
+- **G — 9b + hindsight:** all-9b run with cross-branch hindsight feedback.
+- **H — 9b + self-eval value fn:** all-9b run with 9b value function (no hindsight).
+- **I — 9b full swe-search style:** 9b value function + hindsight (swe-search-style package on 9b).
+- **J — 30b full swe-search style:** flat 30b role assignment + value fn + hindsight.
+- **K — minimal swe-search baseline:** stripped-down single-agent/UCB1-style baseline with swe-search-style signals but without our custom orchestration improvements.
 
 ## 2) Custom cases summary and why they exist
 
@@ -57,32 +64,29 @@ The project intentionally uses `custom_cases`, `custom_cases_2`, and `custom_cas
 
 ## 3) Performance summary (ablative + final)
 
-Primary sources used:
-- `combined_results/results.csv`
-- `combined_results/tables.tex`
-- `combined_results/figures/fig1..fig4`
+Primary sources used (latest run set):
+- `combined_results/final_results.csv`
+- `combined_results/final_tables.tex`
+- `combined_results/final_efficiency_accuracy.csv`
+- `combined_results/final_pareto_frontier.csv`
+- `combined_results/figures/`
 
-### Headline solve-rate results (current combined evaluator outputs)
+### Headline solve-rate results (final-labeled outputs)
 
 - **A (9b MCTS)**: c1 75%, c2 60%, c3 70%.
-- **B (linear split)**: c1 90%, c2 60%, c3 80%.
+- **B (linear split)**: c1 80%, c2 60%, c3 80%.
 - **C (mixed MCTS)**: c1 85%, c2 70%, c3 75%.
 
-### Important caveat on B(c1)
+### Final ablation trends (c1+c2 average solve-rate)
 
-- Current `eval_combined.py` now falls back to trajectory `submitted` status for B(c1) because strict patch replay against evolving fixture repos is unreliable.
-- This can inflate B(c1) relative to strict success-check evaluation.
-- Paper text should explicitly mark B(c1) as **proxy-evaluated unless strict rejudge is rerun from frozen fixtures/commits**.
+- Top: **C and G** at 77.5%.
+- Next: **E and I** at 72.5%.
+- Middle: **B, D, H** at 70%.
+- Lower: **A and J** at 67.5%, **F** at 65%, **K** at 55%.
 
-### Ablation trends (c1+c2 average solve-rate)
+### Efficiency vs accuracy (final estimated USD metric)
 
-- Top group: **C and G** at 77.5%.
-- Strong middle: B (75%), E and I (72.5%), D/H (70%).
-- Lower: A/J (67.5%), F (65%), K (55%).
-
-### Efficiency vs accuracy (current estimated USD metric)
-
-- New Pareto frontier export (`combined_results/pareto_frontier.csv`) identifies **B** and **G** as non-dominated under current metrics.
+- `combined_results/final_pareto_frontier.csv` identifies **B** and **G** as non-dominated under current metrics.
 - **G (9b hindsight)** is the strongest low-cost/high-accuracy frontier point among search-heavy variants.
 
 ## 4) Analysis-tool improvements completed in this pass
@@ -90,23 +94,24 @@ Primary sources used:
 ### Updated evaluator (`SWE-agent/scripts/combined/eval_combined.py`)
 
 Added exports to support paper analysis:
-- `--instance-csv` → per-instance metrics (`combined_results/instance_metrics.csv`)
-- `--efficiency-csv` → run-level efficiency/accuracy table (`combined_results/efficiency_accuracy.csv`)
-- `--frontier-csv` → c1+c2 Pareto table (`combined_results/pareto_frontier.csv`)
+- `--instance-csv` → per-instance metrics (`combined_results/final_instance_metrics.csv`)
+- `--efficiency-csv` → run-level efficiency/accuracy table (`combined_results/final_efficiency_accuracy.csv`)
+- `--frontier-csv` → c1+c2 Pareto table (`combined_results/final_pareto_frontier.csv`)
 
 Also updated reporting/tables to use **estimated USD cost** consistently.
 
-### Regenerated artifacts
+### Regenerated / analyzed artifacts (final set)
 
-- `combined_results/results.csv`
-- `combined_results/tables.tex`
-- `combined_results/instance_metrics.csv`
-- `combined_results/efficiency_accuracy.csv`
-- `combined_results/pareto_frontier.csv`
+- `combined_results/final_results.csv`
+- `combined_results/final_tables.tex`
+- `combined_results/final_instance_metrics.csv`
+- `combined_results/final_efficiency_accuracy.csv`
+- `combined_results/final_pareto_frontier.csv`
 - `combined_results/figures/fig1_main_results.png`
 - `combined_results/figures/fig2_ablation.png`
 - `combined_results/figures/fig3_efficiency.png`
 - `combined_results/figures/fig4_token_breakdown.png`
+- `combined_results/figures/fig5_set_heatmap.png`
 
 ## 5) Key findings so far
 
@@ -132,3 +137,112 @@ Also updated reporting/tables to use **estimated USD cost** consistently.
 - How much of the apparent linear baseline strength is true correctness vs submission proxy effects.
 - Whether planner gains and reviewer gains are additive or redundant by case type.
 - Whether value-function overhead is justified after variance is accounted for.
+
+## 8) CLI runbook (c1/c2, c3, and analysis)
+
+### Prereqs
+
+- Run from repo root.
+- Keep **exactly one local-GPU terminal** for local 9b runs.
+- Remote-only runs can execute in parallel terminals.
+
+### A) c1/c2 runs (recommended minimum: A/B/C/E/G)
+
+#### Seed 1
+
+```bash
+# Terminal L (local only)
+python SWE-agent/scripts/combined/run_combined_ablation.py --execute --resume --group local --only A_c1,A_c2,G_c1,G_c2 --output-root SWE-agent/tree_search_runs/combined_seed1
+```
+
+```bash
+# Terminal R1 (remote)
+python SWE-agent/scripts/combined/run_combined_ablation.py --execute --resume --group remote --only B_c1,B_c2 --output-root SWE-agent/tree_search_runs/combined_seed1
+```
+
+```bash
+# Terminal R2 (remote)
+python SWE-agent/scripts/combined/run_combined_ablation.py --execute --resume --group remote --only C_c1,C_c2 --output-root SWE-agent/tree_search_runs/combined_seed1
+```
+
+```bash
+# Terminal R3 (remote)
+python SWE-agent/scripts/combined/run_combined_ablation.py --execute --resume --group remote --only E_c1,E_c2 --output-root SWE-agent/tree_search_runs/combined_seed1
+```
+
+Repeat the same four commands for seeds 2 and 3 by replacing:
+
+- `combined_seed1` → `combined_seed2`
+- `combined_seed1` → `combined_seed3`
+
+### B) c3 final evaluation (run after architecture/model freeze)
+
+#### Seed 1
+
+```bash
+# Terminal L (local only)
+python SWE-agent/scripts/combined/run_combined_ablation.py --execute --resume --group local --only A_c3 --output-root SWE-agent/tree_search_runs/combined_seed1_c3
+```
+
+```bash
+# Terminal R1 (remote)
+python SWE-agent/scripts/combined/run_combined_ablation.py --execute --resume --group remote --only B_c3 --output-root SWE-agent/tree_search_runs/combined_seed1_c3
+```
+
+```bash
+# Terminal R2 (remote)
+python SWE-agent/scripts/combined/run_combined_ablation.py --execute --resume --group remote --only C_c3 --output-root SWE-agent/tree_search_runs/combined_seed1_c3
+```
+
+Repeat for additional seeds with `combined_seed2_c3`, `combined_seed3_c3` if needed.
+
+### C) Full analysis scripts (in place) and commands
+
+Scripts:
+
+- `SWE-agent/scripts/combined/eval_combined.py`
+- `SWE-agent/scripts/combined/plot_results.py`
+- `SWE-agent/scripts/combined/audit_reviewer.py`
+- `SWE-agent/scripts/combined/eval_patches.py`
+
+Per-seed evaluation + artifact generation:
+
+```bash
+python SWE-agent/scripts/combined/eval_combined.py \
+  --combined-root SWE-agent/tree_search_runs/combined_seed1 \
+  --csv combined_results/seed1_results.csv \
+  --instance-csv combined_results/seed1_instance_metrics.csv \
+  --efficiency-csv combined_results/seed1_efficiency_accuracy.csv \
+  --frontier-csv combined_results/seed1_pareto_frontier.csv \
+  --latex combined_results/seed1_tables.tex
+```
+
+```bash
+python SWE-agent/scripts/combined/plot_results.py \
+  --combined-root SWE-agent/tree_search_runs/combined_seed1 \
+  --output-dir combined_results/figures_seed1 \
+  --format png
+```
+
+To process all seeds quickly:
+
+```bash
+for s in 1 2 3; do
+  python SWE-agent/scripts/combined/eval_combined.py \
+    --combined-root SWE-agent/tree_search_runs/combined_seed${s} \
+    --csv combined_results/seed${s}_results.csv \
+    --instance-csv combined_results/seed${s}_instance_metrics.csv \
+    --efficiency-csv combined_results/seed${s}_efficiency_accuracy.csv \
+    --frontier-csv combined_results/seed${s}_pareto_frontier.csv \
+    --latex combined_results/seed${s}_tables.tex
+done
+```
+
+Generate publication figures directly from finalized CSV outputs:
+
+```bash
+python SWE-agent/scripts/combined/plot_results.py \
+  --results-csv combined_results/final_results.csv \
+  --output-dir combined_results/figures \
+  --format png
+```

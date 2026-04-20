@@ -1,0 +1,809 @@
+{
+  "turns": [
+    {
+      "turn": 1,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q tests/test_team_digest.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q tests/test_team_digest.py"
+          },
+          "output": "F..                                                                      [100%]\n=================================== FAILURES ===================================\n___________________ test_action_items_exclude_snoozed_tasks ____________________\n\n    def test_action_items_exclude_snoozed_tasks() -> None:\n        tasks = [\n            Task(title=\"CPU\", owner=\"Ava\"),\n            Task(title=\"Billing\", owner=\"Mina\", snoozed=True),\n            Task(title=\"Queue\", owner=\"Ava\"),\n        ]\n        digest = build_team_digest(tasks)\n        assert digest.open_tasks == 3\n>       assert digest.action_items == 2\nE       AssertionError: assert 3 == 2\nE        +  where 3 = TeamDigest(open_tasks=3, action_items=3, owners=['Ava', 'Mina']).action_items\n\ntests/test_team_digest.py:13: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_team_digest.py::test_action_items_exclude_snoozed_tasks - AssertionError: assert 3 == 2\n1 failed, 2 passed in 0.09s",
+          "is_error": true,
+          "exit_code": 1
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 2,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/services/team_digest.py",
+            "start_line": 1,
+            "end_line": 50
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/services/team_digest.py",
+            "start_line": 1,
+            "end_line": 50
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/services/team_digest.py:\n     1\tfrom dataclasses import dataclass\n     2\t\n     3\tfrom app.models.task import Task\n     4\t\n     5\t\n     6\t@dataclass\n     7\tclass TeamDigest:\n     8\t    open_tasks: int\n     9\t    action_items: int\n    10\t    owners: list[str]\n    11\t\n    12\t\n    13\tdef build_team_digest(tasks: list[Task]) -> TeamDigest:\n    14\t    open_tasks = [task for task in tasks if not task.done]\n    15\t    action_items = len(open_tasks)\n    16\t    owners = sorted({task.owner for task in open_tasks})\n    17\t    return TeamDigest(open_tasks=len(open_tasks), action_items=action_items, owners=owners)",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 3,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/models/task.py",
+            "start_line": 1,
+            "end_line": 30
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/models/task.py",
+            "start_line": 1,
+            "end_line": 30
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/models/task.py:\n     1\tfrom dataclasses import dataclass\n     2\t\n     3\t\n     4\t@dataclass\n     5\tclass Task:\n     6\t    title: str\n     7\t    owner: str\n     8\t    done: bool = False\n     9\t    snoozed: bool = False",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 4,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/services/team_digest.py",
+            "old_str": "open_tasks = [task for task in tasks if not task.done]\n    action_items = len(open_tasks)",
+            "new_str": "open_tasks = [task for task in tasks if not task.done and not task.snoozed]\n    action_items = len(open_tasks)"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/services/team_digest.py",
+            "old_str": "open_tasks = [task for task in tasks if not task.done]\n    action_items = len(open_tasks)",
+            "new_str": "open_tasks = [task for task in tasks if not task.done and not task.snoozed]\n    action_items = len(open_tasks)"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/services/team_digest.py:\n     1\tfrom dataclasses import dataclass\n     2\t\n     3\tfrom app.models.task import Task\n     4\t\n     5\t\n     6\t@dataclass\n     7\tclass TeamDigest:\n     8\t    open_tasks: int\n     9\t    action_items: int\n    10\t    owners: list[str]\n    11\t\n    12\t\n    13\tdef build_team_digest(tasks: list[Task]) -> TeamDigest:\n    14\t    open_tasks = [task for task in tasks if not task.done and not task.snoozed]\n    15\t    action_items = len(open_tasks)\n    16\t    owners = sorted({task.owner for task in open_tasks})\n    17\t    return TeamDigest(open_tasks=len(open_tasks), action_items=action_items, owners=owners)",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 5,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q tests/test_team_digest.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q tests/test_team_digest.py"
+          },
+          "output": "F..                                                                      [100%]\n=================================== FAILURES ===================================\n___________________ test_action_items_exclude_snoozed_tasks ____________________\n\n    def test_action_items_exclude_snoozed_tasks() -> None:\n        tasks = [\n            Task(title=\"CPU\", owner=\"Ava\"),\n            Task(title=\"Billing\", owner=\"Mina\", snoozed=True),\n            Task(title=\"Queue\", owner=\"Ava\"),\n        ]\n        digest = build_team_digest(tasks)\n>       assert digest.open_tasks == 3\nE       AssertionError: assert 2 == 3\nE        +  where 2 = TeamDigest(open_tasks=2, action_items=2, owners=['Ava']).open_tasks\n\ntests/test_team_digest.py:12: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_team_digest.py::test_action_items_exclude_snoozed_tasks - AssertionError: assert 2 == 3\n1 failed, 2 passed in 0.09s",
+          "is_error": true,
+          "exit_code": 1
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 6,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "/repo/app/services/team_digest.py",
+            "old_str": "open_tasks = [task for task in tasks if not task.done and not task.snoozed]\n    action_items = len(open_tasks)",
+            "new_str": "open_tasks = [task for task in tasks if not task.done]\n    action_items = len([task for task in open_tasks if not task.snoozed])"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "/repo/app/services/team_digest.py",
+            "old_str": "open_tasks = [task for task in tasks if not task.done and not task.snoozed]\n    action_items = len(open_tasks)",
+            "new_str": "open_tasks = [task for task in tasks if not task.done]\n    action_items = len([task for task in open_tasks if not task.snoozed])"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/services/team_digest.py:\n     1\tfrom dataclasses import dataclass\n     2\t\n     3\tfrom app.models.task import Task\n     4\t\n     5\t\n     6\t@dataclass\n     7\tclass TeamDigest:\n     8\t    open_tasks: int\n     9\t    action_items: int\n    10\t    owners: list[str]\n    11\t\n    12\t\n    13\tdef build_team_digest(tasks: list[Task]) -> TeamDigest:\n    14\t    open_tasks = [task for task in tasks if not task.done]\n    15\t    action_items = len([task for task in open_tasks if not task.snoozed])\n    16\t    owners = sorted({task.owner for task in open_tasks})\n    17\t    return TeamDigest(open_tasks=len(open_tasks), action_items=action_items, owners=owners)",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    }
+  ],
+  "stats": {
+    "input_tokens": 14578,
+    "output_tokens": 820,
+    "turns": 6,
+    "tool_calls": 6,
+    "iterations": 18,
+    "tree_nodes_created": 7,
+    "best_node_depth": 6,
+    "best_node_value": 38.31671222673399,
+    "value_fn_tokens_in": 0,
+    "value_fn_tokens_out": 0
+  },
+  "loop_state": {
+    "executable_edit_made": true,
+    "validation_passed": false,
+    "validation_attempted_after_edit": true,
+    "diff_checked": false,
+    "successful_post_edit_commands": [],
+    "satisfied_success_checks": [
+      "team_digest_tests_pass"
+    ],
+    "changed_files": [
+      "/repo/app/services/team_digest.py",
+      "app/services/team_digest.py"
+    ]
+  },
+  "stopped_reason": "auto_finalized",
+  "submitted": true,
+  "submission_summary": "Auto-finalized: required success checks were satisfied with a non-empty patch.",
+  "patch": "diff --git a/app/services/team_digest.py b/app/services/team_digest.py\nindex 6847e4e..9926ce1 100644\n--- a/app/services/team_digest.py\n+++ b/app/services/team_digest.py\n@@ -12,6 +12,6 @@ class TeamDigest:\n \n def build_team_digest(tasks: list[Task]) -> TeamDigest:\n     open_tasks = [task for task in tasks if not task.done]\n-    action_items = len(open_tasks)\n+    action_items = len([task for task in open_tasks if not task.snoozed])\n     owners = sorted({task.owner for task in open_tasks})\n     return TeamDigest(open_tasks=len(open_tasks), action_items=action_items, owners=owners)\n",
+  "info": {
+    "submission": "diff --git a/app/services/team_digest.py b/app/services/team_digest.py\nindex 6847e4e..9926ce1 100644\n--- a/app/services/team_digest.py\n+++ b/app/services/team_digest.py\n@@ -12,6 +12,6 @@ class TeamDigest:\n \n def build_team_digest(tasks: list[Task]) -> TeamDigest:\n     open_tasks = [task for task in tasks if not task.done]\n-    action_items = len(open_tasks)\n+    action_items = len([task for task in open_tasks if not task.snoozed])\n     owners = sorted({task.owner for task in open_tasks})\n     return TeamDigest(open_tasks=len(open_tasks), action_items=action_items, owners=owners)\n",
+    "submitted": true,
+    "submission_summary": "Auto-finalized: required success checks were satisfied with a non-empty patch.",
+    "stopped_reason": "auto_finalized"
+  },
+  "auto_finalized": true,
+  "mcts_meta": {
+    "model": "openai/Qwen/Qwen3-VL-30B-A3B-Instruct",
+    "value_model": null,
+    "hindsight_feedback": false,
+    "dead_branch_feedback_count": 0,
+    "iterations": 18,
+    "expansion_candidates": 1,
+    "edit_vote_samples": 1,
+    "ucb_c": 1.414,
+    "root_visits": 6,
+    "early_branching": false,
+    "early_branch_depth": 2
+  },
+  "vote_summary": [
+    {
+      "depth": 4,
+      "action": "str_replace",
+      "winner_votes": 1,
+      "total_samples": 1,
+      "unique_candidates": 1
+    },
+    {
+      "depth": 6,
+      "action": "str_replace",
+      "winner_votes": 1,
+      "total_samples": 1,
+      "unique_candidates": 1
+    }
+  ],
+  "mcts_tree": {
+    "nodes": [
+      {
+        "id": "0",
+        "parent_id": null,
+        "depth": 0,
+        "action_name": null,
+        "action_args_preview": "",
+        "visits": 6,
+        "mean_value": 3.64,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0",
+        "parent_id": "0",
+        "depth": 1,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q tests/test_team_digest.py\"}",
+        "visits": 6,
+        "mean_value": 3.64,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0",
+        "parent_id": "0.0",
+        "depth": 2,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"app/services/team_digest.py\", \"start_line\": 1, \"end_line\": 50}",
+        "visits": 5,
+        "mean_value": 4.37,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0",
+        "parent_id": "0.0.0",
+        "depth": 3,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"app/models/task.py\", \"start_line\": 1, \"end_line\": 30}",
+        "visits": 4,
+        "mean_value": 5.47,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0",
+        "parent_id": "0.0.0.0",
+        "depth": 4,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"app/services/team_digest.py\", \"old_str\": \"open_tasks = [task for task ",
+        "visits": 3,
+        "mean_value": 7.29,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 1,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"open_tasks = [task for task in tasks if not task.done and not task.snoozed]\\n    action_items = len(open_tasks)\", \"old_str\": \"open_tasks = [task for task in tasks if not task.done]\\n    action_items = len(open_tasks)\", \"path\": \"app/services/team_digest.py\"}, \"name\": \"str_replace\"}": 1
+        },
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0",
+        "depth": 5,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q tests/test_team_digest.py\"}",
+        "visits": 2,
+        "mean_value": 9.6,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 2,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0",
+        "depth": 6,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"/repo/app/services/team_digest.py\", \"old_str\": \"open_tasks = [task for",
+        "visits": 1,
+        "mean_value": 17.49,
+        "llm_value": null,
+        "submitted": true,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 3,
+        "has_nonempty_patch": true,
+        "stopped_reason": "auto_finalized",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"open_tasks = [task for task in tasks if not task.done]\\n    action_items = len([task for task in open_tasks if not task.snoozed])\", \"old_str\": \"open_tasks = [task for task in tasks if not task.done and not task.snoozed]\\n    action_items = len(open_tasks)\", \"path\": \"/repo/app/services/team_digest.py\"}, \"name\": \"str_replace\"}": 1
+        },
+        "on_result_path": true
+      }
+    ],
+    "result_node_id": "0.0.0.0.0.0.0"
+  },
+  "agent_architecture": "planner_coder_reviewer",
+  "architecture": "planner_coder_reviewer",
+  "role_model_stats": {
+    "planner": {
+      "model": "openai/openai/gpt-oss-120b",
+      "tokens_in": 641,
+      "tokens_out": 528,
+      "api_calls": 1
+    },
+    "coder": {
+      "model": "openai/Qwen/Qwen3-VL-30B-A3B-Instruct",
+      "input_tokens": 13937,
+      "output_tokens": 292,
+      "turns": 6,
+      "tool_calls": 6,
+      "iterations": 18,
+      "tree_nodes_created": 7,
+      "best_node_depth": 6,
+      "best_node_value": 38.31671222673399,
+      "value_fn_tokens_in": 0,
+      "value_fn_tokens_out": 0
+    }
+  },
+  "planner_handoff": {
+    "problem_summary": "",
+    "root_cause_hypothesis": "team_digest.get_action_items counts tasks without excluding those marked as snoozed",
+    "files_likely_affected": [
+      "app/services/team_digest.py",
+      "app/models/task.py"
+    ],
+    "target_symbols": [],
+    "discovery_priority": [
+      "app/services/team_digest.py",
+      "app/models/task.py"
+    ],
+    "first_actions": [
+      "Read app/services/team_digest.py around the get_action_items implementation",
+      "Run pytest -q tests/test_team_digest.py to reproduce the failing count",
+      "Inspect app/models/task.py to confirm the snoozed attribute/property name"
+    ],
+    "safe_reproduction_steps": [],
+    "reproduction_notes": [],
+    "required_validations": [
+      "pytest -q tests/test_team_digest.py",
+      "python -c \"import app.services.team_digest as td; print('ok')\""
+    ],
+    "allowed_change_types": [
+      "targeted runtime code fixes"
+    ],
+    "forbidden_edits": [
+      "do not modify any test files",
+      "do not change unrelated service or model logic"
+    ],
+    "escalation_conditions": [
+      "If the issue is still unclear after targeted inspection and reproduction."
+    ]
+  },
+  "review_feedback": {
+    "decision": "accept",
+    "primary_reason": "All success checks verified (pre-run); skipping model reviewer.",
+    "required_changes": [],
+    "validations_to_rerun": []
+  },
+  "coder_rounds": [
+    {
+      "round": 1,
+      "turns": [
+        {
+          "turn": 1,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q tests/test_team_digest.py"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q tests/test_team_digest.py"
+              },
+              "output": "F..                                                                      [100%]\n=================================== FAILURES ===================================\n___________________ test_action_items_exclude_snoozed_tasks ____________________\n\n    def test_action_items_exclude_snoozed_tasks() -> None:\n        tasks = [\n            Task(title=\"CPU\", owner=\"Ava\"),\n            Task(title=\"Billing\", owner=\"Mina\", snoozed=True),\n            Task(title=\"Queue\", owner=\"Ava\"),\n        ]\n        digest = build_team_digest(tasks)\n        assert digest.open_tasks == 3\n>       assert digest.action_items == 2\nE       AssertionError: assert 3 == 2\nE        +  where 3 = TeamDigest(open_tasks=3, action_items=3, owners=['Ava', 'Mina']).action_items\n\ntests/test_team_digest.py:13: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_team_digest.py::test_action_items_exclude_snoozed_tasks - AssertionError: assert 3 == 2\n1 failed, 2 passed in 0.09s",
+              "is_error": true,
+              "exit_code": 1
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 2,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "app/services/team_digest.py",
+                "start_line": 1,
+                "end_line": 50
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "app/services/team_digest.py",
+                "start_line": 1,
+                "end_line": 50
+              },
+              "output": "Here's the result of running `cat -n` on /repo/app/services/team_digest.py:\n     1\tfrom dataclasses import dataclass\n     2\t\n     3\tfrom app.models.task import Task\n     4\t\n     5\t\n     6\t@dataclass\n     7\tclass TeamDigest:\n     8\t    open_tasks: int\n     9\t    action_items: int\n    10\t    owners: list[str]\n    11\t\n    12\t\n    13\tdef build_team_digest(tasks: list[Task]) -> TeamDigest:\n    14\t    open_tasks = [task for task in tasks if not task.done]\n    15\t    action_items = len(open_tasks)\n    16\t    owners = sorted({task.owner for task in open_tasks})\n    17\t    return TeamDigest(open_tasks=len(open_tasks), action_items=action_items, owners=owners)",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 3,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "app/models/task.py",
+                "start_line": 1,
+                "end_line": 30
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "app/models/task.py",
+                "start_line": 1,
+                "end_line": 30
+              },
+              "output": "Here's the result of running `cat -n` on /repo/app/models/task.py:\n     1\tfrom dataclasses import dataclass\n     2\t\n     3\t\n     4\t@dataclass\n     5\tclass Task:\n     6\t    title: str\n     7\t    owner: str\n     8\t    done: bool = False\n     9\t    snoozed: bool = False",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 4,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "app/services/team_digest.py",
+                "old_str": "open_tasks = [task for task in tasks if not task.done]\n    action_items = len(open_tasks)",
+                "new_str": "open_tasks = [task for task in tasks if not task.done and not task.snoozed]\n    action_items = len(open_tasks)"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "app/services/team_digest.py",
+                "old_str": "open_tasks = [task for task in tasks if not task.done]\n    action_items = len(open_tasks)",
+                "new_str": "open_tasks = [task for task in tasks if not task.done and not task.snoozed]\n    action_items = len(open_tasks)"
+              },
+              "output": "Here's the result of running `cat -n` on /repo/app/services/team_digest.py:\n     1\tfrom dataclasses import dataclass\n     2\t\n     3\tfrom app.models.task import Task\n     4\t\n     5\t\n     6\t@dataclass\n     7\tclass TeamDigest:\n     8\t    open_tasks: int\n     9\t    action_items: int\n    10\t    owners: list[str]\n    11\t\n    12\t\n    13\tdef build_team_digest(tasks: list[Task]) -> TeamDigest:\n    14\t    open_tasks = [task for task in tasks if not task.done and not task.snoozed]\n    15\t    action_items = len(open_tasks)\n    16\t    owners = sorted({task.owner for task in open_tasks})\n    17\t    return TeamDigest(open_tasks=len(open_tasks), action_items=action_items, owners=owners)",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 5,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q tests/test_team_digest.py"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q tests/test_team_digest.py"
+              },
+              "output": "F..                                                                      [100%]\n=================================== FAILURES ===================================\n___________________ test_action_items_exclude_snoozed_tasks ____________________\n\n    def test_action_items_exclude_snoozed_tasks() -> None:\n        tasks = [\n            Task(title=\"CPU\", owner=\"Ava\"),\n            Task(title=\"Billing\", owner=\"Mina\", snoozed=True),\n            Task(title=\"Queue\", owner=\"Ava\"),\n        ]\n        digest = build_team_digest(tasks)\n>       assert digest.open_tasks == 3\nE       AssertionError: assert 2 == 3\nE        +  where 2 = TeamDigest(open_tasks=2, action_items=2, owners=['Ava']).open_tasks\n\ntests/test_team_digest.py:12: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_team_digest.py::test_action_items_exclude_snoozed_tasks - AssertionError: assert 2 == 3\n1 failed, 2 passed in 0.09s",
+              "is_error": true,
+              "exit_code": 1
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 6,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "/repo/app/services/team_digest.py",
+                "old_str": "open_tasks = [task for task in tasks if not task.done and not task.snoozed]\n    action_items = len(open_tasks)",
+                "new_str": "open_tasks = [task for task in tasks if not task.done]\n    action_items = len([task for task in open_tasks if not task.snoozed])"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "/repo/app/services/team_digest.py",
+                "old_str": "open_tasks = [task for task in tasks if not task.done and not task.snoozed]\n    action_items = len(open_tasks)",
+                "new_str": "open_tasks = [task for task in tasks if not task.done]\n    action_items = len([task for task in open_tasks if not task.snoozed])"
+              },
+              "output": "Here's the result of running `cat -n` on /repo/app/services/team_digest.py:\n     1\tfrom dataclasses import dataclass\n     2\t\n     3\tfrom app.models.task import Task\n     4\t\n     5\t\n     6\t@dataclass\n     7\tclass TeamDigest:\n     8\t    open_tasks: int\n     9\t    action_items: int\n    10\t    owners: list[str]\n    11\t\n    12\t\n    13\tdef build_team_digest(tasks: list[Task]) -> TeamDigest:\n    14\t    open_tasks = [task for task in tasks if not task.done]\n    15\t    action_items = len([task for task in open_tasks if not task.snoozed])\n    16\t    owners = sorted({task.owner for task in open_tasks})\n    17\t    return TeamDigest(open_tasks=len(open_tasks), action_items=action_items, owners=owners)",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        }
+      ],
+      "patch": "diff --git a/app/services/team_digest.py b/app/services/team_digest.py\nindex 6847e4e..9926ce1 100644\n--- a/app/services/team_digest.py\n+++ b/app/services/team_digest.py\n@@ -12,6 +12,6 @@ class TeamDigest:\n \n def build_team_digest(tasks: list[Task]) -> TeamDigest:\n     open_tasks = [task for task in tasks if not task.done]\n-    action_items = len(open_tasks)\n+    action_items = len([task for task in open_tasks if not task.snoozed])\n     owners = sorted({task.owner for task in open_tasks})\n     return TeamDigest(open_tasks=len(open_tasks), action_items=action_items, owners=owners)\n",
+      "submitted": true,
+      "stopped_reason": "auto_finalized",
+      "stats": {
+        "input_tokens": 14578,
+        "output_tokens": 820,
+        "turns": 6,
+        "tool_calls": 6,
+        "iterations": 18,
+        "tree_nodes_created": 7,
+        "best_node_depth": 6,
+        "best_node_value": 38.31671222673399,
+        "value_fn_tokens_in": 0,
+        "value_fn_tokens_out": 0
+      },
+      "mcts_tree": {
+        "nodes": [
+          {
+            "id": "0",
+            "parent_id": null,
+            "depth": 0,
+            "action_name": null,
+            "action_args_preview": "",
+            "visits": 6,
+            "mean_value": 3.64,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0",
+            "parent_id": "0",
+            "depth": 1,
+            "action_name": "bash",
+            "action_args_preview": "{\"command\": \"python -m pytest -q tests/test_team_digest.py\"}",
+            "visits": 6,
+            "mean_value": 3.64,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0",
+            "parent_id": "0.0",
+            "depth": 2,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"app/services/team_digest.py\", \"start_line\": 1, \"end_line\": 50}",
+            "visits": 5,
+            "mean_value": 4.37,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0",
+            "parent_id": "0.0.0",
+            "depth": 3,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"app/models/task.py\", \"start_line\": 1, \"end_line\": 30}",
+            "visits": 4,
+            "mean_value": 5.47,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0",
+            "parent_id": "0.0.0.0",
+            "depth": 4,
+            "action_name": "str_replace",
+            "action_args_preview": "{\"path\": \"app/services/team_digest.py\", \"old_str\": \"open_tasks = [task for task ",
+            "visits": 3,
+            "mean_value": 7.29,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": true,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 1,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {
+              "{\"arguments\": {\"new_str\": \"open_tasks = [task for task in tasks if not task.done and not task.snoozed]\\n    action_items = len(open_tasks)\", \"old_str\": \"open_tasks = [task for task in tasks if not task.done]\\n    action_items = len(open_tasks)\", \"path\": \"app/services/team_digest.py\"}, \"name\": \"str_replace\"}": 1
+            },
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0.0",
+            "parent_id": "0.0.0.0.0",
+            "depth": 5,
+            "action_name": "bash",
+            "action_args_preview": "{\"command\": \"python -m pytest -q tests/test_team_digest.py\"}",
+            "visits": 2,
+            "mean_value": 9.6,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": true,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 2,
+            "has_nonempty_patch": true,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0.0.0.0",
+            "parent_id": "0.0.0.0.0.0",
+            "depth": 6,
+            "action_name": "str_replace",
+            "action_args_preview": "{\"path\": \"/repo/app/services/team_digest.py\", \"old_str\": \"open_tasks = [task for",
+            "visits": 1,
+            "mean_value": 17.49,
+            "llm_value": null,
+            "submitted": true,
+            "is_branch_point": true,
+            "edit_made": true,
+            "success_checks": 1,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 3,
+            "has_nonempty_patch": true,
+            "stopped_reason": "auto_finalized",
+            "vote_counts": {
+              "{\"arguments\": {\"new_str\": \"open_tasks = [task for task in tasks if not task.done]\\n    action_items = len([task for task in open_tasks if not task.snoozed])\", \"old_str\": \"open_tasks = [task for task in tasks if not task.done and not task.snoozed]\\n    action_items = len(open_tasks)\", \"path\": \"/repo/app/services/team_digest.py\"}, \"name\": \"str_replace\"}": 1
+            },
+            "on_result_path": true
+          }
+        ],
+        "result_node_id": "0.0.0.0.0.0.0"
+      },
+      "vote_summary": [
+        {
+          "depth": 4,
+          "action": "str_replace",
+          "winner_votes": 1,
+          "total_samples": 1,
+          "unique_candidates": 1
+        },
+        {
+          "depth": 6,
+          "action": "str_replace",
+          "winner_votes": 1,
+          "total_samples": 1,
+          "unique_candidates": 1
+        }
+      ],
+      "review_feedback": {
+        "decision": "accept",
+        "primary_reason": "All success checks verified (pre-run); skipping model reviewer.",
+        "required_changes": [],
+        "validations_to_rerun": []
+      }
+    }
+  ],
+  "instance_id": "team_digest_001",
+  "duration_seconds": 69.68
+}

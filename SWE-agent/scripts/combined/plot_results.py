@@ -16,6 +16,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import csv
 import pathlib
 import sys
 
@@ -106,6 +107,34 @@ def _build_lookup(summaries: list[RunSummary]) -> dict[str, RunSummary]:
     return {_prefix(s.run_id): s for s in summaries}
 
 
+def _load_summaries_from_csv(path: pathlib.Path) -> list[RunSummary]:
+    summaries: list[RunSummary] = []
+    with open(path, newline="") as f:
+        for row in csv.DictReader(f):
+            summaries.append(
+                RunSummary(
+                    run_id=row["run_id"],
+                    solved=int(row["solved"]),
+                    total=int(row["total"]),
+                    solve_rate=float(row["solve_rate"]),
+                    avg_compute=float(row["avg_compute"]),
+                    compute_per_solve=float(row["compute_per_solve"]) if row["compute_per_solve"] != "inf" else float("inf"),
+                    avg_tokens_in=float(row["avg_tokens_in"]),
+                    avg_tokens_out=float(row["avg_tokens_out"]),
+                    avg_planner_tokens=float(row["avg_planner_tokens"]),
+                    avg_coder_tokens=float(row["avg_coder_tokens"]),
+                    avg_reviewer_tokens=float(row["avg_reviewer_tokens"]),
+                    avg_value_tokens=float(row["avg_value_tokens"]),
+                    avg_tree_nodes=float(row["avg_tree_nodes"]),
+                    avg_best_depth=float(row["avg_best_depth"]),
+                    avg_duration_s=float(row["avg_duration_s"]),
+                    coder_model=row.get("coder_model", ""),
+                    planner_model=row.get("planner_model", ""),
+                )
+            )
+    return summaries
+
+
 # ---------------------------------------------------------------------------
 # Figure 1: Main results (A / B / C across c1, c2, c3)
 # ---------------------------------------------------------------------------
@@ -193,32 +222,41 @@ def fig_ablation(summaries: list[RunSummary], out_dir: pathlib.Path, fmt: str) -
         if test_set in ("c1", "c2") and s.total > 0:
             by_letter.setdefault(letter, []).append(s.solve_rate * 100)
 
-    # Build ordered list
+    # Build ordered list (best solve rate first)
     rows = []
-    for letter in ABLATION_ORDER:
+    for letter in sorted(by_letter.keys()):
         if letter not in by_letter:
             continue
         rates = by_letter[letter]
         avg = sum(rates) / len(rates)
+        # Pair with average cost for tradeoff annotation
+        costs = [
+            s.avg_compute
+            for s in summaries
+            if _variant_letter(s.run_id) == letter and _set_label(s.run_id) in ("c1", "c2")
+        ]
+        avg_cost = sum(costs) / len(costs) if costs else 0.0
         # Look up group for color
         sample_key = next((k for k in VARIANT_META if k.startswith(letter + "_c1")), None)
         group = VARIANT_META[sample_key][1] if sample_key else "baseline"
         label = VARIANT_META[sample_key][0] if sample_key else letter
-        rows.append((label, avg, GROUP_COLORS[group], group))
+        rows.append((label, avg, avg_cost, GROUP_COLORS[group], group))
+
+    rows.sort(key=lambda r: r[1], reverse=True)
 
     if not rows:
         print("No ablation data available yet.")
         return
 
-    labels, values, colors, groups = zip(*rows)
+    labels, values, costs, colors, groups = zip(*rows)
     y = np.arange(len(labels))
 
     fig, ax = plt.subplots(figsize=(9, 0.55 * len(labels) + 2))
     bars = ax.barh(y, values, color=colors, edgecolor="white", linewidth=0.5, zorder=3)
 
-    for bar, val in zip(bars, values):
+    for bar, val, cost in zip(bars, values, costs):
         ax.text(val + 0.5, bar.get_y() + bar.get_height() / 2,
-                f"{val:.0f}%", va="center", ha="left", fontsize=8.5, fontweight="bold")
+                f"{val:.0f}%  (${cost:.4f})", va="center", ha="left", fontsize=8.5, fontweight="bold")
 
     ax.set_yticks(y)
     ax.set_yticklabels(labels, fontsize=9)
@@ -236,7 +274,7 @@ def fig_ablation(summaries: list[RunSummary], out_dir: pathlib.Path, fmt: str) -
         if g not in seen:
             seen[g] = mpatches.Patch(color=GROUP_COLORS[g], label=GROUP_LABELS[g])
     ax.legend(handles=list(seen.values()), loc="lower right", fontsize=8.5, framealpha=0.9)
-    ax.set_title("Ablation: Average Solve Rate (c1 + c2)", fontsize=12, fontweight="bold", pad=10)
+    ax.set_title("Ablation: Avg Solve Rate (c1+c2), annotated with Avg Cost", fontsize=12, fontweight="bold", pad=10)
 
     fig.tight_layout()
     out = out_dir / f"fig2_ablation.{fmt}"
@@ -270,31 +308,35 @@ def fig_efficiency(summaries: list[RunSummary], out_dir: pathlib.Path, fmt: str)
         cost = sum(d["costs"]) / len(d["costs"])
         sample_key = next((k for k in VARIANT_META if k.startswith(letter + "_c1")), None)
         group = VARIANT_META[sample_key][1] if sample_key else "baseline"
-        short_label = VARIANT_META[sample_key][0].split()[0] if sample_key else letter
+        short_label = letter
         points.append((cost, rate, GROUP_COLORS[group], short_label, group))
 
     if not points:
         print("No efficiency data available.")
         return
 
-    costs, rates, colors, labels, groups = zip(*sorted(points, key=lambda x: x[0]))
+    sorted_points = sorted(points, key=lambda x: x[0])
+    costs, rates, colors, labels, groups = zip(*sorted_points)
 
     fig, ax = plt.subplots(figsize=(8, 5))
-    scatter = ax.scatter(costs, rates, c=colors, s=130, zorder=4, edgecolors="white", linewidths=0.8)
+    ax.scatter(costs, rates, c=colors, s=130, zorder=4, edgecolors="white", linewidths=0.8)
 
     for x, y, c, lbl in zip(costs, rates, colors, labels):
         ax.annotate(lbl, (x, y), textcoords="offset points", xytext=(6, 4),
                     fontsize=9, fontweight="bold", color=c)
 
-    # Efficiency frontier (Pareto-optimal points)
-    pts_sorted = sorted(zip(costs, rates), key=lambda p: p[0])
+    # Efficiency frontier (Pareto-optimal points in cost-min, rate-max space)
+    pts_sorted = sorted(zip(costs, rates, labels), key=lambda p: p[0])
     frontier_x, frontier_y = [pts_sorted[0][0]], [pts_sorted[0][1]]
-    for cx, cy in pts_sorted[1:]:
+    frontier_labels = [pts_sorted[0][2]]
+    for cx, cy, lbl in pts_sorted[1:]:
         if cy >= frontier_y[-1]:
             frontier_x.append(cx)
             frontier_y.append(cy)
+            frontier_labels.append(lbl)
     if len(frontier_x) > 1:
         ax.plot(frontier_x, frontier_y, "k--", alpha=0.25, linewidth=1.2, zorder=2, label="Pareto frontier")
+        ax.scatter(frontier_x, frontier_y, marker="*", s=180, c="gold", edgecolors="black", linewidths=0.6, zorder=5)
 
     ax.set_xlabel("Avg estimated cost per instance (USD)", fontsize=11)
     ax.set_ylabel("Avg solve rate, c1+c2 (%)", fontsize=11)
@@ -314,7 +356,7 @@ def fig_efficiency(summaries: list[RunSummary], out_dir: pathlib.Path, fmt: str)
     if len(frontier_x) > 1:
         handles.append(mlines.Line2D([], [], color="k", linestyle="--", alpha=0.4, label="Pareto frontier"))
     ax.legend(handles=handles, fontsize=8.5, framealpha=0.9)
-    ax.set_title("Solve Rate vs. Compute Cost", fontsize=12, fontweight="bold", pad=10)
+    ax.set_title("Efficiency Frontier: Solve Rate vs. Cost (c1+c2 avg)", fontsize=12, fontweight="bold", pad=10)
 
     fig.tight_layout()
     out = out_dir / f"fig3_efficiency.{fmt}"
@@ -386,6 +428,54 @@ def fig_token_breakdown(summaries: list[RunSummary], out_dir: pathlib.Path, fmt:
 
 
 # ---------------------------------------------------------------------------
+# Figure 5: set-by-set variant heatmap
+# ---------------------------------------------------------------------------
+
+def fig_set_heatmap(summaries: list[RunSummary], out_dir: pathlib.Path, fmt: str) -> None:
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    variants = sorted({_variant_letter(s.run_id) for s in summaries if _set_label(s.run_id) in ("c1", "c2", "c3")})
+    sets = ["c1", "c2", "c3"]
+    matrix = []
+    for v in variants:
+        row = []
+        for st in sets:
+            s = next((x for x in summaries if _variant_letter(x.run_id) == v and _set_label(x.run_id) == st), None)
+            row.append((s.solve_rate * 100.0) if s else np.nan)
+        matrix.append(row)
+
+    if not matrix:
+        print("No set heatmap data available.")
+        return
+
+    arr = np.array(matrix, dtype=float)
+    fig, ax = plt.subplots(figsize=(6.5, 0.5 * len(variants) + 2))
+    im = ax.imshow(arr, cmap="YlGn", aspect="auto", vmin=45, vmax=90)
+    ax.set_xticks(np.arange(len(sets)))
+    ax.set_xticklabels(sets)
+    ax.set_yticks(np.arange(len(variants)))
+    ax.set_yticklabels(variants)
+    ax.set_xlabel("Case set")
+    ax.set_ylabel("Variant")
+    ax.set_title("Per-set solve rates by variant (%)", fontsize=12, fontweight="bold", pad=10)
+
+    for i in range(arr.shape[0]):
+        for j in range(arr.shape[1]):
+            if not np.isnan(arr[i, j]):
+                ax.text(j, i, f"{arr[i, j]:.0f}", ha="center", va="center", fontsize=8, color="black")
+
+    cbar = fig.colorbar(im, ax=ax, fraction=0.035, pad=0.03)
+    cbar.set_label("Solve rate (%)")
+
+    fig.tight_layout()
+    out = out_dir / f"fig5_set_heatmap.{fmt}"
+    fig.savefig(out, dpi=220, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved: {out}")
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -395,13 +485,19 @@ def main() -> None:
     parser.add_argument("--output-dir", type=pathlib.Path, default=pathlib.Path("figures"))
     parser.add_argument("--format", choices=["pdf", "png", "svg"], default="pdf")
     parser.add_argument("--combined-root", type=pathlib.Path, default=COMBINED_RUNS)
+    parser.add_argument("--results-csv", type=pathlib.Path, default=None,
+                        help="Use an existing results.csv/final_results.csv instead of loading runs")
     args = parser.parse_args()
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
-    print("Loading runs…", file=sys.stderr)
-    all_runs = load_all_runs(args.combined_root)
-    summaries = [_aggregate(instances) for instances in all_runs.values()]
+    if args.results_csv:
+        print(f"Loading summaries from CSV: {args.results_csv}", file=sys.stderr)
+        summaries = _load_summaries_from_csv(args.results_csv)
+    else:
+        print("Loading runs…", file=sys.stderr)
+        all_runs = load_all_runs(args.combined_root)
+        summaries = [_aggregate(instances) for instances in all_runs.values()]
 
     try:
         import matplotlib
@@ -415,6 +511,7 @@ def main() -> None:
     fig_ablation(summaries,        args.output_dir, args.format)
     fig_efficiency(summaries,      args.output_dir, args.format)
     fig_token_breakdown(summaries, args.output_dir, args.format)
+    fig_set_heatmap(summaries,     args.output_dir, args.format)
     print(f"\nAll figures written to: {args.output_dir}/")
 
 
