@@ -6,7 +6,7 @@ Figures produced:
                              (the paper's headline comparison)
   fig2_ablation.pdf        — Horizontal bar: all variants ranked by avg solve rate,
                              color-coded by what each adds over the baseline
-  fig3_efficiency.pdf      — Scatter: solve rate vs. relative compute cost,
+  fig3_efficiency.pdf      — Scatter: solve rate vs. estimated USD cost,
                              per variant (avg over available test sets)
   fig4_token_breakdown.pdf — Stacked bar: token share by role for key variants
 
@@ -246,7 +246,7 @@ def fig_ablation(summaries: list[RunSummary], out_dir: pathlib.Path, fmt: str) -
 
 
 # ---------------------------------------------------------------------------
-# Figure 3: Efficiency scatter (solve rate vs. relative compute)
+# Figure 3: Efficiency scatter (solve rate vs. estimated USD cost)
 # ---------------------------------------------------------------------------
 
 def fig_efficiency(summaries: list[RunSummary], out_dir: pathlib.Path, fmt: str) -> None:
@@ -296,7 +296,7 @@ def fig_efficiency(summaries: list[RunSummary], out_dir: pathlib.Path, fmt: str)
     if len(frontier_x) > 1:
         ax.plot(frontier_x, frontier_y, "k--", alpha=0.25, linewidth=1.2, zorder=2, label="Pareto frontier")
 
-    ax.set_xlabel("Avg relative compute cost (model-size weighted tokens)", fontsize=11)
+    ax.set_xlabel("Avg estimated cost per instance (USD)", fontsize=11)
     ax.set_ylabel("Avg solve rate, c1+c2 (%)", fontsize=11)
     ax.set_ylim(40, 95)
     ax.xaxis.grid(True, linestyle="--", alpha=0.4, zorder=0)

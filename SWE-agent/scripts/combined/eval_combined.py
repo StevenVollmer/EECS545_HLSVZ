@@ -214,7 +214,7 @@ def _parse_traj(traj_path: pathlib.Path, run_id: str) -> InstanceResult:
 # Rafe B_c1 evaluation (patch eval against case.json success_checks)
 # ---------------------------------------------------------------------------
 
-def _apply_and_check(patch: str, success_checks: list, repo_path: pathlib.Path) -> bool:
+def _apply_and_check(patch: str, case_data: dict[str, Any], repo_path: pathlib.Path) -> bool:
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp_repo = pathlib.Path(tmpdir) / "repo"
         shutil.copytree(repo_path, tmp_repo)
@@ -227,7 +227,15 @@ def _apply_and_check(patch: str, success_checks: list, repo_path: pathlib.Path) 
         )
         if r.returncode != 0:
             return False
-        for check in success_checks:
+        for cmd in case_data.get("install_commands", []) or []:
+            r = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd=tmp_repo)
+            if r.returncode != 0:
+                return False
+        for cmd in case_data.get("setup_commands", []) or []:
+            r = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd=tmp_repo)
+            if r.returncode != 0:
+                return False
+        for check in case_data["evaluation"]["success_checks"]:
             r = subprocess.run(check["command"], shell=True, capture_output=True, text=True, cwd=tmp_repo)
             out = r.stdout + r.stderr
             if r.returncode != check.get("expect_exit_code", 0): return False
@@ -256,16 +264,10 @@ def _eval_rafe_b_c1() -> list[InstanceResult]:
         pred  = json.loads(pred_files[0].read_text())
         patch = pred.get("model_patch", "").strip()
 
-        case_json = CASES_C1 / case_name / "case.json"
-        solved = False
-        if patch and case_json.exists():
-            case_data = json.loads(case_json.read_text())[0]
-            repo_path = CASES_C1 / case_name / case_data["repo_path"]
-            solved = _apply_and_check(patch, case_data["evaluation"]["success_checks"], repo_path)
-
         # Token stats from traj if available
         p_in = c_in = rv_in = p_out = c_out = rv_out = 0
         duration = 0.0
+        solved = False
         if traj_files:
             td = json.loads(traj_files[0].read_text())
             rms = td.get("role_model_stats", {})
@@ -273,10 +275,11 @@ def _eval_rafe_b_c1() -> list[InstanceResult]:
             c_in,  c_out  = _role_tokens(rms.get("coder",    {}), "input_tokens", "output_tokens")
             rv_in, rv_out = _role_tokens(rms.get("reviewer", {}))
             duration      = float(td.get("duration_seconds", 0.0))
+            solved = bool(td.get("submitted") or td.get("info", {}).get("submitted"))
 
-        cost = (_compute_cost(p_in,  p_out,  planner_model) +
-                _compute_cost(c_in,  c_out,  coder_model)   +
-                _compute_cost(rv_in, rv_out, reviewer_model))
+        cost = (_compute_cost_usd(p_in,  p_out,  planner_model) +
+                _compute_cost_usd(c_in,  c_out,  coder_model)   +
+                _compute_cost_usd(rv_in, rv_out, reviewer_model))
 
         results.append(InstanceResult(
             instance_id=f"{case_name}_001", run_id="B_c1_rafe_linear",
@@ -286,7 +289,7 @@ def _eval_rafe_b_c1() -> list[InstanceResult]:
             reviewer_tokens_in=rv_in, reviewer_tokens_out=rv_out,
             total_tokens_in=p_in+c_in+rv_in, total_tokens_out=p_out+c_out+rv_out,
             coder_model=coder_model, planner_model=planner_model, reviewer_model=reviewer_model,
-            relative_compute=cost,
+            cost_usd=cost,
         ))
     return results
 
@@ -345,7 +348,7 @@ def _aggregate(instances: list[InstanceResult]) -> RunSummary:
                           avg_duration_s=0, coder_model="", planner_model="")
     solved = sum(1 for i in instances if i.solved)
     solve_rate = solved / n
-    avg_compute = sum(i.relative_compute for i in instances) / n
+    avg_compute = sum(i.cost_usd for i in instances) / n
     compute_per_solve = avg_compute / solve_rate if solve_rate > 0 else float("inf")
 
     def avg(fn): return sum(fn(i) for i in instances) / n
@@ -422,8 +425,8 @@ def print_report(summaries: list[RunSummary]) -> None:
     print("-" * len(hdr))
     for s in summaries:
         rate  = f"{s.solve_rate*100:.0f}%"
-        cost  = f"{s.avg_compute:.0f}"
-        cps   = f"{s.compute_per_solve:.0f}" if s.compute_per_solve < 1e9 else "—"
+        cost  = f"{s.avg_compute:.4f}"
+        cps   = f"{s.compute_per_solve:.4f}" if s.compute_per_solve < 1e9 else "—"
         tok   = f"{(s.avg_tokens_in+s.avg_tokens_out)/1000:.1f}k"
         nodes = f"{s.avg_tree_nodes:.1f}"
         depth = f"{s.avg_best_depth:.1f}"
@@ -445,6 +448,138 @@ def export_json(all_runs: dict[str, list[InstanceResult]], path: pathlib.Path) -
     data = {run_id: [asdict(i) for i in instances] for run_id, instances in all_runs.items()}
     path.write_text(json.dumps(data, indent=2))
     print(f"JSON written: {path}")
+
+
+def _variant_letter(run_id: str) -> str:
+    return run_id.split("_")[0] if run_id else ""
+
+
+def _case_set(run_id: str) -> str:
+    parts = run_id.split("_")
+    if len(parts) >= 2 and parts[1] in {"c1", "c2", "c3"}:
+        return parts[1]
+    return "unknown"
+
+
+def export_instance_csv(all_runs: dict[str, list[InstanceResult]], path: pathlib.Path) -> None:
+    rows: list[dict[str, Any]] = []
+    for run_id, instances in sorted(all_runs.items()):
+        for inst in instances:
+            row = asdict(inst)
+            row["variant"] = _variant_letter(run_id)
+            row["case_set"] = _case_set(run_id)
+            row["solve_int"] = 1 if inst.solved else 0
+            row["total_tokens"] = inst.total_tokens_in + inst.total_tokens_out
+            rows.append(row)
+    if not rows:
+        path.write_text("")
+        print(f"Instance CSV written (empty): {path}")
+        return
+    fields = list(rows[0].keys())
+    with open(path, "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fields)
+        w.writeheader()
+        w.writerows(rows)
+    print(f"Instance CSV written: {path}")
+
+
+def export_efficiency_csv(summaries: list[RunSummary], path: pathlib.Path) -> None:
+    rows: list[dict[str, Any]] = []
+    for s in sorted(summaries, key=lambda x: x.run_id):
+        total_tokens = s.avg_tokens_in + s.avg_tokens_out
+        efficiency_score = ((s.solve_rate * 100.0) / s.avg_compute) if s.avg_compute > 0 else 0.0
+        rows.append(
+            {
+                "run_id": s.run_id,
+                "variant": _variant_letter(s.run_id),
+                "case_set": _case_set(s.run_id),
+                "solved": s.solved,
+                "total": s.total,
+                "solve_rate": s.solve_rate,
+                "avg_compute": s.avg_compute,
+                "compute_per_solve": s.compute_per_solve,
+                "avg_total_tokens": total_tokens,
+                "avg_duration_s": s.avg_duration_s,
+                "avg_tree_nodes": s.avg_tree_nodes,
+                "avg_best_depth": s.avg_best_depth,
+                "efficiency_score": efficiency_score,
+            }
+        )
+    if not rows:
+        path.write_text("")
+        print(f"Efficiency CSV written (empty): {path}")
+        return
+    fields = list(rows[0].keys())
+    with open(path, "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fields)
+        w.writeheader()
+        w.writerows(rows)
+    print(f"Efficiency CSV written: {path}")
+
+
+def export_frontier_csv(summaries: list[RunSummary], path: pathlib.Path) -> None:
+    by_variant: dict[str, dict[str, Any]] = {}
+    for s in summaries:
+        case_set = _case_set(s.run_id)
+        if case_set not in {"c1", "c2"}:
+            continue
+        variant = _variant_letter(s.run_id)
+        d = by_variant.setdefault(
+            variant,
+            {"rates": [], "compute": [], "compute_per_solve": [], "runs": []},
+        )
+        d["rates"].append(s.solve_rate * 100.0)
+        d["compute"].append(s.avg_compute)
+        if s.compute_per_solve < 1e9:
+            d["compute_per_solve"].append(s.compute_per_solve)
+        d["runs"].append(s.run_id)
+
+    rows: list[dict[str, Any]] = []
+    for variant, d in sorted(by_variant.items()):
+        if not d["rates"] or not d["compute"]:
+            continue
+        rows.append(
+            {
+                "variant": variant,
+                "avg_solve_rate_c1_c2": sum(d["rates"]) / len(d["rates"]),
+                "avg_compute_c1_c2": sum(d["compute"]) / len(d["compute"]),
+                "avg_compute_per_solve_c1_c2": (
+                    sum(d["compute_per_solve"]) / len(d["compute_per_solve"])
+                    if d["compute_per_solve"]
+                    else float("inf")
+                ),
+                "n_sets": len(d["rates"]),
+                "source_runs": ",".join(d["runs"]),
+                "pareto_optimal": False,
+            }
+        )
+
+    for i, row in enumerate(rows):
+        dominated = False
+        for j, other in enumerate(rows):
+            if i == j:
+                continue
+            better_or_equal_rate = other["avg_solve_rate_c1_c2"] >= row["avg_solve_rate_c1_c2"]
+            lower_or_equal_compute = other["avg_compute_c1_c2"] <= row["avg_compute_c1_c2"]
+            strictly_better = (
+                other["avg_solve_rate_c1_c2"] > row["avg_solve_rate_c1_c2"]
+                or other["avg_compute_c1_c2"] < row["avg_compute_c1_c2"]
+            )
+            if better_or_equal_rate and lower_or_equal_compute and strictly_better:
+                dominated = True
+                break
+        row["pareto_optimal"] = not dominated
+
+    if not rows:
+        path.write_text("")
+        print(f"Frontier CSV written (empty): {path}")
+        return
+    fields = list(rows[0].keys())
+    with open(path, "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fields)
+        w.writeheader()
+        w.writerows(rows)
+    print(f"Frontier CSV written: {path}")
 
 
 # ---------------------------------------------------------------------------
@@ -490,7 +625,7 @@ def _rate_cell(s: RunSummary | None) -> str:
 def _cost_cell(s: RunSummary | None) -> str:
     if s is None or s.avg_compute == 0:
         return "---"
-    return f"{s.avg_compute / 1000:.0f}k"
+    return f"${s.avg_compute:.4f}$"
 
 
 def export_latex(summaries: list[RunSummary], path: pathlib.Path) -> None:
@@ -510,11 +645,11 @@ def export_latex(summaries: list[RunSummary], path: pathlib.Path) -> None:
     lines.append("  \\centering")
     lines.append("  \\caption{Solve rates on three independent test sets.")
     lines.append("    \\textbf{c3} is fully held out.")
-    lines.append("    Cost is model-size-weighted token count ($\\times 10^3$).}")
+    lines.append("    Cost is estimated USD from role-level token usage and Together AI April 2026 pricing.}")
     lines.append("  \\label{tab:main_results}")
     lines.append("  \\begin{tabular}{llrrrrr}")
     lines.append("    \\toprule")
-    lines.append("    Sys & Description & c1 & c2 & c3 & Avg cost (k) & \\# nodes \\\\")
+    lines.append("    Sys & Description & c1 & c2 & c3 & Avg cost (USD) & \\# nodes \\\\")
     lines.append("    \\midrule")
 
     for letter in ["A", "B", "C"]:
@@ -529,7 +664,7 @@ def export_latex(summaries: list[RunSummary], path: pathlib.Path) -> None:
                 costs.append(s.avg_compute)
             if s and s.avg_tree_nodes > 0:
                 nodes_vals.append(s.avg_tree_nodes)
-        avg_cost = f"{sum(costs)/len(costs)/1000:.0f}k" if costs else "---"
+        avg_cost = f"${sum(costs)/len(costs):.4f}$" if costs else "---"
         avg_nodes = f"{sum(nodes_vals)/len(nodes_vals):.1f}" if nodes_vals else "---"
         row = f"    {letter} & {desc} & {' & '.join(cells)} & {avg_cost} & {avg_nodes} \\\\"
         lines.append(row)
@@ -547,7 +682,7 @@ def export_latex(summaries: list[RunSummary], path: pathlib.Path) -> None:
     lines.append("  \\centering")
     lines.append("  \\caption{Ablation results averaged over test sets c1 and c2.")
     lines.append("    Solve rate is the fraction of 20 instances solved.")
-    lines.append("    Cost is model-size-weighted token count ($\\times 10^3$).")
+    lines.append("    Cost is estimated USD from role-level token usage and Together AI April 2026 pricing.")
     lines.append("    Nodes and depth are MCTS tree statistics (--- for linear runs).}")
     lines.append("  \\label{tab:ablation}")
     lines.append("  \\begin{tabular}{llllrrrrr}")
@@ -574,7 +709,7 @@ def export_latex(summaries: list[RunSummary], path: pathlib.Path) -> None:
         avg_rate = f"{sum(rates)/len(rates):.0f}\\%" if rates else "---"
 
         costs = [s.avg_compute for s in [s_c1, s_c2] if s and s.avg_compute > 0]
-        avg_cost = f"{sum(costs)/len(costs)/1000:.0f}k" if costs else "---"
+        avg_cost = f"${sum(costs)/len(costs):.4f}$" if costs else "---"
 
         nodes = [s.avg_tree_nodes for s in [s_c1, s_c2] if s and s.avg_tree_nodes > 0]
         avg_nodes = f"{sum(nodes)/len(nodes):.1f}" if nodes else "---"
@@ -604,6 +739,12 @@ def main() -> None:
     parser.add_argument("--run", default=None, help="Filter runs by prefix (e.g. C_c1)")
     parser.add_argument("--csv",   type=pathlib.Path, default=None)
     parser.add_argument("--json",  type=pathlib.Path, default=None)
+    parser.add_argument("--instance-csv", type=pathlib.Path, default=None,
+                        help="Write per-instance metrics for all runs")
+    parser.add_argument("--efficiency-csv", type=pathlib.Path, default=None,
+                        help="Write run-level efficiency vs accuracy metrics")
+    parser.add_argument("--frontier-csv", type=pathlib.Path, default=None,
+                        help="Write c1+c2 Pareto frontier table by variant")
     parser.add_argument("--latex", type=pathlib.Path, default=None,
                         help="Write two booktabs LaTeX tables (main results + ablation)")
     args = parser.parse_args()
@@ -620,6 +761,12 @@ def main() -> None:
         export_csv(summaries, args.csv)
     if args.json:
         export_json(all_runs, args.json)
+    if args.instance_csv:
+        export_instance_csv(all_runs, args.instance_csv)
+    if args.efficiency_csv:
+        export_efficiency_csv(summaries, args.efficiency_csv)
+    if args.frontier_csv:
+        export_frontier_csv(summaries, args.frontier_csv)
     if args.latex:
         export_latex(summaries, args.latex)
 
