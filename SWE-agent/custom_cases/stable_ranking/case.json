@@ -1,0 +1,59 @@
+[
+  {
+    "image_name": "python:3.11",
+    "instance_id": "stable_ranking_001",
+    "problem_statement": "The leaderboard orders tied teams incorrectly in some cases. Reproduce via `python scripts/demo_leaderboard.py`. Existing tests pass. Fix the bug so the demo reports OK, keep existing tests passing, and submit.",
+    "repo_path": "repo",
+    "install_commands": [
+      "pip install pytest"
+    ],
+    "analysis": {
+      "likely_fix_paths": [
+        "app/core/ranking.py"
+      ],
+      "difficulty": "medium",
+      "showcase": "planner"
+    },
+    "evaluation": {
+      "baseline_checks": [
+        {
+          "name": "existing_tests_still_pass",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "3 passed"
+          ]
+        },
+        {
+          "name": "demo_shows_bad_tiebreak",
+          "command": "python scripts/demo_leaderboard.py",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "WARNING: tie-break order is wrong"
+          ]
+        }
+      ],
+      "success_checks": [
+        {
+          "name": "tests_still_pass_after_fix",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "3 passed"
+          ]
+        },
+        {
+          "name": "demo_tiebreak_fixed",
+          "command": "python scripts/demo_leaderboard.py",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "OK: tie-break order matches the numeric submission order"
+          ],
+          "stdout_not_contains": [
+            "WARNING: tie-break order is wrong"
+          ]
+        }
+      ]
+    }
+  }
+]

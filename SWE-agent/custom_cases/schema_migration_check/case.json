@@ -1,0 +1,59 @@
+[
+  {
+    "image_name": "python:3.11",
+    "instance_id": "schema_migration_check_001",
+    "problem_statement": "CI is tripping the post-migration schema validator for a new migration. The validator reports columns as missing even though the migration ran successfully. Reproduce via `python scripts/demo_validator.py`. Existing tests pass. Fix the bug so the demo reports OK, keep existing tests passing, and submit. Downstream consumers depend on the existing apply-step behavior — do not change it.",
+    "repo_path": "repo",
+    "install_commands": [
+      "pip install pytest"
+    ],
+    "analysis": {
+      "likely_fix_paths": [
+        "app/validators/schema_check.py"
+      ],
+      "difficulty": "hard",
+      "showcase": "coder"
+    },
+    "evaluation": {
+      "baseline_checks": [
+        {
+          "name": "existing_tests_still_pass",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "4 passed"
+          ]
+        },
+        {
+          "name": "demo_shows_false_positive",
+          "command": "python scripts/demo_validator.py",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "WARNING: validator reports declared columns as missing after apply"
+          ]
+        }
+      ],
+      "success_checks": [
+        {
+          "name": "tests_still_pass_after_fix",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "4 passed"
+          ]
+        },
+        {
+          "name": "demo_aligns_invariant",
+          "command": "python scripts/demo_validator.py",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "OK: validator aligns with apply-step invariant"
+          ],
+          "stdout_not_contains": [
+            "WARNING: validator reports declared columns as missing after apply"
+          ]
+        }
+      ]
+    }
+  }
+]

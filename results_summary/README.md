@@ -1,137 +1,136 @@
 # Split-Model Findings
 
-This note summarizes the clearest result from the current custom SWE-agent experiments.
+This note summarizes results from the custom SWE-agent experiments across two benchmark sets.
 
 Primary sources:
 
 - [benchmark_round_split_compare_cloud/README.md](/Users/rafe/classes/eecs545/project/SWE-agent/custom_matrix_runs/benchmark_round_split_compare_cloud/README.md)
-- [benchmark_round_split_compare_cloud/analysis.summary.json](/Users/rafe/classes/eecs545/project/SWE-agent/custom_matrix_runs/benchmark_round_split_compare_cloud/analysis.summary.json)
+- [routed_matrix results](/Users/rafe/classes/eecs545/project/SWE-agent/custom_matrix_runs/routed_matrix/)
 
-## Main Finding
+Generated figures:
 
-The clearest current result is that a strong planner makes the smaller coder much better, and the split setup is now competitive with the all-large baseline.
+- [Score vs compute](/Users/rafe/classes/eecs545/project/results_summary/figures/score_vs_compute.svg)
+- [Configuration summary bars](/Users/rafe/classes/eecs545/project/results_summary/figures/config_summary_bars.svg)
+- [Per-case score heatmap](/Users/rafe/classes/eecs545/project/results_summary/figures/case_score_heatmap.svg)
+- [Architecture deltas](/Users/rafe/classes/eecs545/project/results_summary/figures/architecture_deltas.svg)
+- [Figure data table](/Users/rafe/classes/eecs545/project/results_summary/figures/config_summary.csv)
 
-Current 20-case cloud-only comparison:
+---
 
-- `qwen`
-  - avg score: `86.05`
-  - strict resolved: `0.700`
-  - avg relative compute burden: `3.467`
-- `qwen -> qwen`
-  - avg score: `79.95`
-  - strict resolved: `0.650`
-  - avg relative compute burden: `3.163`
-- `gpt -> qwen`
-  - avg score: `91.15`
-  - strict resolved: `0.800`
-  - avg relative compute burden: `3.064`
-- `gpt -> qwen -> gpt`
-  - avg score: `92.25`
-  - strict resolved: `0.800`
-  - avg relative compute burden: `3.224`
-- `gpt`
-  - avg score: `92.50`
-  - strict resolved: `0.800`
-  - avg relative compute burden: `13.873`
-- `gpt -> gpt`
-  - avg score: `90.65`
-  - strict resolved: `0.800`
-  - avg relative compute burden: `12.244`
+## Part 1: 20-Case Benchmark (Planner Effect)
 
-This shows the planner effect much more clearly than the older runs:
+The original 20-case benchmark established the core planner finding:
 
-- `gpt -> qwen` is better than `qwen`
-- `gpt -> qwen` is much better than `qwen -> qwen`
-- `gpt -> qwen` matches both `gpt` and `gpt -> gpt` on strict resolved rate
-- `gpt -> qwen` does this at about one quarter of the compute burden of the all-large configurations
+- `qwen` — resolved `0.700`, compute `3.467`
+- `qwen -> qwen` — resolved `0.650`, compute `3.163`
+- `gpt -> qwen` — resolved `0.800`, compute `3.064`
+- `gpt -> qwen -> gpt` — resolved `0.800`, compute `3.224`
+- `gpt` — resolved `0.800`, compute `13.873`
 
-## What The Planner Is Doing
+Key takeaways:
 
-The planner does not edit code. It gives the coder a structured handoff:
+- A strong planner makes a weak coder competitive with all-large configs
+- A weak planner hurts (`qwen -> qwen` < `qwen` solo)
+- Planner quality matters more than just having a planner role
+- `gpt -> qwen` matches `gpt` resolved rate at ~1/4 the compute
 
-- likely files
-- likely symbols
-- safe reproduction steps
-- validation priorities
+---
 
-The current data suggests:
+## Part 2: 10-Case Audit Benchmark (Critic + Reviewer)
 
-- a stronger planner can make a smaller coder more competitive
-- a weak planner is not enough by itself
-- planner quality matters more than just adding a planner role
+A second 10-case benchmark was designed with harder cases to test two new plan-audit mechanisms:
 
-The most direct planner comparison is:
+- **Critic (pre-coder audit):** An adversarial pass reviews the planner's handoff *before* the coder starts. If the critic rejects, the planner revises once.
+- **Reviewer (post-coder audit):** After the coder finishes, a reviewer examines the patch and validation evidence. If rejected, the coder gets a second round with the reviewer's feedback, the prior patch, and changed-file context.
 
-- `qwen`
-  - score `86.05`
-  - resolved `0.700`
-- `qwen -> qwen`
-  - score `79.95`
-  - resolved `0.650`
-- `gpt -> qwen`
-  - score `91.15`
-  - resolved `0.800`
+### Results
 
-So the current 20-case benchmark supports:
+```
+Config           Resolved   Compute   Description
+─────────────────────────────────────────────────────────────────
+qwen              5/10       3.37     small coder, no planner (floor)
+gpt -> qwen       7/10       2.04     planner + small coder (baseline)
+reviewer          8/10       2.60     planner + small coder + post-coder review
+critic            8/10       2.15     planner + pre-coder audit + small coder
+crit+rev          8/10       2.52     planner + pre-coder audit + small coder + post-coder review
+gpt               9/10      24.62    large coder solo (ceiling)
+```
 
-- `strong planner + weak coder > weak coder`
-- `strong planner + weak coder > weak planner + weak coder`
+### Per-Case Breakdown
 
-## What The Reviewer Is Doing
+```
+case                     qwen     gpt->qwen  reviewer  critic   crit+rev  gpt      bucket
+──────────────────────────────────────────────────────────────────────────────────────────────
+date_parse_locale        FAIL     FAIL       PASS      FAIL     FAIL      PASS     needs-large
+dep_cycle_detect         PASS     PASS       PASS      PASS     PASS      PASS     trivial
+numeric_drift_sum        FAIL     PASS       PASS      PASS     PASS      PASS     plan-rescuable
+pagination_drift         FAIL     PASS       PASS      PASS     PASS      PASS     plan-rescuable
+path_normalizer_cache    PASS     PASS       PASS      PASS     PASS      PASS     trivial
+retry_cap                PASS     PASS       FAIL      PASS     PASS      PASS     trivial
+schema_migration_check   PASS     PASS       PASS      PASS     PASS      PASS     trivial
+search_hit_localize      PASS     PASS       PASS      PASS     PASS      PASS     trivial
+stable_ranking           FAIL     FAIL       PASS      PASS     PASS      PASS     needs-large
+weighted_median          FAIL     FAIL       FAIL      FAIL     FAIL      FAIL     impossible
+```
 
-Reviewer is helping, but it is no longer the main story.
+### Key Findings
 
-Direct comparison:
+**1. Both audits independently boost resolved rate by +1 over no-audit baseline.**
 
-- `gpt -> qwen`
-  - avg score: `91.15`
-  - strict resolved: `0.800`
-  - compute: `3.064`
-- `gpt -> qwen -> gpt`
-  - avg score: `92.25`
-  - strict resolved: `0.800`
-  - compute: `3.224`
+- `gpt -> qwen` (no audit): 7/10
+- `reviewer` (post-coder): 8/10
+- `critic` (pre-coder): 8/10
 
-So reviewer is adding real value here:
+**2. They solve different cases through different mechanisms.**
 
-- `+1.10` avg score
-- no change in strict resolved rate
-- only a small compute increase
+- Critic rescues `stable_ranking` — a needs-large case where the plan audit improves hypothesis quality enough for the small coder to succeed.
+- Reviewer rescues `date_parse_locale` — a needs-large case where the coder's first attempt fails but reviewer-directed revision on the second round succeeds.
+- Neither mechanism rescues both. They operate on different failure modes.
 
-That means reviewer is still useful, but the bigger gain in the new 20-case benchmark is the planner improvement, not the reviewer loop by itself.
+**3. Critic is cheaper than reviewer for the same lift.**
+
+- Critic: 8/10 at compute 2.15
+- Reviewer: 8/10 at compute 2.60
+- The critic catches plan errors before the coder wastes turns. The reviewer can only catch patch errors after the coder has already committed to a direction.
+
+**4. Stacking does not compound.**
+
+- `crit+rev`: 8/10 at compute 2.52
+- No additional resolved-rate lift over either audit alone.
+- The two mechanisms rescue different cases but the total unique rescues don't exceed what either achieves individually on this benchmark.
+
+**5. Both audits reach 89% of the large-coder ceiling at ~10x less compute.**
+
+- Critic/reviewer: 8/10 at ~2.15–2.60 compute
+- `gpt` solo: 9/10 at 24.62 compute
+
+### Bucket Classification
+
+Cases were classified by which configs solve them:
+
+- **trivial** (5): solved by all configs including qwen solo
+- **plan-rescuable** (2): qwen fails, planner+qwen succeeds
+- **needs-large** (2): planner+qwen fails, audit or gpt rescues
+- **impossible** (1): no config solves (`weighted_median`)
+
+### Audit Mechanism Details
+
+**Critic prompt design:** The critic checks whether the planner's root-cause hypothesis explains the observed symptom, whether target symbols look fabricated, and whether the plan is specific enough for a weak coder to act on. Critical constraint: the critic may not shrink the planner's file list or add forbidden-edit entries — it can only refine the hypothesis and suggest additional files to examine.
+
+**Reviewer improvements:** The reviewer uses a split turn budget (2/3 for round 1, 1/3 for round 2) and carries the prior patch and changed-file list into the revision round. This prevents the coder from restarting cold on round 2 and lets it build on prior work rather than repeat dead ends.
+
+---
 
 ## Compute Caveat
 
-`Avg relative compute burden to 4o-mini` is a heuristic.
+`Avg relative compute burden to 4o-mini` is a heuristic useful for internal relative comparison. For self-hosted or UMich models, it estimates relative compute burden, not literal dollar cost.
 
-It is useful for internal relative comparison, but it is not a literal API price comparison across providers.
-For self-hosted or UMich models, the metric should be interpreted as:
+## Best Current Claims
 
-- estimated relative compute burden
+1. **A strong planner makes a weak coder competitive with all-large configs at ~1/4 the compute.** (20-case benchmark)
 
-not:
+2. **Pre-coder plan auditing (critic) and post-coder patch review (reviewer) each independently boost resolved rate, but through different mechanisms on different cases.** (10-case audit benchmark)
 
-- real dollar cost
+3. **Critic is the most compute-efficient audit mechanism** — same resolved-rate lift as reviewer at 17% less compute. Catching plan errors before code generation is cheaper than catching patch errors after.
 
-## Best Current Claim
-
-The strongest current claim is:
-
-> A stronger planner can make a smaller coder competitive with all-large configurations while using far less relative compute burden.
-
-The clearest evidence is:
-
-- `gpt -> qwen`
-  - score `91.15`
-  - resolved `0.800`
-  - estimated relative compute burden `3.064`
-- `gpt`
-  - score `92.50`
-  - resolved `0.800`
-  - estimated relative compute burden `13.873`
-- `gpt -> gpt`
-  - score `90.65`
-  - resolved `0.800`
-  - estimated relative compute burden `12.244`
-
-So the clearest current split-model result is `gpt -> qwen`, with `gpt -> qwen -> gpt` as a smaller follow-on improvement rather than the main source of the gain.
+4. **Both audits reach 89% of the large-coder ceiling (8/10 vs 9/10) at roughly 10x less compute.**

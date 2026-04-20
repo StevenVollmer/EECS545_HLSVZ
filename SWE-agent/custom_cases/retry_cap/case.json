@@ -1,0 +1,59 @@
+[
+  {
+    "image_name": "python:3.11",
+    "instance_id": "retry_cap_001",
+    "problem_statement": "Operators report the retry preview occasionally warns about scheduled delays that exceed the configured 30s cap. Reproduce via `python scripts/demo_backoff.py`. Existing tests pass. Fix the bug so the demo reports OK, keep existing tests passing, and submit.",
+    "repo_path": "repo",
+    "install_commands": [
+      "pip install pytest"
+    ],
+    "analysis": {
+      "likely_fix_paths": [
+        "app/utils/backoff.py"
+      ],
+      "difficulty": "medium",
+      "showcase": "planner"
+    },
+    "evaluation": {
+      "baseline_checks": [
+        {
+          "name": "existing_tests_still_pass",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "5 passed"
+          ]
+        },
+        {
+          "name": "demo_shows_cap_exceeded",
+          "command": "python scripts/demo_backoff.py",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "WARNING: scheduled delay exceeds configured cap"
+          ]
+        }
+      ],
+      "success_checks": [
+        {
+          "name": "tests_still_pass_after_fix",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "5 passed"
+          ]
+        },
+        {
+          "name": "demo_respects_cap",
+          "command": "python scripts/demo_backoff.py",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "OK: all scheduled delays are within the cap"
+          ],
+          "stdout_not_contains": [
+            "WARNING: scheduled delay exceeds configured cap"
+          ]
+        }
+      ]
+    }
+  }
+]

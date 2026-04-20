@@ -513,7 +513,88 @@ Return a JSON object with these keys:
 - allowed_change_types: array of strings
 - forbidden_edits: array of strings
 - escalation_conditions: array of strings
+- difficulty: one of "easy" or "hard"
+- difficulty_rationale: one short sentence explaining the difficulty call
+
+Difficulty criteria — you are rating whether a SMALLER, weaker coder can complete THIS plan, not how prestigious the bug sounds. The question is how much uncertainty remains after your handoff.
+
+Mark "easy" when ALL hold:
+- files_likely_affected has at most 2 entries and you are confident about them
+- the fix is mechanical: add/remove a branch, swap an operator, fix a constant, reorder adjacent statements, or apply a normalization/cap you have already named
+- you can describe the fix in one or two sentences without pointing at invariants in uncited modules
+- no floating-point stability reasoning, no algorithm derivation from scratch, no unstated spec the coder must infer
+
+Mark "hard" when ANY hold:
+- you are uncertain which file or layer holds the bug, or multiple plausible sites exist where the wrong pick yields a passing-but-wrong edit
+- the fix requires deriving/inventing an algorithm or a numerical-stability rewrite
+- the fix requires cross-file coordination you cannot fully specify in the plan
+- the problem statement implies a spec or invariant the coder will have to infer from prose rather than code
+
+Calibration: roughly half of well-scoped repair tasks are "easy" under this definition. Do NOT default to "hard". A plan that fully names the file, symbol, and one-line fix recipe is "easy" even if the underlying bug sounds tricky — difficulty tracks the coder's remaining uncertainty, not the problem's reputation.
 """
+
+
+def _build_plan_critic_system_prompt() -> str:
+    return """You are the adversarial critic of a repair plan produced by another model.
+
+Your job: find the most likely ways this plan is WRONG before a coder acts on it.
+
+Rules:
+- Output JSON only. No markdown, no prose outside the object.
+- Only reject when the weakness would plausibly cause the coder to produce a wrong or incomplete patch.
+- Do NOT reject for stylistic reasons, verbosity, or missing nice-to-haves.
+- Accept plans that correctly identify the likely fix site and give the coder a clear first action, even if the plan is imperfect in other ways.
+
+Concrete things to check:
+- Does root_cause_hypothesis actually explain the observed symptom? Or does it describe a symptom as if it were the cause?
+- Are target_symbols fabricated? If the planner could not have known a symbol name from the problem statement or runtime context, that is suspicious.
+- Are first_actions concrete and ordered, or do they say "investigate" without pointing somewhere?
+- Does the plan miss an obvious file or layer that the problem statement implies? If so, suggest ADDING it — do not remove existing entries.
+
+CRITICAL scope rules for your objections:
+- NEVER suggest removing files from files_likely_affected. The coder needs visibility into all relevant files, even files it will only read. If you think a file is wrong, say so but do NOT tell the planner to drop it.
+- NEVER suggest adding files to forbidden_edits. The planner decides what is off-limits. Your job is to critique the hypothesis and fix direction, not to shrink the coder's search space.
+- Your objections should point the planner toward a BETTER hypothesis or a MISSING file, not toward a narrower scope.
+
+Return a JSON object with exactly these keys:
+- verdict: "accepted" or "rejected"
+- confidence: "low", "medium", or "high"
+- objections: array of 0-2 short strings; each objection names a concrete weakness in the hypothesis or fix direction. Empty array iff verdict == "accepted".
+- revision_hint: one short sentence. If rejected, tell the planner what to RECONSIDER about the root cause or which additional file/layer to examine. If accepted, restate the plan's strongest edit-site claim.
+"""
+
+
+def _build_plan_critic_user_prompt(problem_statement: str, runtime_context: str, planner_handoff: dict[str, Any]) -> str:
+    return (
+        "Problem statement:\n<problem_statement>\n"
+        + problem_statement
+        + "\n</problem_statement>\n\n"
+        + "Runtime context:\n<runtime_context>\n"
+        + runtime_context
+        + "\n</runtime_context>\n\n"
+        + "Planner's proposed handoff (JSON):\n"
+        + json.dumps(planner_handoff, indent=2)
+        + "\n\nReturn your critique as a single JSON object."
+    )
+
+
+def _default_plan_critic_verdict() -> dict[str, Any]:
+    return {"verdict": "accepted", "confidence": "low", "objections": [], "revision_hint": ""}
+
+
+def _build_planner_revision_prompt(critic_verdict: dict[str, Any]) -> str:
+    objs = critic_verdict.get("objections") or []
+    hint = critic_verdict.get("revision_hint") or ""
+    bullets = "\n".join(f"- {o}" for o in objs if isinstance(o, str) and o.strip())
+    return (
+        "A critic reviewed your previous plan and rejected it. Revise your root_cause_hypothesis and "
+        "first_actions to address these objections, keeping the same JSON schema. "
+        "IMPORTANT: keep ALL files from your original files_likely_affected — do NOT remove any. "
+        "Do NOT add new entries to forbidden_edits. Only refine your hypothesis and actions.\n"
+        + (bullets or "- (no specific objections)")
+        + (f"\n\nCritic hint: {hint}" if hint else "")
+        + "\n\nReturn the revised plan as a single JSON object."
+    )
 
 
 def _build_planner_task_prompt(problem_statement: str, repo_root: str, runtime_context: str) -> str:
@@ -794,8 +875,8 @@ def _build_planner_handoff_prompt(planner_handoff: dict[str, Any]) -> str:
     )
 
 
-def _build_reviewer_feedback_prompt(review_feedback: dict[str, Any]) -> str:
-    return (
+def _build_reviewer_feedback_prompt(review_feedback: dict[str, Any], prior_patch: str = "", prior_changed_files: list[str] | None = None) -> str:
+    parts = [
         "Reviewer feedback JSON:\n"
         + json.dumps(review_feedback, indent=2)
         + "\nAddress the required_changes first. "
@@ -803,7 +884,27 @@ def _build_reviewer_feedback_prompt(review_feedback: dict[str, Any]) -> str:
         "Run the requested validations before submit. "
         "If the reviewer says `revise`, do not submit until the rejection is resolved. "
         "Do not change tests to satisfy the reviewer unless the case explicitly allows test edits."
-    )
+    ]
+    if prior_changed_files:
+        parts.append(
+            "\nFiles already modified in the previous attempt: "
+            + ", ".join(prior_changed_files)
+            + "\nCheck these files first — your prior edits are still in the repo."
+        )
+    if prior_patch and prior_patch.strip():
+        patch_preview = prior_patch[:2000]
+        parts.append(
+            "\nPatch from previous attempt (still applied):\n```\n"
+            + patch_preview
+            + ("\n... (truncated)" if len(prior_patch) > 2000 else "")
+            + "\n```\nBuild on this patch rather than starting over. Fix only what the reviewer flagged."
+        )
+    elif not prior_changed_files:
+        parts.append(
+            "\nNo edits were made in the previous attempt. "
+            "Focus on making the fix this round — start by inspecting the files the reviewer listed."
+        )
+    return "\n".join(parts)
 
 
 def _extract_first_json_dict(text: str) -> dict[str, Any]:
@@ -876,6 +977,8 @@ def _default_planner_handoff() -> dict[str, Any]:
         "allowed_change_types": ["targeted runtime code fixes"],
         "forbidden_edits": ["broad refactors without evidence"],
         "escalation_conditions": ["If the issue is still unclear after targeted inspection and reproduction."],
+        "difficulty": "hard",
+        "difficulty_rationale": "Planner output could not be parsed; defaulting to hard to avoid under-allocating compute.",
     }
 
 
@@ -956,6 +1059,14 @@ def _normalize_planner_handoff(raw: dict[str, Any]) -> dict[str, Any]:
     handoff["allowed_change_types"] = allowed_change_types or handoff["allowed_change_types"]
     handoff["forbidden_edits"] = forbidden_edits or handoff["forbidden_edits"]
     handoff["escalation_conditions"] = escalation_conditions or handoff["escalation_conditions"]
+
+    difficulty_raw = str(raw.get("difficulty", "")).strip().lower()
+    if difficulty_raw in {"easy", "hard"}:
+        handoff["difficulty"] = difficulty_raw
+    else:
+        handoff["difficulty"] = "hard"
+    rationale = str(raw.get("difficulty_rationale", "")).strip()
+    handoff["difficulty_rationale"] = rationale or handoff.get("difficulty_rationale", "")
 
     if handoff["safe_reproduction_steps"]:
         first = handoff["safe_reproduction_steps"][0]
@@ -2121,6 +2232,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--planner-api-key")
     parser.add_argument("--reviewer-api-base")
     parser.add_argument("--reviewer-api-key")
+    parser.add_argument("--coder-easy-model")
+    parser.add_argument("--coder-easy-api-base")
+    parser.add_argument("--coder-easy-api-key")
+    parser.add_argument("--coder-hard-model")
+    parser.add_argument("--coder-hard-api-base")
+    parser.add_argument("--coder-hard-api-key")
+    parser.add_argument("--route-coder-by-difficulty", action="store_true",
+                        help="If set and easy/hard coder configs are provided, select the coder model per case based on planner difficulty.")
+    parser.add_argument("--plan-critic", action="store_true",
+                        help="If set, run an adversarial critic on the planner's handoff; if rejected, revise the plan once before handing to coder.")
     parser.add_argument("--tool-call-mode", choices=["openai_tools", "react_json"])
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--planner-temperature", type=float)
@@ -2164,6 +2285,22 @@ def parse_args() -> argparse.Namespace:
             args.reviewer_api_base = preset.get("reviewer_api_base")
         if args.reviewer_api_key is None and preset.get("reviewer_api_key") is not None:
             args.reviewer_api_key = preset.get("reviewer_api_key")
+        if args.coder_easy_model is None and preset.get("coder_easy_model") is not None:
+            args.coder_easy_model = preset.get("coder_easy_model")
+        if args.coder_easy_api_base is None and preset.get("coder_easy_api_base") is not None:
+            args.coder_easy_api_base = preset.get("coder_easy_api_base")
+        if args.coder_easy_api_key is None and preset.get("coder_easy_api_key") is not None:
+            args.coder_easy_api_key = preset.get("coder_easy_api_key")
+        if args.coder_hard_model is None and preset.get("coder_hard_model") is not None:
+            args.coder_hard_model = preset.get("coder_hard_model")
+        if args.coder_hard_api_base is None and preset.get("coder_hard_api_base") is not None:
+            args.coder_hard_api_base = preset.get("coder_hard_api_base")
+        if args.coder_hard_api_key is None and preset.get("coder_hard_api_key") is not None:
+            args.coder_hard_api_key = preset.get("coder_hard_api_key")
+        if not args.route_coder_by_difficulty and preset.get("route_coder_by_difficulty"):
+            args.route_coder_by_difficulty = bool(preset.get("route_coder_by_difficulty"))
+        if not args.plan_critic and preset.get("plan_critic"):
+            args.plan_critic = bool(preset.get("plan_critic"))
         if args.tool_call_mode is None and preset.get("tool_call_mode") is not None:
             args.tool_call_mode = preset.get("tool_call_mode")
         if args.max_tokens == 4096 and preset.get("max_tokens") is not None:
@@ -2211,6 +2348,14 @@ def main() -> None:
     reviewer_api_key = _resolve_api_key(args.backend, args.reviewer_api_key) if args.reviewer_api_key else api_key
     planner_model = _normalize_model_name(args.backend, args.planner_model) if args.planner_model else model
     reviewer_model = _normalize_model_name(args.backend, args.reviewer_model) if args.reviewer_model else model
+
+    coder_easy_model = _normalize_model_name(args.backend, args.coder_easy_model) if args.coder_easy_model else None
+    coder_hard_model = _normalize_model_name(args.backend, args.coder_hard_model) if args.coder_hard_model else None
+    coder_easy_api_base = args.coder_easy_api_base or api_base
+    coder_hard_api_base = args.coder_hard_api_base or api_base
+    coder_easy_api_key = _resolve_api_key(args.backend, args.coder_easy_api_key) if args.coder_easy_api_key else api_key
+    coder_hard_api_key = _resolve_api_key(args.backend, args.coder_hard_api_key) if args.coder_hard_api_key else api_key
+    routing_enabled = bool(args.route_coder_by_difficulty and coder_easy_model and coder_hard_model)
 
     run_config = {
         "backend": args.backend,
@@ -2352,24 +2497,105 @@ def main() -> None:
                 if planner_raw.strip() and planner_raw.strip() != json.dumps(planner_handoff):
                     log_line(f"[planner] raw {planner_raw.strip()[:500]}")
 
+                if args.plan_critic:
+                    log_line(f"[plan_critic] calling model={planner_model}")
+                    critic_verdict, critic_stats, critic_raw = _call_json_role(
+                        model=planner_model,
+                        api_base=planner_api_base,
+                        api_key=planner_api_key,
+                        temperature=args.planner_temperature,
+                        max_tokens=args.max_tokens,
+                        num_ctx=args.num_ctx,
+                        system_prompt=_build_plan_critic_system_prompt(),
+                        user_prompt=_build_plan_critic_user_prompt(
+                            instance.problem_statement.text, runtime_context, planner_handoff
+                        ),
+                        fallback_payload=_default_plan_critic_verdict(),
+                    )
+                    verdict = str(critic_verdict.get("verdict", "")).lower()
+                    objections = [o for o in (critic_verdict.get("objections") or []) if isinstance(o, str) and o.strip()]
+                    role_model_stats["plan_critic"] = {
+                        "model": planner_model,
+                        "verdict": verdict or "accepted",
+                        "confidence": str(critic_verdict.get("confidence", "")).lower(),
+                        "objections_count": len(objections),
+                        "revised": False,
+                        **critic_stats,
+                    }
+                    log_line(
+                        f"[plan_critic] verdict={verdict or 'accepted'} "
+                        f"objections={len(objections)} "
+                        f"confidence={role_model_stats['plan_critic']['confidence']}"
+                    )
+                    if verdict == "rejected" and objections:
+                        log_line("[plan_critic] revising plan")
+                        revised_handoff, revise_stats, revised_raw = _call_json_role(
+                            model=planner_model,
+                            api_base=planner_api_base,
+                            api_key=planner_api_key,
+                            temperature=args.planner_temperature,
+                            max_tokens=args.max_tokens,
+                            num_ctx=args.num_ctx,
+                            system_prompt=_build_planner_system_prompt(repo_root),
+                            user_prompt=(
+                                _build_planner_task_prompt(instance.problem_statement.text, repo_root, runtime_context)
+                                + "\n\n"
+                                + _build_planner_revision_prompt(critic_verdict)
+                            ),
+                            fallback_payload=planner_handoff,
+                        )
+                        planner_handoff = _normalize_planner_handoff(revised_handoff)
+                        role_model_stats["plan_critic"]["revised"] = True
+                        role_model_stats["plan_critic"]["tokens_in"] += revise_stats.get("tokens_in", 0)
+                        role_model_stats["plan_critic"]["tokens_out"] += revise_stats.get("tokens_out", 0)
+                        role_model_stats["plan_critic"]["api_calls"] += revise_stats.get("api_calls", 0)
+                        log_line(f"[plan_critic] revised handoff {json.dumps(planner_handoff, sort_keys=True)}")
+
             coder_result: dict[str, Any] | None = None
             coder_accumulated_stats = {"tokens_in": 0, "tokens_out": 0, "api_calls": 0, "turns": 0, "tool_calls": 0}
 
-            for reviewer_round in range(max(1, args.reviewer_rounds if args.agent_architecture == "planner_coder_reviewer" else 1)):
+            routed_difficulty = str((planner_handoff or {}).get("difficulty", "")).lower()
+            if routing_enabled and routed_difficulty in {"easy", "hard"}:
+                if routed_difficulty == "easy":
+                    coder_model_for_case = coder_easy_model or model
+                    coder_api_base_for_case = coder_easy_api_base
+                    coder_api_key_for_case = coder_easy_api_key
+                else:
+                    coder_model_for_case = coder_hard_model or model
+                    coder_api_base_for_case = coder_hard_api_base
+                    coder_api_key_for_case = coder_hard_api_key
+                log_line(f"[router] difficulty={routed_difficulty} coder_model={coder_model_for_case}")
+            else:
+                coder_model_for_case = model
+                coder_api_base_for_case = api_base
+                coder_api_key_for_case = api_key
+                if routing_enabled:
+                    log_line(f"[router] no valid difficulty in handoff; falling back to default coder={coder_model_for_case}")
+
+            prior_patch_text: str = ""
+            prior_changed_files: list[str] = []
+            total_reviewer_rounds = max(1, args.reviewer_rounds if args.agent_architecture == "planner_coder_reviewer" else 1)
+            for reviewer_round in range(total_reviewer_rounds):
                 extra_prompts: list[str] = []
                 if planner_handoff:
                     extra_prompts.append(_build_planner_handoff_prompt(planner_handoff))
                 if review_feedback:
-                    extra_prompts.append(_build_reviewer_feedback_prompt(review_feedback))
+                    extra_prompts.append(_build_reviewer_feedback_prompt(review_feedback, prior_patch=prior_patch_text, prior_changed_files=prior_changed_files))
                 if case_validation_prompt:
                     extra_prompts.append(case_validation_prompt)
 
+                # Split turn budget: round 1 gets 2/3, subsequent rounds get remaining
+                if total_reviewer_rounds > 1:
+                    round_turns = (args.max_turns * 2 // 3) if reviewer_round == 0 else (args.max_turns // 3)
+                else:
+                    round_turns = args.max_turns
+
                 loop = CustomAgentLoop(
-                    model=model,
-                    api_base=api_base,
-                    api_key=api_key,
+                    model=coder_model_for_case,
+                    api_base=coder_api_base_for_case,
+                    api_key=coder_api_key_for_case,
                     temperature=args.temperature,
-                    max_turns=args.max_turns,
+                    max_turns=round_turns,
                     max_tokens=args.max_tokens,
                     num_ctx=args.num_ctx,
                     env=env,
@@ -2395,6 +2621,9 @@ def main() -> None:
 
                 assert coder_result is not None
                 patch_text = str(coder_result.get("patch", ""))
+                prior_patch_text = patch_text
+                loop_state = coder_result.get("loop_state", {}) if isinstance(coder_result.get("loop_state"), dict) else {}
+                prior_changed_files = [str(p) for p in loop_state.get("changed_files", []) if str(p).strip()]
                 log_line(f"[reviewer] calling model={reviewer_model} round={reviewer_round + 1}")
                 review_feedback, reviewer_stats, reviewer_raw = _call_json_role(
                     model=reviewer_model,
@@ -2436,7 +2665,9 @@ def main() -> None:
                 result["submission_summary"] = ""
                 result["stopped_reason"] = "reviewer_rejected"
                 log_line("[reviewer] final decision is revise; marking run as reviewer_rejected")
-            role_model_stats["coder"] = {"model": model, **coder_accumulated_stats}
+            role_model_stats["coder"] = {"model": coder_model_for_case, **coder_accumulated_stats}
+            if routing_enabled:
+                role_model_stats["coder"]["routed_difficulty"] = routed_difficulty or "missing"
             result["agent_architecture"] = args.agent_architecture
             result["role_model_stats"] = role_model_stats
             result["planner_handoff"] = planner_handoff or {}

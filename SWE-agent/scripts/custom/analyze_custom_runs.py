@@ -20,9 +20,25 @@ VALIDATION_HINTS = ("pytest", "unittest", "python -m", "python3 -m", "tox", "nox
 SEARCH_HINTS = ("find ", "rg ", "grep ", "ls ", "git diff", "cat ", "python scripts/")
 PATH_RE = re.compile(r"(/repo/[^\s'\"`]+|[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+)")
 MODEL_SIZE_RE = re.compile(r"(?P<size>\d+(?:\.\d+)?)b\b", re.IGNORECASE)
+# Matches the active-parameter suffix in MoE model names, e.g. "A3B" in "30B-A3B"
+MOE_ACTIVE_RE = re.compile(r"-a(?P<active>\d+(?:\.\d+)?)b\b", re.IGNORECASE)
+# Cost multipliers relative to gpt-4o-mini ($0.15/MTok in, $0.60/MTok out).
+# Formula: input_mult = model_input_price / 0.15, output_mult = model_output_price / 0.60.
+# UMICH-hosted model prices are H100-GPU-rate estimates (no public API pricing).
+# For MoE models, VRAM cost (all expert weights must reside in GPU memory) is a
+# significant driver even when active params are small, so estimates are higher
+# than the active-params-only floor would suggest.
+#   gpt-oss-120b: ~$5/MTok in, ~$10/MTok out  → 33.3× in, 16.7× out
+#   Qwen3-VL-30B-A3B (memory-bandwidth-bound MoE): ~$0.70/MTok in, ~$2.00/MTok out
+#                                                  → 4.7× in, 3.3× out
+#   Implied output ratio (gpt-oss-120b vs Qwen-MoE): ~5×
 OPENAI_COST_MULTIPLIERS = {
     "gpt-4o-mini": {"input": 1.0, "output": 4.0},
     "gpt-4o": {"input": 16.67, "output": 16.67},
+    # UMICH cluster — dense 120B model
+    "gpt-oss-120b": {"input": 33.3, "output": 16.7},
+    # UMICH cluster — MoE 30B total / 3B active, memory-bandwidth-bound
+    "qwen3-vl-30b-a3b": {"input": 4.7, "output": 3.3},
 }
 PRESET_FILE = Path(__file__).resolve().parents[2] / "config" / "custom_configs" / "custom_runner_model_presets.yaml"
 
@@ -111,38 +127,27 @@ def _role_size_ranks(
     return planner_rank, coder_rank, reviewer_rank
 
 
-def _resolve_cases_roots(value: str) -> list[Path]:
-    roots: list[Path] = []
-    for chunk in value.split(","):
-        cleaned = chunk.strip()
-        if not cleaned:
-            continue
-        roots.append(Path(cleaned).resolve())
-    return roots
+def _resolve_cases_root(path: Path) -> Path:
+    return path.resolve()
 
 
-def _load_case_map(cases_roots: list[Path]) -> dict[str, dict[str, Any]]:
+def _load_case_map(cases_root: Path) -> dict[str, dict[str, Any]]:
     case_map: dict[str, dict[str, Any]] = {}
-    for cases_root in cases_roots:
-        if not cases_root.exists():
+    for case_file in sorted(cases_root.glob("*/case.json")):
+        raw = yaml.safe_load(case_file.read_text())
+        if not isinstance(raw, list):
             continue
-        for case_file in sorted(cases_root.glob("*/case.json")):
-            raw = yaml.safe_load(case_file.read_text())
-            if not isinstance(raw, list):
+        for item in raw:
+            if not isinstance(item, dict):
                 continue
-            for item in raw:
-                if not isinstance(item, dict):
-                    continue
-                instance_id = str(item.get("instance_id", "")).strip()
-                if not instance_id:
-                    continue
-                if instance_id in case_map:
-                    raise ValueError(f"Duplicate instance_id '{instance_id}' found in {case_file}")
-                case_map[instance_id] = {
-                    "case_file": case_file.resolve(),
-                    "case_dir": case_file.parent.resolve(),
-                    "item": item,
-                }
+            instance_id = str(item.get("instance_id", "")).strip()
+            if not instance_id:
+                continue
+            case_map[instance_id] = {
+                "case_file": case_file.resolve(),
+                "case_dir": case_file.parent.resolve(),
+                "item": item,
+            }
     return case_map
 
 
@@ -264,10 +269,22 @@ def _count_patch_changed_lines(patch_text: str) -> int:
 
 
 def _extract_model_size(model_name: str) -> float | None:
-    match = MODEL_SIZE_RE.search(model_name)
-    if not match:
-        return None
-    return float(match.group("size"))
+    """Return effective cost weight (param-billions) for the model, or None if unknown.
+
+    For dense models this is the total parameter count. For MoE models with an
+    active-parameter suffix (e.g. "30B-A3B"), returns the mean of total
+    and active params — sqrt(total × active) — which accounts for both VRAM cost
+    (proportional to total params) and compute cost (proportional to active params).
+    """
+    moe_match = MOE_ACTIVE_RE.search(model_name)
+    total_match = MODEL_SIZE_RE.search(model_name)
+    if moe_match and total_match:
+        active = float(moe_match.group("active"))
+        total = float(total_match.group("size"))
+        return (total * active) ** 0.5
+    if total_match:
+        return float(total_match.group("size"))
+    return None
 
 
 def _estimate_relative_compute(tokens_in: int, tokens_out: int, model_name: str) -> tuple[float, dict[str, float]]:
@@ -362,7 +379,9 @@ def analyze_artifact(artifact: RunArtifact, case_entry: dict[str, Any], run_inst
 
     baseline_eval = evaluate_case(case_path=case_file, mode="baseline", run_install=run_install)
     if patch_text.strip():
-        success_eval = evaluate_case(case_path=case_file, mode="patch", patch_file=artifact.patch_path, run_install=run_install)
+        success_eval = evaluate_case(
+            case_path=case_file, mode="patch", patch_file=artifact.patch_path, run_install=run_install
+        )
     else:
         success_eval = {
             "case": str(case_file),
@@ -467,7 +486,9 @@ def analyze_artifact(artifact: RunArtifact, case_entry: dict[str, Any], run_inst
     success_fraction = _fraction_passed(success_eval["results"])
     baseline_effective_fraction, baseline_effective_checks = _effective_fraction(baseline_eval["results"])
     success_effective_fraction, success_effective_checks = _effective_fraction(success_eval["results"])
-    evaluation_blocked = any(_is_environment_blocked_result(result) for result in baseline_eval["results"] + success_eval["results"])
+    evaluation_blocked = any(
+        _is_environment_blocked_result(result) for result in baseline_eval["results"] + success_eval["results"]
+    )
 
     model_name = str(run_config.get("model", ""))
     input_tokens = int(stats.get("input_tokens", 0) or 0)
@@ -718,7 +739,9 @@ def _aggregate(results: list[dict[str, Any]]) -> dict[str, Any]:
         "observed_resolved_rate": round(observed_resolved / runs, 3),
         "evaluation_blocked_runs": blocked,
         "avg_total_score": round(sum(result["total_score"] for result in results) / runs, 2),
-        "avg_relative_compute_to_4o_mini": round(sum(result["relative_compute_to_4o_mini"] for result in results) / runs, 3),
+        "avg_relative_compute_to_4o_mini": round(
+            sum(result["relative_compute_to_4o_mini"] for result in results) / runs, 3
+        ),
         "avg_turns": round(sum(result["turns"] for result in results) / runs, 2),
         "avg_parse_errors": round(sum(result["parse_errors"] for result in results) / runs, 2),
         "avg_tool_errors": round(sum(result["tool_error_count"] for result in results) / runs, 2),
@@ -728,12 +751,10 @@ def _aggregate(results: list[dict[str, Any]]) -> dict[str, Any]:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target", type=Path, help="Run root, single run dir, or single .traj file.")
+    parser.add_argument("--cases-root", type=Path, default=Path("SWE-agent/custom_cases"))
     parser.add_argument(
-        "--cases-roots",
-        default="SWE-agent/custom_cases,SWE-agent/custom_cases_2,SWE-agent/custom_cases_3",
-        help="Comma-separated case roots to scan for instance metadata.",
+        "--run-install", action="store_true", help="Run case install/setup commands before evaluation checks."
     )
-    parser.add_argument("--run-install", action="store_true", help="Run case install/setup commands before evaluation checks.")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--write-json", type=Path)
     return parser.parse_args()
@@ -741,8 +762,8 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    cases_roots = _resolve_cases_roots(args.cases_roots)
-    case_map = _load_case_map(cases_roots)
+    cases_root = _resolve_cases_root(args.cases_root)
+    case_map = _load_case_map(cases_root)
     artifacts = _collect_artifacts(args.target)
     if not artifacts:
         raise SystemExit(f"No custom-run artifacts found under {args.target}")
@@ -758,7 +779,7 @@ def main() -> None:
 
     payload = {
         "target": str(args.target.resolve()),
-        "cases_roots": [str(path) for path in cases_roots],
+        "cases_root": str(cases_root),
         "missing_cases": sorted(set(missing_cases)),
         "aggregate": _aggregate(results),
         "results": results,

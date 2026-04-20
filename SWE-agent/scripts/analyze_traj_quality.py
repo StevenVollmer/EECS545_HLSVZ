@@ -17,6 +17,34 @@ ABS_PATH_RE = re.compile(r"(/(?:testbed|workspace|repo)[^\s'\"`]+)")
 ISSUE_PATH_RE = re.compile(r"(?P<path>(?:[\w.-]+/)+[\w.-]+\.\w+)")
 TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9_]+")
 MODEL_SIZE_RE = re.compile(r"(?P<size>\d+(?:\.\d+)?)b\b", re.IGNORECASE)
+# Matches the active-parameter suffix in MoE model names, e.g. "A3B" in "30B-A3B-Instruct"
+MOE_ACTIVE_RE = re.compile(r"-a(?P<active>\d+(?:\.\d+)?)b\b", re.IGNORECASE)
+# Per-model pricing in USD per million tokens: (input_price, output_price).
+# Used to produce concrete dollar cost estimates alongside the relative metric.
+#
+# The UMICH models below run on a private GPU cluster with no public pricing.
+# Estimates use commercial H100 rental rates (~$3/GPU-hr) scaled by the number
+# of GPUs required and typical inference throughput for each model class.
+#
+# For MoE models, GPU *memory* (VRAM) is a significant cost driver even when
+# active params are small — all expert weights must reside in VRAM. The
+# relative_cost_estimate uses sqrt(total × active) as the effective weight to
+# account for both compute (active params) and memory bandwidth (total params).
+#
+#   gpt-oss-120b  — dense 120B, ~2 H100s needed, ~60 tok/s generation
+#                   → ~$5/MTok input, ~$10/MTok output
+#   Qwen3-VL-30B-A3B — MoE, 30B total/3B active, 1 H100, memory-bandwidth-bound
+#                   → ~$0.70/MTok input, ~$2.00/MTok output
+#   Implied ratio (output): ~5× more expensive for gpt-oss-120b vs Qwen MoE
+#
+MODEL_PRICE_TABLE: dict[str, tuple[float, float]] = {
+    # UMICH cluster — dense 120B model; estimated from H100 rental cost
+    "gpt-oss-120b": (5.00, 10.00),
+    # UMICH cluster — MoE 30B total / 3B active; memory-bandwidth cost dominates
+    "qwen3-vl-30b-a3b": (0.70, 2.00),
+    # MiniMax M2.7 MoE (reference only)
+    "minimax-m2.7": (0.50, 1.50),
+}
 EDIT_FAILURE_HINTS = (
     "no replacement was performed",
     "usage: str_replace_editor",
@@ -142,16 +170,79 @@ def parse_replay_config(data: dict) -> dict:
     return {}
 
 
-def model_size_weight(model_name: str) -> float:
-    match = MODEL_SIZE_RE.search(model_name)
-    if not match:
-        return 1.0
-    return float(match.group("size"))
+def _model_param_counts(model_name: str) -> tuple[float, float]:
+    """Return (total_params_b, active_params_b) for the model.
+
+    For dense models, total == active. For MoE models that include an active-param
+    suffix (e.g. "30B-A3B"), total is the full parameter count and active is the
+    per-token compute count. Falls back to (1.0, 1.0) if no size is found.
+    """
+    moe_match = MOE_ACTIVE_RE.search(model_name)
+    total_match = MODEL_SIZE_RE.search(model_name)
+    if moe_match and total_match:
+        active = float(moe_match.group("active"))
+        total = float(total_match.group("size"))
+        return total, active
+    if total_match:
+        total = float(total_match.group("size"))
+        return total, total
+    return 1.0, 1.0
+
+
+def model_effective_weight(model_name: str) -> float:
+    """Effective cost weight (in param-billions) for use in relative cost estimates.
+
+    For dense models this is simply the parameter count.
+    For MoE models, VRAM (proportional to total params) and compute (proportional
+    to active params) are both significant cost drivers, so we use the geometric
+    mean: sqrt(total × active). This gives a more realistic ratio than pure active
+    params (which overstates MoE cost-efficiency) or pure total params (which
+    understates it).
+
+    Example — Qwen3-VL-30B-A3B vs gpt-oss-120b:
+        Qwen:     sqrt(30 × 3) ≈ 9.5
+        gpt-120b: sqrt(120 × 120) = 120
+        ratio: ~12.6× (vs 40× active-only or 4× total-only)
+    """
+    total, active = _model_param_counts(model_name)
+    return (total * active) ** 0.5
+
+
+# Aliases kept for backward compatibility
+model_active_params = model_effective_weight
+model_size_weight = model_effective_weight
 
 
 def estimate_relative_cost(tokens_in: int, tokens_out: int, model_name: str) -> float:
-    size_weight = model_size_weight(model_name)
+    """Relative cost proxy using geometric-mean effective parameter weight.
+
+    Output tokens are weighted 2× input tokens to reflect the higher per-token
+    cost of generation vs. prefill on most inference backends.
+    """
+    size_weight = model_effective_weight(model_name)
     return (tokens_in * size_weight) + (tokens_out * size_weight * 2.0)
+
+
+def _model_price_per_mtok(model_name: str) -> tuple[float, float] | None:
+    """Return (input_usd_per_mtok, output_usd_per_mtok) from the price table, or None."""
+    lower = model_name.lower()
+    for key, prices in MODEL_PRICE_TABLE.items():
+        if key in lower:
+            return prices
+    return None
+
+
+def estimate_cost_usd(tokens_in: int, tokens_out: int, model_name: str) -> float | None:
+    """Estimate actual cost in USD using the MODEL_PRICE_TABLE.
+
+    Returns None when the model is not in the table so callers can distinguish
+    "free" from "unknown".
+    """
+    prices = _model_price_per_mtok(model_name)
+    if prices is None:
+        return None
+    input_price, output_price = prices
+    return (tokens_in * input_price + tokens_out * output_price) / 1_000_000
 
 
 def _extract_paths(text: str) -> list[str]:
@@ -328,6 +419,7 @@ def score_traj(data: dict) -> dict:
         "token_total": 0,
         "tokens_per_step": "0.0",
         "relative_cost_estimate": 0.0,
+        "estimated_cost_usd": None,
         "planner_model": role_model_names["planner"],
         "coder_model": role_model_names["coder"],
         "reviewer_model": role_model_names["reviewer"],
@@ -455,14 +547,20 @@ def score_traj(data: dict) -> dict:
         summary["tokens_per_step"] = f"{int(summary['token_total']) / len(trajectory):.1f}"
 
     relative_cost = 0.0
+    cost_usd: float | None = 0.0
     for role in ("planner", "coder", "reviewer"):
         stats = role_model_stats.get(role, {}) if isinstance(role_model_stats.get(role), dict) else {}
         role_in = int(stats.get("tokens_sent", 0) or 0)
         role_out = int(stats.get("tokens_received", 0) or 0)
         summary[f"{role}_tokens_in"] = role_in
         summary[f"{role}_tokens_out"] = role_out
-        relative_cost += estimate_relative_cost(role_in, role_out, str(role_model_names.get(role, "")))
+        model = str(role_model_names.get(role, ""))
+        relative_cost += estimate_relative_cost(role_in, role_out, model)
+        role_usd = estimate_cost_usd(role_in, role_out, model)
+        if cost_usd is not None:
+            cost_usd = (cost_usd + role_usd) if role_usd is not None else None
     summary["relative_cost_estimate"] = round(relative_cost, 1)
+    summary["estimated_cost_usd"] = round(cost_usd, 4) if cost_usd is not None else None
 
     if planner_enabled:
         applicable_progress_max += 3

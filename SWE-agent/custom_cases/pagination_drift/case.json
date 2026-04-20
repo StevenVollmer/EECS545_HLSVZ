@@ -1,0 +1,59 @@
+[
+  {
+    "image_name": "python:3.11",
+    "instance_id": "pagination_drift_001",
+    "problem_statement": "Callers of the list API are seeing truncated results. Reproduce via `python scripts/demo_list.py`. Existing tests pass. Fix the bug so the demo reports OK for any requested page size against any dataset, keep existing tests passing, and submit. The storage layer's behavior is a stable v1 invariant — do not change it.",
+    "repo_path": "repo",
+    "install_commands": [
+      "pip install pytest"
+    ],
+    "analysis": {
+      "likely_fix_paths": [
+        "app/api/list_endpoint.py"
+      ],
+      "difficulty": "hard",
+      "showcase": "coder"
+    },
+    "evaluation": {
+      "baseline_checks": [
+        {
+          "name": "existing_tests_still_pass",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "3 passed"
+          ]
+        },
+        {
+          "name": "demo_shows_truncation",
+          "command": "python scripts/demo_list.py",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "WARNING: list endpoint did not return all rows"
+          ]
+        }
+      ],
+      "success_checks": [
+        {
+          "name": "tests_still_pass_after_fix",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "3 passed"
+          ]
+        },
+        {
+          "name": "demo_returns_full_dataset",
+          "command": "python scripts/demo_list.py",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "OK: list endpoint returned all rows"
+          ],
+          "stdout_not_contains": [
+            "WARNING: list endpoint did not return all rows"
+          ]
+        }
+      ]
+    }
+  }
+]

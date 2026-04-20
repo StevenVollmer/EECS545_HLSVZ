@@ -109,6 +109,7 @@ def read_traj_score(path: Path) -> dict[str, object]:
             "tokens_per_step": "n/a",
             "api_calls": "n/a",
             "relative_cost_estimate": "n/a",
+            "estimated_cost_usd": "n/a",
             "issue_alignment_score": "n/a",
             "solution_focus_score": "n/a",
             "workflow_score": "n/a",
@@ -188,6 +189,7 @@ def build_rows_for_preset(root: Path, preset_name: str) -> list[dict[str, object
                     "tokens_per_step": score["tokens_per_step"],
                     "api_calls": score["api_calls"],
                     "relative_cost_estimate": score["relative_cost_estimate"],
+                    "estimated_cost_usd": score["estimated_cost_usd"],
                     "edited_files": score["edited_files"],
                     "aligned_files": score["aligned_files"],
                     "traj": str(traj) if traj.exists() else "",
@@ -260,6 +262,18 @@ def average_float(rows: list[dict[str, object]], key: str) -> str:
     return f"{sum(values) / len(values):.2f}"
 
 
+def average_usd(rows: list[dict[str, object]], key: str) -> str:
+    """Average USD values, skipping None (unknown pricing) and non-numeric entries.
+
+    Returns 'n/a' when no rows have known pricing, or a dollar-formatted string
+    marked with '~' to indicate it is an estimate (e.g. '~$0.0124').
+    """
+    values = [float(row[key]) for row in rows if isinstance(row[key], (int, float)) and not isinstance(row[key], bool)]
+    if not values:
+        return "n/a"
+    return f"~${sum(values) / len(values):.4f}"
+
+
 def true_count(rows: list[dict[str, object]], key: str) -> str:
     values = [row[key] for row in rows if isinstance(row[key], bool)]
     if not values:
@@ -313,6 +327,7 @@ def build_variant_rollup(rows: list[dict[str, object]]) -> list[dict[str, object
                 "avg_tokens_in": average_int(variant_rows, "tokens_in"),
                 "avg_tokens_out": average_int(variant_rows, "tokens_out"),
                 "avg_rel_cost": average_float(variant_rows, "relative_cost_estimate"),
+                "avg_cost_usd": average_usd(variant_rows, "estimated_cost_usd"),
                 "avg_legacy_quality": average_fraction(variant_rows, "quality_score"),
             }
         )
@@ -339,6 +354,7 @@ def build_project_rollup(rows: list[dict[str, object]]) -> list[dict[str, object
                 "avg_tokens_in": average_int(project_rows, "tokens_in"),
                 "avg_tokens_out": average_int(project_rows, "tokens_out"),
                 "avg_rel_cost": average_float(project_rows, "relative_cost_estimate"),
+                "avg_cost_usd": average_usd(project_rows, "estimated_cost_usd"),
                 "best_variant": best_variant,
             }
         )
@@ -373,6 +389,7 @@ def build_instance_rollup(rows: list[dict[str, object]]) -> list[dict[str, objec
                 "avg_tokens_in": average_int(instance_rows, "tokens_in"),
                 "avg_tokens_out": average_int(instance_rows, "tokens_out"),
                 "avg_rel_cost": average_float(instance_rows, "relative_cost_estimate"),
+                "avg_cost_usd": average_usd(instance_rows, "estimated_cost_usd"),
                 "best_variant": best_variant,
                 "best_analysis": best_analysis,
                 "exit_summary": exit_summary,
@@ -403,12 +420,12 @@ def write_root_readme(rows: list[dict[str, object]], path: Path) -> None:
         "",
         "These metrics prioritize issue alignment, focused editing, validation after edits, and execution stability.",
         "",
-        "| Config | Instances | Submitted | Manual Submit | Validated After Edit | Aligned Edits | Avg Analysis | Avg Issue Alignment | Avg Focus | Avg Workflow | Avg Stability | Avg In Tok | Avg Out Tok | Avg Rel Cost | Avg Steps |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: |",
+        "| Config | Instances | Submitted | Manual Submit | Validated After Edit | Aligned Edits | Avg Analysis | Avg Issue Alignment | Avg Focus | Avg Workflow | Avg Stability | Avg In Tok | Avg Out Tok | Avg Rel Cost | Avg Cost USD | Avg Steps |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: |",
     ]
     for row in variant_rollup:
         lines.append(
-            "| {config} | {instances} | {submitted} | {manual_submit} | {validated_after_edit} | {aligned_edits} | {avg_analysis} | {avg_issue_alignment} | {avg_focus} | {avg_workflow} | {avg_stability} | {avg_tokens_in} | {avg_tokens_out} | {avg_rel_cost} | {avg_steps} |".format(
+            "| {config} | {instances} | {submitted} | {manual_submit} | {validated_after_edit} | {aligned_edits} | {avg_analysis} | {avg_issue_alignment} | {avg_focus} | {avg_workflow} | {avg_stability} | {avg_tokens_in} | {avg_tokens_out} | {avg_rel_cost} | {avg_cost_usd} | {avg_steps} |".format(
                 **row
             )
         )
@@ -418,13 +435,13 @@ def write_root_readme(rows: list[dict[str, object]], path: Path) -> None:
             "",
             "## Issue Index",
             "",
-            "| Issue | Project | Configs Run | Submitted | Validated After Edit | Aligned Edits | Avg Analysis | Avg Issue Alignment | Avg Focus | Avg Workflow | Avg Stability | Avg In Tok | Avg Out Tok | Avg Rel Cost | Best Variant | Best Analysis | Exit Mix |",
-            "| --- | --- | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |",
+            "| Issue | Project | Configs Run | Submitted | Validated After Edit | Aligned Edits | Avg Analysis | Avg Issue Alignment | Avg Focus | Avg Workflow | Avg Stability | Avg In Tok | Avg Out Tok | Avg Rel Cost | Avg Cost USD | Best Variant | Best Analysis | Exit Mix |",
+            "| --- | --- | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- | --- |",
         ]
     )
     for row in instance_rollup:
         lines.append(
-            "| {instance_id} | {project_id} | {variants_run} | {submitted} | {validated_after_edit} | {aligned_edits} | {avg_analysis} | {avg_issue_alignment} | {avg_focus} | {avg_workflow} | {avg_stability} | {avg_tokens_in} | {avg_tokens_out} | {avg_rel_cost} | {best_variant} | {best_analysis} | {exit_summary} |".format(
+            "| {instance_id} | {project_id} | {variants_run} | {submitted} | {validated_after_edit} | {aligned_edits} | {avg_analysis} | {avg_issue_alignment} | {avg_focus} | {avg_workflow} | {avg_stability} | {avg_tokens_in} | {avg_tokens_out} | {avg_rel_cost} | {avg_cost_usd} | {best_variant} | {best_analysis} | {exit_summary} |".format(
                 **row
             )
         )
@@ -434,14 +451,14 @@ def write_root_readme(rows: list[dict[str, object]], path: Path) -> None:
             "",
             "## Project Index",
             "",
-            "| Project | Issues | Configs | Avg Analysis | Avg Issue Alignment | Avg Focus | Avg Workflow | Avg Stability | Avg In Tok | Avg Out Tok | Avg Rel Cost | Best Variant | Report |",
-            "| --- | ---: | ---: | --- | --- | --- | --- | --- | ---: | ---: | ---: | --- | --- |",
+            "| Project | Issues | Configs | Avg Analysis | Avg Issue Alignment | Avg Focus | Avg Workflow | Avg Stability | Avg In Tok | Avg Out Tok | Avg Rel Cost | Avg Cost USD | Best Variant | Report |",
+            "| --- | ---: | ---: | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- |",
         ]
     )
     for row in project_rollup:
         report_path = f"./projects/{row['project_id']}/README.md"
         lines.append(
-            "| {project_id} | {issues} | {configs} | {avg_analysis} | {avg_issue_alignment} | {avg_focus} | {avg_workflow} | {avg_stability} | {avg_tokens_in} | {avg_tokens_out} | {avg_rel_cost} | {best_variant} | [{project_id}]({report_path}) |".format(
+            "| {project_id} | {issues} | {configs} | {avg_analysis} | {avg_issue_alignment} | {avg_focus} | {avg_workflow} | {avg_stability} | {avg_tokens_in} | {avg_tokens_out} | {avg_rel_cost} | {avg_cost_usd} | {best_variant} | [{project_id}]({report_path}) |".format(
                 report_path=report_path,
                 **row,
             )
@@ -481,12 +498,12 @@ def write_project_reports(rows: list[dict[str, object]], root: Path) -> None:
             "",
             "## Variant Aggregate",
             "",
-            "| Config | Instances | Submitted | Manual Submit | Validated After Edit | Aligned Edits | Avg Analysis | Avg Issue Alignment | Avg Focus | Avg Workflow | Avg Stability | Avg In Tok | Avg Out Tok | Avg Rel Cost | Avg Steps | Legacy Quality |",
-            "| --- | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- |",
+            "| Config | Instances | Submitted | Manual Submit | Validated After Edit | Aligned Edits | Avg Analysis | Avg Issue Alignment | Avg Focus | Avg Workflow | Avg Stability | Avg In Tok | Avg Out Tok | Avg Rel Cost | Avg Cost USD | Avg Steps | Legacy Quality |",
+            "| --- | ---: | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |",
         ]
         for row in variant_rollup:
             lines.append(
-                "| {config} | {instances} | {submitted} | {manual_submit} | {validated_after_edit} | {aligned_edits} | {avg_analysis} | {avg_issue_alignment} | {avg_focus} | {avg_workflow} | {avg_stability} | {avg_tokens_in} | {avg_tokens_out} | {avg_rel_cost} | {avg_steps} | {avg_legacy_quality} |".format(
+                "| {config} | {instances} | {submitted} | {manual_submit} | {validated_after_edit} | {aligned_edits} | {avg_analysis} | {avg_issue_alignment} | {avg_focus} | {avg_workflow} | {avg_stability} | {avg_tokens_in} | {avg_tokens_out} | {avg_rel_cost} | {avg_cost_usd} | {avg_steps} | {avg_legacy_quality} |".format(
                     **row
                 )
             )
@@ -495,13 +512,13 @@ def write_project_reports(rows: list[dict[str, object]], root: Path) -> None:
                 "",
                 "## Issue Aggregate",
                 "",
-                "| Issue | Configs Run | Submitted | Validated After Edit | Aligned Edits | Avg Analysis | Avg Issue Alignment | Avg Focus | Avg Workflow | Avg Stability | Avg In Tok | Avg Out Tok | Avg Rel Cost | Best Variant | Best Analysis | Exit Mix |",
-                "| --- | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |",
+                "| Issue | Configs Run | Submitted | Validated After Edit | Aligned Edits | Avg Analysis | Avg Issue Alignment | Avg Focus | Avg Workflow | Avg Stability | Avg In Tok | Avg Out Tok | Avg Rel Cost | Avg Cost USD | Best Variant | Best Analysis | Exit Mix |",
+                "| --- | ---: | ---: | ---: | ---: | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- | --- |",
             ]
         )
         for row in instance_rollup:
             lines.append(
-                "| {instance_id} | {variants_run} | {submitted} | {validated_after_edit} | {aligned_edits} | {avg_analysis} | {avg_issue_alignment} | {avg_focus} | {avg_workflow} | {avg_stability} | {avg_tokens_in} | {avg_tokens_out} | {avg_rel_cost} | {best_variant} | {best_analysis} | {exit_summary} |".format(
+                "| {instance_id} | {variants_run} | {submitted} | {validated_after_edit} | {aligned_edits} | {avg_analysis} | {avg_issue_alignment} | {avg_focus} | {avg_workflow} | {avg_stability} | {avg_tokens_in} | {avg_tokens_out} | {avg_rel_cost} | {avg_cost_usd} | {best_variant} | {best_analysis} | {exit_summary} |".format(
                     **row
                 )
             )
@@ -510,13 +527,13 @@ def write_project_reports(rows: list[dict[str, object]], root: Path) -> None:
                 "",
                 "## Instance Details",
                 "",
-                "| Instance | Preset | Variant | Exit | Analysis | Issue Align | Focus | Workflow | Stability | Validated After Edit | Aligned Files Edited | Edited Files | Legacy Quality | Completion | Grounding | In Tok | Out Tok | Rel Cost | Steps |",
-                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | --- | --- | --- | --- | ---: | ---: | ---: | ---: |",
+                "| Instance | Preset | Variant | Exit | Analysis | Issue Align | Focus | Workflow | Stability | Validated After Edit | Aligned Files Edited | Edited Files | Legacy Quality | Completion | Grounding | In Tok | Out Tok | Rel Cost | Cost USD | Steps |",
+                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: |",
             ]
         )
         for row in sorted(project_rows, key=lambda item: (str(item["instance_id"]), str(item["variant"]))):
             lines.append(
-                "| {instance_id} | {preset} | {variant} | {exit_status} | {analysis_score} | {issue_alignment_score} | {solution_focus_score} | {workflow_score} | {stability_score} | {validation_after_edit} | {aligned_files_edited} | {edited_files} | {quality_score} | {completion_score} | {grounding_score} | {tokens_in} | {tokens_out} | {relative_cost_estimate} | {steps} |".format(
+                "| {instance_id} | {preset} | {variant} | {exit_status} | {analysis_score} | {issue_alignment_score} | {solution_focus_score} | {workflow_score} | {stability_score} | {validation_after_edit} | {aligned_files_edited} | {edited_files} | {quality_score} | {completion_score} | {grounding_score} | {tokens_in} | {tokens_out} | {relative_cost_estimate} | {estimated_cost_usd} | {steps} |".format(
                     **row
                 )
             )

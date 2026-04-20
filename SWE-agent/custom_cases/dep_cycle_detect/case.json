@@ -1,0 +1,59 @@
+[
+  {
+    "image_name": "python:3.11",
+    "instance_id": "dep_cycle_detect_001",
+    "problem_statement": "The task scheduler rejects some valid dependency graphs as cyclic. Reproduce via `python scripts/demo_cycle.py`. Existing tests pass. Fix the bug so the demo reports OK, keep existing tests passing, and submit.",
+    "repo_path": "repo",
+    "install_commands": [
+      "pip install pytest"
+    ],
+    "analysis": {
+      "likely_fix_paths": [
+        "app/graph/cycle.py"
+      ],
+      "difficulty": "medium",
+      "showcase": "planner"
+    },
+    "evaluation": {
+      "baseline_checks": [
+        {
+          "name": "existing_tests_still_pass",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "4 passed"
+          ]
+        },
+        {
+          "name": "demo_shows_false_positive",
+          "command": "python scripts/demo_cycle.py",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "WARNING: diamond DAG incorrectly reported as cyclic"
+          ]
+        }
+      ],
+      "success_checks": [
+        {
+          "name": "tests_still_pass_after_fix",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "4 passed"
+          ]
+        },
+        {
+          "name": "demo_diamond_acyclic",
+          "command": "python scripts/demo_cycle.py",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "OK: diamond DAG correctly reported as acyclic"
+          ],
+          "stdout_not_contains": [
+            "WARNING: diamond DAG incorrectly reported as cyclic"
+          ]
+        }
+      ]
+    }
+  }
+]

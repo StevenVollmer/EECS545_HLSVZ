@@ -1,0 +1,24 @@
+"""Ledger totals.
+
+Amounts are stored as dollars-and-cents in float form. The reporting pipeline
+then rounds the final total to two decimal places for display. All amounts
+entering the ledger are guaranteed to be representable as cents (i.e., each
+individual amount is exact to two decimal places as a decimal number).
+"""
+
+from __future__ import annotations
+
+
+def total(amounts: list[float]) -> float:
+    # BUG: naive float summation accumulates drift when summing thousands of
+    # values that individually are exact in two-decimal form but whose binary
+    # float representations are not. The reporting layer rounds to two
+    # decimals, so small drift is usually hidden, but at operator scale the
+    # drift crosses a penny boundary and the reported total is off by 0.01.
+    # Fix requires recognizing that summing decimal-exact amounts demands a
+    # numerically stable approach (sum of integer cents, Decimal, or
+    # fsum/Kahan) — a naive sum is insufficient.
+    running = 0.0
+    for amount in amounts:
+        running += amount
+    return running

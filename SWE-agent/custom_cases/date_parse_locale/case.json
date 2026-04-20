@@ -1,0 +1,59 @@
+[
+  {
+    "image_name": "python:3.11",
+    "instance_id": "date_parse_locale_001",
+    "problem_statement": "Operators report records are being grouped under the wrong month. Reproduce via `python scripts/demo_grouping.py`. Existing tests pass. Fix the bug so the demo reports OK, keep existing tests passing, and submit.",
+    "repo_path": "repo",
+    "install_commands": [
+      "pip install pytest"
+    ],
+    "analysis": {
+      "likely_fix_paths": [
+        "app/parsing/date_parser.py"
+      ],
+      "difficulty": "medium",
+      "showcase": "planner"
+    },
+    "evaluation": {
+      "baseline_checks": [
+        {
+          "name": "existing_tests_still_pass",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "5 passed"
+          ]
+        },
+        {
+          "name": "demo_shows_wrong_month",
+          "command": "python scripts/demo_grouping.py",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "WARNING: US date grouped incorrectly"
+          ]
+        }
+      ],
+      "success_checks": [
+        {
+          "name": "tests_still_pass_after_fix",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "5 passed"
+          ]
+        },
+        {
+          "name": "demo_us_date_correct",
+          "command": "python scripts/demo_grouping.py",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "OK: US date grouped into March"
+          ],
+          "stdout_not_contains": [
+            "WARNING: US date grouped incorrectly"
+          ]
+        }
+      ]
+    }
+  }
+]

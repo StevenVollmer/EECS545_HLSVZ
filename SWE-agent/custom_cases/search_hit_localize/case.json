@@ -1,0 +1,59 @@
+[
+  {
+    "image_name": "python:3.11",
+    "instance_id": "search_hit_localize_001",
+    "problem_statement": "Operators report search result numbering is wrong. Reproduce via `python scripts/demo_results.py`. Existing tests pass. Fix the bug so the demo reports OK, keep existing tests passing, and submit.",
+    "repo_path": "repo",
+    "install_commands": [
+      "pip install pytest"
+    ],
+    "analysis": {
+      "likely_fix_paths": [
+        "app/formatters/hit_renderer.py"
+      ],
+      "difficulty": "medium",
+      "showcase": "planner"
+    },
+    "evaluation": {
+      "baseline_checks": [
+        {
+          "name": "existing_tests_still_pass",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "5 passed"
+          ]
+        },
+        {
+          "name": "demo_shows_zero_indexed",
+          "command": "python scripts/demo_results.py",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "WARNING: first result does not start with rank 1"
+          ]
+        }
+      ],
+      "success_checks": [
+        {
+          "name": "tests_still_pass_after_fix",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "5 passed"
+          ]
+        },
+        {
+          "name": "demo_one_indexed",
+          "command": "python scripts/demo_results.py",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "OK: first result is rank 1"
+          ],
+          "stdout_not_contains": [
+            "WARNING: first result does not start with rank 1"
+          ]
+        }
+      ]
+    }
+  }
+]

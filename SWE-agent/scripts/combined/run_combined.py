@@ -100,6 +100,10 @@ from run_custom_swebench import (  # noqa: E402
     _normalize_model_name,
     _resolve_api_key,
     _summarize_validation_events,
+    _build_plan_critic_system_prompt,
+    _build_plan_critic_user_prompt,
+    _default_plan_critic_verdict,
+    _build_planner_revision_prompt,
 )
 from sweagent.run.batch_instances import SWEBenchInstances  # noqa: E402
 
@@ -639,6 +643,12 @@ class MCTSAgentLoop:
         value_api_base: str | None = None,
         value_api_key: str | None = None,
         hindsight_feedback: bool = False,
+        # --- Critic gate (replaces auto-accept) ---
+        critic_gate: bool = False,
+        critic_model: str | None = None,
+        critic_api_base: str | None = None,
+        critic_api_key: str | None = None,
+        planner_handoff: dict[str, Any] | None = None,
     ):
         self.model = model
         self.api_base = api_base
@@ -673,6 +683,13 @@ class MCTSAgentLoop:
         self._dead_branch_feedback: list[str] = []
         self._value_tokens_in: int = 0
         self._value_tokens_out: int = 0
+        # Critic gate (replaces auto-accept with LLM quality check)
+        self.critic_gate = critic_gate
+        self.critic_model = critic_model or (value_model or model)
+        self.critic_api_base = critic_api_base or api_base
+        self.critic_api_key = critic_api_key or api_key
+        self.planner_handoff = planner_handoff
+        self._critic_stats: dict[str, Any] = {"calls": 0, "accepts": 0, "rejects": 0}
         # End combined agent additions
         self._global_stats = RunStats()
         self._turn_counter = 0
@@ -1816,13 +1833,61 @@ class MCTSAgentLoop:
             and self._is_ready_for_finalization(result_node)
             and patch.strip()
         ):
-            result_node.submitted = True
-            result_node.auto_finalized = True
-            result_node.submit_summary = (
-                "Auto-finalized: required success checks were satisfied with a non-empty patch."
-            )
-            result_node.stopped_reason = "auto_finalized"
-            self._log("[mcts] auto-finalized solved branch without explicit submit")
+            if self.critic_gate:
+                # --- Critic gate: LLM evaluates patch quality before accepting ---
+                self._log("[critic_gate] evaluating patch before finalization")
+                critic_prompt = (
+                    "You are reviewing a patch for correctness before it is submitted.\n\n"
+                    "Problem statement:\n" + self.problem_statement[:1500] + "\n\n"
+                    + ("Planner guidance:\n" + json.dumps(self.planner_handoff or {}, indent=2)[:1000] + "\n\n" if self.planner_handoff else "")
+                    + "Patch (git diff):\n```\n" + patch[:2000] + "\n```\n\n"
+                    "Does this patch correctly and completely fix the described issue? "
+                    "Return JSON: {\"decision\": \"accept\" or \"reject\", \"reason\": \"one sentence\"}"
+                )
+                try:
+                    gate_result, gate_stats, _ = _call_json_role_local(
+                        model=self.critic_model,
+                        api_base=self.critic_api_base,
+                        api_key=self.critic_api_key,
+                        temperature=0.0,
+                        max_tokens=self.max_tokens,
+                        num_ctx=self.num_ctx,
+                        system_prompt="You are a code reviewer. Output JSON only. Be skeptical — reject if the patch is incomplete, targets the wrong file, or doesn't address the root cause.",
+                        user_prompt=critic_prompt,
+                        fallback_payload={"decision": "accept", "reason": "fallback"},
+                    )
+                    decision = str(gate_result.get("decision", "")).lower()
+                    reason = str(gate_result.get("reason", ""))
+                    self._critic_stats["calls"] += 1
+                except Exception as e:
+                    self._log(f"[critic_gate] error: {e}; falling back to accept")
+                    decision = "accept"
+                    reason = "critic_error_fallback"
+
+                if decision == "accept":
+                    result_node.submitted = True
+                    result_node.auto_finalized = True
+                    result_node.submit_summary = f"Critic-gate accepted: {reason}"
+                    result_node.stopped_reason = "critic_accepted_finalized"
+                    self._critic_stats["accepts"] += 1
+                    self._log(f"[critic_gate] ACCEPTED — {reason}")
+                else:
+                    self._critic_stats["rejects"] += 1
+                    self._log(f"[critic_gate] REJECTED — {reason}")
+                    # Inject rejection into hindsight feedback so next branches avoid this
+                    if self.hindsight_feedback:
+                        self._dead_branch_feedback.append(
+                            f"Critic rejected a patch: {reason}"
+                        )
+            else:
+                # --- Original auto-finalize (no critic gate) ---
+                result_node.submitted = True
+                result_node.auto_finalized = True
+                result_node.submit_summary = (
+                    "Auto-finalized: required success checks were satisfied with a non-empty patch."
+                )
+                result_node.stopped_reason = "auto_finalized"
+                self._log("[mcts] auto-finalized solved branch without explicit submit")
 
         all_turns = [asdict(t) for t in result_node.turn_records]
 
@@ -1958,6 +2023,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--failure-surfacing", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--hindsight-feedback", action=argparse.BooleanOptionalAction, default=False,
                         help="Inject dead-branch failure summaries into sibling branches (combined agent)")
+    parser.add_argument("--plan-critic", action=argparse.BooleanOptionalAction, default=False,
+                        help="Run adversarial critic on planner handoff; revise plan if rejected.")
+    parser.add_argument("--critic-gate", action=argparse.BooleanOptionalAction, default=False,
+                        help="Use critic as submission gate: replace auto-accept with critic evaluation of patch quality.")
 
     # Instances
     parser.add_argument("--instances-type", choices=["swe_bench", "file"], default="swe_bench")
@@ -2049,6 +2118,8 @@ def main() -> None:
         "reviewer_gate_mode": args.reviewer_gate_mode,
         "adaptive_branching": bool(args.adaptive_branching),
         "hindsight_feedback": bool(getattr(args, "hindsight_feedback", False)),
+        "plan_critic": bool(getattr(args, "plan_critic", False)),
+        "critic_gate": bool(getattr(args, "critic_gate", False)),
         "mcts": {
             "iterations": MAX_ITERATIONS,
             "expansion_candidates": EXPANSION_CANDIDATES,
@@ -2145,6 +2216,7 @@ def main() -> None:
             # ------------------------------------------------------------------
             role_model_stats: dict[str, Any] = {}
             planner_handoff: dict[str, Any] | None = None
+            critic_warnings: list[str] = []
 
             if args.agent_architecture in {"planner_coder", "planner_coder_reviewer"}:
                 log_line(f"[planner] model={planner_model} api_base={args.planner_api_base}")
@@ -2166,12 +2238,52 @@ def main() -> None:
                 role_model_stats["planner"] = {"model": planner_model, **planner_stats}
                 log_line(f"[planner] handoff summary: {planner_handoff.get('root_cause_hypothesis', '')[:120]}")
 
+                # --- Plan critic (pre-coder audit, MCTS-adapted) ---
+                # For MCTS: do NOT revise the plan (revisions degrade exploration).
+                # Instead, inject critic objections as warnings the search can consider.
+                critic_warnings: list[str] = []
+                if getattr(args, "plan_critic", False):
+                    log_line(f"[plan_critic] calling model={planner_model}")
+                    critic_verdict, critic_stats, _ = _call_json_role_local(
+                        model=planner_model,
+                        api_base=args.planner_api_base,
+                        api_key=args.planner_api_key,
+                        temperature=0.0,
+                        max_tokens=args.max_tokens,
+                        num_ctx=args.num_ctx,
+                        system_prompt=_build_plan_critic_system_prompt(),
+                        user_prompt=_build_plan_critic_user_prompt(
+                            instance.problem_statement.text, runtime_context, planner_handoff
+                        ),
+                        fallback_payload=_default_plan_critic_verdict(),
+                    )
+                    verdict = str(critic_verdict.get("verdict", "")).lower()
+                    objections = [o for o in (critic_verdict.get("objections") or []) if isinstance(o, str) and o.strip()]
+                    role_model_stats["plan_critic"] = {
+                        "model": planner_model, "verdict": verdict or "accepted",
+                        "objections_count": len(objections), "revised": False, **critic_stats,
+                    }
+                    log_line(f"[plan_critic] verdict={verdict or 'accepted'} objections={len(objections)}")
+                    if objections:
+                        critic_warnings = objections
+                        hint = critic_verdict.get("revision_hint", "")
+                        log_line(f"[plan_critic] injecting {len(objections)} warnings as search context (no revision)")
+                        if hint:
+                            log_line(f"[plan_critic] hint: {hint}")
+
             # ------------------------------------------------------------------
             # MCTS coder loop (reviewer rounds)
             # ------------------------------------------------------------------
             extra_prompts: list[str] = []
             if planner_handoff:
                 extra_prompts.append(_build_planner_handoff_prompt(planner_handoff))
+            if critic_warnings:
+                warning_text = (
+                    "Plan audit warnings (an independent critic flagged these concerns — "
+                    "consider them but do not treat them as ground truth):\n"
+                    + "\n".join(f"- {w}" for w in critic_warnings)
+                )
+                extra_prompts.append(warning_text)
             if case_validation_prompt:
                 extra_prompts.append(case_validation_prompt)
 
@@ -2236,9 +2348,17 @@ def main() -> None:
                     value_api_base=args.value_api_base,
                     value_api_key=args.value_api_key,
                     hindsight_feedback=bool(getattr(args, "hindsight_feedback", False)),
+                    # Critic gate parameters
+                    critic_gate=bool(getattr(args, "critic_gate", False)),
+                    critic_model=args.reviewer_model,
+                    critic_api_base=args.reviewer_api_base,
+                    critic_api_key=args.reviewer_api_key,
+                    planner_handoff=planner_handoff,
                 )
                 coder_result = mcts.run()
                 role_model_stats["coder"] = {"model": model, **coder_result.get("stats", {})}
+                if getattr(args, "critic_gate", False):
+                    role_model_stats["critic_gate"] = mcts._critic_stats
 
                 if args.agent_architecture != "planner_coder_reviewer":
                     break

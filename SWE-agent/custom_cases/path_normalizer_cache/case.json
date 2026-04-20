@@ -1,0 +1,59 @@
+[
+  {
+    "image_name": "python:3.11",
+    "instance_id": "path_normalizer_cache_001",
+    "problem_statement": "Operators report that responses arriving via HTTP redirects disappear from the cache after the periodic eviction pass, even when the target URL is permitted. Reproduce via `python scripts/demo_redirect_cache.py`. Existing tests pass. Fix the bug so the demo reports OK, keep existing tests passing, and submit.",
+    "repo_path": "repo",
+    "install_commands": [
+      "pip install pytest"
+    ],
+    "analysis": {
+      "likely_fix_paths": [
+        "app/cache/url_cache.py"
+      ],
+      "difficulty": "hard",
+      "showcase": "coder"
+    },
+    "evaluation": {
+      "baseline_checks": [
+        {
+          "name": "existing_tests_still_pass",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "6 passed"
+          ]
+        },
+        {
+          "name": "demo_shows_redirect_evicted",
+          "command": "python scripts/demo_redirect_cache.py",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "WARNING: redirect-cached entry was evicted or is not retrievable"
+          ]
+        }
+      ],
+      "success_checks": [
+        {
+          "name": "tests_still_pass_after_fix",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "6 passed"
+          ]
+        },
+        {
+          "name": "demo_redirect_survives",
+          "command": "python scripts/demo_redirect_cache.py",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "OK: redirect-cached entry survived eviction and is retrievable"
+          ],
+          "stdout_not_contains": [
+            "WARNING: redirect-cached entry was evicted or is not retrievable"
+          ]
+        }
+      ]
+    }
+  }
+]

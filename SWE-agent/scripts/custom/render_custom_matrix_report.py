@@ -500,6 +500,10 @@ def main() -> None:
     matrix_root = args.matrix_root.resolve()
     summary = _maybe_generate_summary(matrix_root)
     results = _collect_run_results(matrix_root)
+    # When runs were launched via the shell-script pipeline (not run_custom_experiment_matrix.py),
+    # there are no per-run analysis.json files — fall back to the results embedded in the summary.
+    if not results and isinstance(summary.get("results"), list):
+        results = summary["results"]
     report = render_report(matrix_root, summary, results)
     output_path = args.output or (matrix_root / "README.md")
     output_path.write_text(report)

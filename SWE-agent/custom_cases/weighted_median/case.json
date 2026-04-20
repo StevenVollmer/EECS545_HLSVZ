@@ -1,0 +1,59 @@
+[
+  {
+    "image_name": "python:3.11",
+    "instance_id": "weighted_median_001",
+    "problem_statement": "Analysts report wrong answers from the statistics module on real-world data. Running `python scripts/demo_weighted.py` reproduces the issue. Existing tests pass. Fix the bug so the demo reports OK, keep existing tests passing, and submit.",
+    "repo_path": "repo",
+    "install_commands": [
+      "pip install pytest"
+    ],
+    "analysis": {
+      "likely_fix_paths": [
+        "app/stats/weighted.py"
+      ],
+      "difficulty": "hard",
+      "showcase": "coder"
+    },
+    "evaluation": {
+      "baseline_checks": [
+        {
+          "name": "existing_tests_still_pass",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "4 passed"
+          ]
+        },
+        {
+          "name": "demo_shows_wrong_answer",
+          "command": "python scripts/demo_weighted.py",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "WARNING: probability-weighted median does not match spec"
+          ]
+        }
+      ],
+      "success_checks": [
+        {
+          "name": "tests_still_pass_after_fix",
+          "command": "python -m pytest -q",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "4 passed"
+          ]
+        },
+        {
+          "name": "demo_matches_spec",
+          "command": "python scripts/demo_weighted.py",
+          "expect_exit_code": 0,
+          "stdout_contains": [
+            "OK: probability-weighted median matches spec"
+          ],
+          "stdout_not_contains": [
+            "WARNING: probability-weighted median does not match spec"
+          ]
+        }
+      ]
+    }
+  }
+]
