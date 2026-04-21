@@ -1,0 +1,5 @@
+{
+  "model_name_or_path": "P_c1_best_combined",
+  "instance_id": "digest_preview_001",
+  "model_patch": "diff --git a/app/utils/text.py b/app/utils/text.py\nindex 0addf0e..a3fcbd6 100644\n--- a/app/utils/text.py\n+++ b/app/utils/text.py\n@@ -21,6 +21,22 @@ def _capitalize_fragment(fragment: str) -> str:\n def _capitalize_word_with_joiners(word: str) -> str:\n     if not word:\n         return word\n+    # Preserve capitalization after joiners like apostrophes and hyphens\n+    if any(c in word for c in \"'-/\"):\n+        # Split on joiners and capitalize each segment\n+        segments = []\n+        current = \"\"\n+        for char in word:\n+            if char in \"'-/\":\n+                if current:\n+                    segments.append(_capitalize_fragment(current))\n+                    current = \"\"\n+                segments.append(char)\n+            else:\n+                current += char\n+        if current:\n+            segments.append(_capitalize_fragment(current))\n+        return \"\".join(segments)\n     return _capitalize_fragment(word)\n \n \n"
+}

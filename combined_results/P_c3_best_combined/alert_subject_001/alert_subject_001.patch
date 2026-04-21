@@ -1,0 +1,17 @@
+diff --git a/app/utils/subject.py b/app/utils/subject.py
+index e6b80f6..13298c7 100644
+--- a/app/utils/subject.py
++++ b/app/utils/subject.py
+@@ -1,6 +1,11 @@
+ def _title_word(word: str) -> str:
+     lowered = word.strip().lower()
+-    return lowered[:1].upper() + lowered[1:]
++    # Preserve capitalization after apostrophes by treating each part after apostrophe as a new word
++    parts = lowered.split("'")
++    result = parts[0][:1].upper() + parts[0][1:]
++    for part in parts[1:]:
++        result += "'" + part[:1].upper() + part[1:]
++    return result
+ 
+ 
+ def format_service_name(service: str) -> str:

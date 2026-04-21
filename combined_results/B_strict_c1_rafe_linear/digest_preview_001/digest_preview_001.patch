@@ -1,0 +1,21 @@
+diff --git a/app/utils/text.py b/app/utils/text.py
+index 0addf0e..48cb804 100644
+--- a/app/utils/text.py
++++ b/app/utils/text.py
+@@ -21,6 +21,16 @@ def _capitalize_fragment(fragment: str) -> str:
+ def _capitalize_word_with_joiners(word: str) -> str:
+     if not word:
+         return word
++    # Preserve capitalization after joiners (e.g., apostrophes, hyphens)
++    parts = word.split("'")
++    if len(parts) > 1:
++        return "'".join(_capitalize_fragment(part) for part in parts)
++    parts = word.split("-")
++    if len(parts) > 1:
++        return "-".join(_capitalize_fragment(part) for part in parts)
++    parts = word.split("/")
++    if len(parts) > 1:
++        return "/".join(_capitalize_fragment(part) for part in parts)
+     return _capitalize_fragment(word)
+ 
+ 

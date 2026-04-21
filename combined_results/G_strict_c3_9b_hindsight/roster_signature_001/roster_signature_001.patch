@@ -1,0 +1,23 @@
+diff --git a/app/utils/names.py b/app/utils/names.py
+index 16d0add..245a7cf 100644
+--- a/app/utils/names.py
++++ b/app/utils/names.py
+@@ -1,3 +1,16 @@
+ def lead_display_name(lead: str) -> str:
+-    cleaned = '-'.join(part.strip().lower() for part in lead.split('-'))
+-    return cleaned[:1].upper() + cleaned[1:]
++    # Split by hyphen to handle lead names like 'D'Arcy-Lee'
++    parts = lead.split('-')
++    # Process each part: strip whitespace and preserve case for display
++    processed_parts = []
++    for part in parts:
++        stripped = part.strip()
++        # If part contains apostrophe, we need to handle it carefully
++        # We want to preserve the original case for display
++        processed_parts.append(stripped)
++    # Join back with hyphens
++    cleaned = '-'.join(processed_parts)
++    # Only capitalize the first character of the entire string
++    if cleaned:
++        return cleaned[0].upper() + cleaned[1:]
++    return cleaned

@@ -1,0 +1,504 @@
+{
+  "turns": [
+    {
+      "turn": 1,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q tests/test_sprint_rollup.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q tests/test_sprint_rollup.py"
+          },
+          "output": "F..                                                                      [100%]\n=================================== FAILURES ===================================\n_____________________ test_blockers_exclude_resolved_items _____________________\n\n    def test_blockers_exclude_resolved_items() -> None:\n        items = [\n            Item(\"Queue\", blocked=True, resolved=False),\n            Item(\"Billing\", blocked=True, resolved=True),\n            Item(\"Docs\", blocked=False, resolved=False),\n        ]\n>       assert blocker_count(items) == 1\nE       AssertionError: assert 2 == 1\nE        +  where 2 = blocker_count([Item(title='Queue', blocked=True, resolved=False), Item(title='Billing', blocked=True, resolved=True), Item(title='Docs', blocked=False, resolved=False)])\n\ntests/test_sprint_rollup.py:12: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_sprint_rollup.py::test_blockers_exclude_resolved_items - AssertionError: assert 2 == 1\n1 failed, 2 passed in 0.09s",
+          "is_error": true,
+          "exit_code": 1
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 2,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/services/rollup.py",
+            "start_line": 1,
+            "end_line": 50
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/services/rollup.py",
+            "start_line": 1,
+            "end_line": 50
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/services/rollup.py:\n     1\tfrom app.models.item import Item\n     2\t\n     3\t\n     4\tdef blocker_count(items: list[Item]) -> int:\n     5\t    return len([item for item in items if item.blocked])\n     6\t",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 3,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/services/rollup.py",
+            "old_str": "return len([item for item in items if item.blocked])",
+            "new_str": "return len([item for item in items if item.blocked and not item.resolved])"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/services/rollup.py",
+            "old_str": "return len([item for item in items if item.blocked])",
+            "new_str": "return len([item for item in items if item.blocked and not item.resolved])"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/services/rollup.py:\n     1\tfrom app.models.item import Item\n     2\t\n     3\t\n     4\tdef blocker_count(items: list[Item]) -> int:\n     5\t    return len([item for item in items if item.blocked and not item.resolved])\n     6\t",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    }
+  ],
+  "stats": {
+    "input_tokens": 8593,
+    "output_tokens": 570,
+    "turns": 3,
+    "tool_calls": 3,
+    "iterations": 18,
+    "tree_nodes_created": 4,
+    "best_node_depth": 3,
+    "best_node_value": 43.808304,
+    "value_fn_tokens_in": 0,
+    "value_fn_tokens_out": 0
+  },
+  "loop_state": {
+    "executable_edit_made": true,
+    "validation_passed": false,
+    "validation_attempted_after_edit": true,
+    "diff_checked": false,
+    "successful_post_edit_commands": [],
+    "satisfied_success_checks": [
+      "sprint_rollup_passes"
+    ],
+    "changed_files": [
+      "app/services/rollup.py"
+    ]
+  },
+  "stopped_reason": "auto_finalized",
+  "submitted": true,
+  "submission_summary": "Auto-finalized: required success checks were satisfied with a non-empty patch.",
+  "patch": "diff --git a/app/services/rollup.py b/app/services/rollup.py\nindex 2421ae4..d862ae0 100644\n--- a/app/services/rollup.py\n+++ b/app/services/rollup.py\n@@ -2,5 +2,5 @@ from app.models.item import Item\n \n \n def blocker_count(items: list[Item]) -> int:\n-    return len([item for item in items if item.blocked])\n+    return len([item for item in items if item.blocked and not item.resolved])\n \n",
+  "info": {
+    "submission": "diff --git a/app/services/rollup.py b/app/services/rollup.py\nindex 2421ae4..d862ae0 100644\n--- a/app/services/rollup.py\n+++ b/app/services/rollup.py\n@@ -2,5 +2,5 @@ from app.models.item import Item\n \n \n def blocker_count(items: list[Item]) -> int:\n-    return len([item for item in items if item.blocked])\n+    return len([item for item in items if item.blocked and not item.resolved])\n \n",
+    "submitted": true,
+    "submission_summary": "Auto-finalized: required success checks were satisfied with a non-empty patch.",
+    "stopped_reason": "auto_finalized"
+  },
+  "auto_finalized": true,
+  "mcts_meta": {
+    "model": "openai/Qwen/Qwen3-VL-30B-A3B-Instruct",
+    "value_model": null,
+    "hindsight_feedback": true,
+    "dead_branch_feedback_count": 0,
+    "iterations": 18,
+    "expansion_candidates": 1,
+    "edit_vote_samples": 5,
+    "ucb_c": 1.414,
+    "root_visits": 3,
+    "early_branching": false,
+    "early_branch_depth": 2
+  },
+  "vote_summary": [
+    {
+      "depth": 3,
+      "action": "str_replace",
+      "winner_votes": 2,
+      "total_samples": 2,
+      "unique_candidates": 1
+    }
+  ],
+  "mcts_tree": {
+    "nodes": [
+      {
+        "id": "0",
+        "parent_id": null,
+        "depth": 0,
+        "action_name": null,
+        "action_args_preview": "",
+        "visits": 3,
+        "mean_value": 7.0,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0",
+        "parent_id": "0",
+        "depth": 1,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q tests/test_sprint_rollup.py\"}",
+        "visits": 3,
+        "mean_value": 7.0,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0",
+        "parent_id": "0.0",
+        "depth": 2,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"app/services/rollup.py\", \"start_line\": 1, \"end_line\": 50}",
+        "visits": 2,
+        "mean_value": 10.5,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0",
+        "parent_id": "0.0.0",
+        "depth": 3,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"app/services/rollup.py\", \"old_str\": \"return len([item for item in item",
+        "visits": 1,
+        "mean_value": 20.99,
+        "llm_value": null,
+        "submitted": true,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 1,
+        "has_nonempty_patch": true,
+        "stopped_reason": "auto_finalized",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"return len([item for item in items if item.blocked and not item.resolved])\", \"old_str\": \"return len([item for item in items if item.blocked])\", \"path\": \"app/services/rollup.py\"}, \"name\": \"str_replace\"}": 2
+        },
+        "on_result_path": true
+      }
+    ],
+    "result_node_id": "0.0.0.0"
+  },
+  "agent_architecture": "planner_coder_reviewer",
+  "architecture": "planner_coder_reviewer",
+  "role_model_stats": {
+    "planner": {
+      "model": "openai/openai/gpt-oss-120b",
+      "tokens_in": 649,
+      "tokens_out": 379,
+      "api_calls": 1
+    },
+    "coder": {
+      "model": "openai/Qwen/Qwen3-VL-30B-A3B-Instruct",
+      "input_tokens": 7944,
+      "output_tokens": 191,
+      "turns": 3,
+      "tool_calls": 3,
+      "iterations": 18,
+      "tree_nodes_created": 4,
+      "best_node_depth": 3,
+      "best_node_value": 43.808304,
+      "value_fn_tokens_in": 0,
+      "value_fn_tokens_out": 0
+    }
+  },
+  "planner_handoff": {
+    "problem_summary": "",
+    "root_cause_hypothesis": "app/services/rollup.py includes resolved blockers in the sprint blocker total aggregation",
+    "files_likely_affected": [
+      "app/services/rollup.py",
+      "app/presenters/summary.py"
+    ],
+    "target_symbols": [],
+    "discovery_priority": [
+      "app/services/rollup.py",
+      "app/presenters/summary.py"
+    ],
+    "first_actions": [
+      "Read app/services/rollup.py around the aggregation function",
+      "Read app/presenters/summary.py to see how totals are displayed",
+      "Run pytest tests/test_sprint_rollup.py to reproduce the inflated total failure"
+    ],
+    "safe_reproduction_steps": [],
+    "reproduction_notes": [],
+    "required_validations": [
+      "pytest -q",
+      "python -c \"import app; print('validation passed')\""
+    ],
+    "allowed_change_types": [
+      "targeted runtime code fixes"
+    ],
+    "forbidden_edits": [
+      "do not modify any test files",
+      "do not change function signatures or public API"
+    ],
+    "escalation_conditions": [
+      "If the issue is still unclear after targeted inspection and reproduction."
+    ]
+  },
+  "review_feedback": {
+    "decision": "accept",
+    "primary_reason": "All success checks verified (pre-run); skipping model reviewer.",
+    "required_changes": [],
+    "validations_to_rerun": []
+  },
+  "coder_rounds": [
+    {
+      "round": 1,
+      "turns": [
+        {
+          "turn": 1,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q tests/test_sprint_rollup.py"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "bash",
+              "arguments": {
+                "command": "python -m pytest -q tests/test_sprint_rollup.py"
+              },
+              "output": "F..                                                                      [100%]\n=================================== FAILURES ===================================\n_____________________ test_blockers_exclude_resolved_items _____________________\n\n    def test_blockers_exclude_resolved_items() -> None:\n        items = [\n            Item(\"Queue\", blocked=True, resolved=False),\n            Item(\"Billing\", blocked=True, resolved=True),\n            Item(\"Docs\", blocked=False, resolved=False),\n        ]\n>       assert blocker_count(items) == 1\nE       AssertionError: assert 2 == 1\nE        +  where 2 = blocker_count([Item(title='Queue', blocked=True, resolved=False), Item(title='Billing', blocked=True, resolved=True), Item(title='Docs', blocked=False, resolved=False)])\n\ntests/test_sprint_rollup.py:12: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_sprint_rollup.py::test_blockers_exclude_resolved_items - AssertionError: assert 2 == 1\n1 failed, 2 passed in 0.09s",
+              "is_error": true,
+              "exit_code": 1
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 2,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "app/services/rollup.py",
+                "start_line": 1,
+                "end_line": 50
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "view",
+              "arguments": {
+                "path": "app/services/rollup.py",
+                "start_line": 1,
+                "end_line": 50
+              },
+              "output": "Here's the result of running `cat -n` on /repo/app/services/rollup.py:\n     1\tfrom app.models.item import Item\n     2\t\n     3\t\n     4\tdef blocker_count(items: list[Item]) -> int:\n     5\t    return len([item for item in items if item.blocked])\n     6\t",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        },
+        {
+          "turn": 3,
+          "assistant_text": "",
+          "tool_calls": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "app/services/rollup.py",
+                "old_str": "return len([item for item in items if item.blocked])",
+                "new_str": "return len([item for item in items if item.blocked and not item.resolved])"
+              }
+            }
+          ],
+          "tool_results": [
+            {
+              "name": "str_replace",
+              "arguments": {
+                "path": "app/services/rollup.py",
+                "old_str": "return len([item for item in items if item.blocked])",
+                "new_str": "return len([item for item in items if item.blocked and not item.resolved])"
+              },
+              "output": "Here's the result of running `cat -n` on /repo/app/services/rollup.py:\n     1\tfrom app.models.item import Item\n     2\t\n     3\t\n     4\tdef blocker_count(items: list[Item]) -> int:\n     5\t    return len([item for item in items if item.blocked and not item.resolved])\n     6\t",
+              "is_error": false,
+              "exit_code": 0
+            }
+          ],
+          "finish_reason": null,
+          "parse_error": null
+        }
+      ],
+      "patch": "diff --git a/app/services/rollup.py b/app/services/rollup.py\nindex 2421ae4..d862ae0 100644\n--- a/app/services/rollup.py\n+++ b/app/services/rollup.py\n@@ -2,5 +2,5 @@ from app.models.item import Item\n \n \n def blocker_count(items: list[Item]) -> int:\n-    return len([item for item in items if item.blocked])\n+    return len([item for item in items if item.blocked and not item.resolved])\n \n",
+      "submitted": true,
+      "stopped_reason": "auto_finalized",
+      "stats": {
+        "input_tokens": 8593,
+        "output_tokens": 570,
+        "turns": 3,
+        "tool_calls": 3,
+        "iterations": 18,
+        "tree_nodes_created": 4,
+        "best_node_depth": 3,
+        "best_node_value": 43.808304,
+        "value_fn_tokens_in": 0,
+        "value_fn_tokens_out": 0
+      },
+      "mcts_tree": {
+        "nodes": [
+          {
+            "id": "0",
+            "parent_id": null,
+            "depth": 0,
+            "action_name": null,
+            "action_args_preview": "",
+            "visits": 3,
+            "mean_value": 7.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0",
+            "parent_id": "0",
+            "depth": 1,
+            "action_name": "bash",
+            "action_args_preview": "{\"command\": \"python -m pytest -q tests/test_sprint_rollup.py\"}",
+            "visits": 3,
+            "mean_value": 7.0,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0",
+            "parent_id": "0.0",
+            "depth": 2,
+            "action_name": "view",
+            "action_args_preview": "{\"path\": \"app/services/rollup.py\", \"start_line\": 1, \"end_line\": 50}",
+            "visits": 2,
+            "mean_value": 10.5,
+            "llm_value": null,
+            "submitted": false,
+            "is_branch_point": false,
+            "edit_made": false,
+            "success_checks": 0,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 0,
+            "has_nonempty_patch": false,
+            "stopped_reason": "",
+            "vote_counts": {},
+            "on_result_path": true
+          },
+          {
+            "id": "0.0.0.0",
+            "parent_id": "0.0.0",
+            "depth": 3,
+            "action_name": "str_replace",
+            "action_args_preview": "{\"path\": \"app/services/rollup.py\", \"old_str\": \"return len([item for item in item",
+            "visits": 1,
+            "mean_value": 20.99,
+            "llm_value": null,
+            "submitted": true,
+            "is_branch_point": true,
+            "edit_made": true,
+            "success_checks": 1,
+            "check_progress_gain": 0,
+            "post_edit_no_progress_turns": 1,
+            "has_nonempty_patch": true,
+            "stopped_reason": "auto_finalized",
+            "vote_counts": {
+              "{\"arguments\": {\"new_str\": \"return len([item for item in items if item.blocked and not item.resolved])\", \"old_str\": \"return len([item for item in items if item.blocked])\", \"path\": \"app/services/rollup.py\"}, \"name\": \"str_replace\"}": 2
+            },
+            "on_result_path": true
+          }
+        ],
+        "result_node_id": "0.0.0.0"
+      },
+      "vote_summary": [
+        {
+          "depth": 3,
+          "action": "str_replace",
+          "winner_votes": 2,
+          "total_samples": 2,
+          "unique_candidates": 1
+        }
+      ],
+      "review_feedback": {
+        "decision": "accept",
+        "primary_reason": "All success checks verified (pre-run); skipping model reviewer.",
+        "required_changes": [],
+        "validations_to_rerun": []
+      }
+    }
+  ],
+  "instance_id": "sprint_rollup_001",
+  "duration_seconds": 70.44
+}

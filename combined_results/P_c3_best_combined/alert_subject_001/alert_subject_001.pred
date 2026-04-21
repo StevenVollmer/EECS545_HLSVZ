@@ -1,0 +1,5 @@
+{
+  "model_name_or_path": "P_c3_best_combined",
+  "instance_id": "alert_subject_001",
+  "model_patch": "diff --git a/app/utils/subject.py b/app/utils/subject.py\nindex e6b80f6..13298c7 100644\n--- a/app/utils/subject.py\n+++ b/app/utils/subject.py\n@@ -1,6 +1,11 @@\n def _title_word(word: str) -> str:\n     lowered = word.strip().lower()\n-    return lowered[:1].upper() + lowered[1:]\n+    # Preserve capitalization after apostrophes by treating each part after apostrophe as a new word\n+    parts = lowered.split(\"'\")\n+    result = parts[0][:1].upper() + parts[0][1:]\n+    for part in parts[1:]:\n+        result += \"'\" + part[:1].upper() + part[1:]\n+    return result\n \n \n def format_service_name(service: str) -> str:\n"
+}

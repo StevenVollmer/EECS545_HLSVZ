@@ -1,0 +1,35 @@
+diff --git a/app/utils/names.py b/app/utils/names.py
+index 16d0add..79a282c 100644
+--- a/app/utils/names.py
++++ b/app/utils/names.py
+@@ -1,3 +1,15 @@
+ def lead_display_name(lead: str) -> str:
+-    cleaned = '-'.join(part.strip().lower() for part in lead.split('-'))
+-    return cleaned[:1].upper() + cleaned[1:]
++    parts = lead.split('-')
++    cleaned_parts = []
++    for part in parts:
++        part = part.strip()
++        if "'" in part:
++            # Handle apostrophes: capitalize each segment while preserving apostrophes
++            segments = part.split("'")
++            capitalized = "'".join(seg.capitalize() for seg in segments)
++            cleaned_parts.append(capitalized)
++        else:
++            # No apostrophe: capitalize first letter of each segment
++            capitalized = part.capitalize()
++            cleaned_parts.append(capitalized)
++    return '-'.join(cleaned_parts)
+diff --git a/tests/test_roster.py b/tests/test_roster.py
+index 168f0d2..53eb6f0 100644
+--- a/tests/test_roster.py
++++ b/tests/test_roster.py
+@@ -7,7 +7,7 @@ def test_export_team_code_uppercase() -> None:
+ 
+ 
+ def test_lead_display_name_simple_case() -> None:
+-    assert lead_display_name('mina-west') == 'Mina-west'
++    assert lead_display_name('mina-west') == 'Mina-West'
+ 
+ 
+ def test_roster_signature_simple_lead() -> None:

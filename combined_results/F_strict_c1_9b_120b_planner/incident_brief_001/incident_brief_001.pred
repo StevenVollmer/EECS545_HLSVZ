@@ -1,0 +1,5 @@
+{
+  "model_name_or_path": "F_strict_c1_9b_120b_planner",
+  "instance_id": "incident_brief_001",
+  "model_patch": "diff --git a/app/services/brief_builder.py b/app/services/brief_builder.py\nindex 5ca917b..c2608fb 100644\n--- a/app/services/brief_builder.py\n+++ b/app/services/brief_builder.py\n@@ -4,9 +4,10 @@ from app.utils.severity import is_critical\n \n \n def build_brief(team_name: str, incidents: list[Incident]) -> IncidentBrief:\n+    from app.utils.severity import should_count_as_visible_urgent\n     return IncidentBrief(\n         team_name=team_name,\n-        urgent_count=count_urgent_incidents(incidents),\n+        urgent_count=sum(1 for incident in incidents if should_count_as_visible_urgent(incident)),\n         open_count=count_open_incidents(incidents),\n         critical_count=sum(1 for incident in incidents if incident.state == \"open\" and is_critical(incident.severity)),\n     )\n"
+}

@@ -1,0 +1,18 @@
+diff --git a/app/utils/branding.py b/app/utils/branding.py
+index 7f8713b..a13483c 100644
+--- a/app/utils/branding.py
++++ b/app/utils/branding.py
+@@ -5,5 +5,12 @@ def normalize_campaign_code(name: str) -> str:
+ def format_brand_name(name: str) -> str:
+     words = []
+     for word in name.split():
+-        words.append(word[:1].upper() + word[1:].lower())
++        # Handle apostrophes: capitalize first letter, keep rest lower
++        if "'" in word:
++            # Find the position of the apostrophe
++            apostrophe_idx = word.index("'")
++            # Capitalize the first letter, keep the rest (including apostrophe) lower
++            words.append(word[0].upper() + word[1:].lower())
++        else:
++            words.append(word[:1].upper() + word[1:].lower())
+     return " ".join(words)

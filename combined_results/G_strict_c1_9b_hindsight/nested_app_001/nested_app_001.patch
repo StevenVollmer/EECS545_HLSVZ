@@ -1,0 +1,34 @@
+diff --git a/app/ui/presenter.py b/app/ui/presenter.py
+index f888aed..8922c22 100644
+--- a/app/ui/presenter.py
++++ b/app/ui/presenter.py
+@@ -1,5 +1,5 @@
+-from app.utils.strings import title_case_words
++from app.utils.strings import capitalize_preserve_apostrophe
+ 
+ 
+ def present_name(name: str) -> str:
+-    return title_case_words(name)
++    return capitalize_preserve_apostrophe(name)
+diff --git a/app/utils/strings.py b/app/utils/strings.py
+index c76158a..fcd62d2 100644
+--- a/app/utils/strings.py
++++ b/app/utils/strings.py
+@@ -1,2 +1,17 @@
+ def title_case_words(value: str) -> str:
+     return " ".join(word.capitalize() for word in value.split(" "))
++
++
++def capitalize_preserve_apostrophe(value: str) -> str:
++    # Capitalize each word while preserving apostrophes within words
++    words = value.split(" ")
++    result = []
++    for word in words:
++        if "'" in word:
++            # Handle words with apostrophes like O'Connor
++            parts = word.split("'")
++            capitalized = parts[0].capitalize() + "'" + parts[1].capitalize()
++        else:
++            capitalized = word.capitalize()
++        result.append(capitalized)
++    return " ".join(result)
