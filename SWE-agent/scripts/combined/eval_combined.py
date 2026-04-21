@@ -57,6 +57,17 @@ CASES_C1         = ROOT / "SWE-agent/custom_cases"
 CASES_C2         = ROOT / "SWE-agent/custom_cases_2"
 CASES_C3         = ROOT / "SWE-agent/custom_cases_3"
 LEGACY_A_C1      = ROOT / "SWE-agent/tree_search_runs/all_custom_run_v10"
+FINAL_MATRIX     = ROOT / "SWE-agent/custom_matrix_runs/final_matrix"
+
+# First 20 alphabetical instances in final_matrix = original c1 set.
+# The remaining 7 (shipment_preview … workspace_digest) are new cases not yet run elsewhere.
+_FINAL_MATRIX_C1_CASES: frozenset[str] = frozenset([
+    "board_rollup", "budget_snapshot", "contact_card", "digest_preview",
+    "incident_brief", "invoice_footer", "label_formatter", "median_window",
+    "milestone_rollup", "nested_app", "numeric_drift_sum", "owner_recap",
+    "owner_sort", "pagination_drift", "path_normalizer_cache", "priority_snapshot",
+    "renewal_preview", "retry_cap", "risk_score", "search_hit_localize",
+])
 LEGACY_A_C2      = ROOT / "SWE-agent/tree_search_runs/custom_cases_2_baseline_9b"
 
 # ---------------------------------------------------------------------------
@@ -173,16 +184,21 @@ def _parse_traj(traj_path: pathlib.Path, run_id: str) -> InstanceResult:
     p_stats  = rms.get("planner",  {})
     c_stats  = rms.get("coder",    {})
     r_stats  = rms.get("reviewer", {})
+    pc_stats = rms.get("plan_critic", {})  # Rafe's plan-critic role
 
     p_in,  p_out  = _role_tokens(p_stats)
     c_in,  c_out  = _role_tokens(c_stats, "input_tokens", "output_tokens")
     rv_in, rv_out = _role_tokens(r_stats)
+    # plan_critic uses same model as planner (120b); fold into reviewer slot for BPT
+    pc_in, pc_out = _role_tokens(pc_stats)
+    rv_in  += pc_in
+    rv_out += pc_out
     v_in  = int(stats.get("value_fn_tokens_in",  c_stats.get("value_fn_tokens_in",  0)))
     v_out = int(stats.get("value_fn_tokens_out", c_stats.get("value_fn_tokens_out", 0)))
 
     coder_model    = c_stats.get("model", "")
     planner_model  = p_stats.get("model", "")
-    reviewer_model = r_stats.get("model", "")
+    reviewer_model = r_stats.get("model", "") or pc_stats.get("model", "")
 
     tree_nodes   = int(stats.get("tree_nodes_created", c_stats.get("tree_nodes_created", 0)))
     best_depth   = int(stats.get("best_node_depth",    c_stats.get("best_node_depth",    0)))
@@ -327,6 +343,49 @@ def _eval_rafe_b_c1() -> list[InstanceResult]:
 
 
 # ---------------------------------------------------------------------------
+# Final matrix (Rafe's new agents, c1 first-20 only)
+# ---------------------------------------------------------------------------
+
+def _eval_final_matrix_variant(
+    variant_name: str,
+    run_id: str,
+    inner_subdir: str | None = None,
+) -> list[InstanceResult]:
+    """Parse c1 instances (first 20 alphabetically) from final_matrix for one variant.
+
+    MCTS variants are flat: {variant}/{instance_id}/{instance_id}.traj
+    Rafe linear variants are nested: {variant}/{inner_subdir}/{case}/{instance_id}/{instance_id}.traj
+    """
+    base = FINAL_MATRIX / variant_name
+    data_dir = (base / inner_subdir) if inner_subdir else base
+    if not data_dir.exists():
+        return []
+    results = []
+    for traj_path in sorted(data_dir.rglob("*.traj")):
+        # Derive case name: strip numeric suffix (e.g. "board_rollup_001" → "board_rollup")
+        stem = traj_path.stem
+        suffix = stem.rsplit("_", 1)[-1]
+        case_name = stem.rsplit("_", 1)[0] if suffix.isdigit() else stem
+        if case_name not in _FINAL_MATRIX_C1_CASES:
+            continue
+        results.append(_parse_traj(traj_path, run_id))
+    return results
+
+
+# Variant configs: (dir_name_in_final_matrix, inner_subdir_or_None, run_id)
+_FINAL_MATRIX_CONFIGS: list[tuple[str, str | None, str]] = [
+    ("mcts_baseline",                            None,                    "rafe_mcts_baseline_c1"),
+    ("mcts_critic_gate",                         None,                    "rafe_mcts_critic_gate_c1"),
+    ("mcts_plan_critic",                         None,                    "rafe_mcts_plan_critic_c1"),
+    ("umich_qwen",                               "single",                "rafe_qwen_c1"),
+    ("umich_gptoss_120b",                        "single",                "rafe_gpt120b_c1"),
+    ("umich_gptoss_planner_umich_qwen_coder",    "planner_coder",         "rafe_gpt_plan_qwen_code_c1"),
+    ("umich_gptoss_planner_umich_qwen_coder_reviewer", "planner_coder_reviewer", "rafe_gpt_plan_qwen_code_rev_c1"),
+    ("umich_gptoss_planner_critic_qwen_coder",   "planner_coder",         "rafe_gpt_plan_critic_qwen_c1"),
+]
+
+
+# ---------------------------------------------------------------------------
 # Legacy A baseline (9b MCTS, original tree_search runner)
 # ---------------------------------------------------------------------------
 
@@ -435,6 +494,14 @@ def load_all_runs(combined_root: pathlib.Path, run_filter: str | None = None
         b1 = _eval_rafe_b_c1()
         if b1:
             runs["B_c1_rafe_linear"] = b1
+
+    # Final matrix: Rafe's new agents, c1 first-20 only
+    if FINAL_MATRIX.exists():
+        for variant_name, inner_subdir, run_id in _FINAL_MATRIX_CONFIGS:
+            if _include(run_id):
+                instances = _eval_final_matrix_variant(variant_name, run_id, inner_subdir)
+                if instances:
+                    runs[run_id] = instances
 
     # Scan both the old combined runs dir and the new combined_results dir
     for root in [combined_root, COMBINED_RESULTS]:

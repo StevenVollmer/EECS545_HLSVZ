@@ -81,25 +81,37 @@ FEATURE_NAMES: dict[str, str] = {
     "value_fn":    "Value function",
 }
 
-# Groups used for steps-to-solve aggregation (fig_d)
+# Groups used for steps-to-solve aggregation (fig_d).
+# 5 architectural categories. Auto-accept runs (rafe_mcts_baseline,
+# rafe_mcts_plan_critic) are intentionally omitted — they default to
+# "swe-search" and are filtered out in fig_steps_to_solve.
 STEP_GROUPS: dict[str, str] = {
-    "A": "9b MCTS",              "A_strict": "9b MCTS",
-    "G": "9b MCTS",              "G_strict": "9b MCTS",
-    "C": "Mixed MCTS",           "C_strict": "Mixed MCTS",
-    "D": "Mixed MCTS",           "E": "Mixed MCTS",    "P": "Mixed MCTS",
-    "B": "Multi-role linear",    "B_strict": "Multi-role linear",
-    "F": "9b+120b",              "F_strict": "9b+120b",
-    "L": "Linear (size)",        "M": "Linear (size)", "N": "Linear (size)",
-    "H": "swe-search",           "I": "swe-search",    "J": "swe-search",  "K": "swe-search",
+    # 1. Linear single-coder (no planning, no search)
+    "L":             "Linear single-coder",
+    "M":             "Linear single-coder",
+    "rafe_qwen":     "Linear single-coder",
+    "rafe_gpt120b":  "Linear single-coder",
+    # 2. Planner + coder (no quality gate after coding)
+    "rafe_gpt_plan_qwen_code": "Planner + coder",
+    # 3. Planner + coder + reviewer (post-code reviewer gate)
+    # B_strict and F_strict excluded: combined_results counts only coder-role turns,
+    # not total pipeline turns — incomparable with final_matrix step counts.
+    "rafe_gpt_plan_qwen_code_rev": "Planner + coder + reviewer",
+    # 4. Planner + critic + coder (plan-level critic before coding)
+    "rafe_gpt_plan_critic_qwen":   "Planner + critic + coder",
+    # 5. MCTS (no auto-accept; all variants use a reviewer/critic gate)
+    "A_strict":              "MCTS",
+    "G_strict":              "MCTS",
+    "C_strict":              "MCTS",
+    "rafe_mcts_critic_gate": "MCTS",
 }
 
 STEP_GROUP_COLORS: dict[str, str] = {
-    "9b MCTS":           "#5b9bd5",
-    "Mixed MCTS":        "#c00000",
-    "Multi-role linear": "#9b9b9b",
-    "9b+120b":           "#a4c2f4",
-    "Linear (size)":     "#c9c9c9",
-    "swe-search":        "#e8a838",
+    "Linear single-coder":         "#c9c9c9",
+    "Planner + coder":             "#70ad47",
+    "Planner + coder + reviewer":  "#2e75b6",
+    "Planner + critic + coder":    "#ed7d31",
+    "MCTS":                        "#c00000",
 }
 
 # Variants tracked in mcts_branch_stats (MCTS variants only)
@@ -398,12 +410,16 @@ def fig_steps_to_solve(data_dir: pathlib.Path, out_dir: pathlib.Path, fmt: str) 
 
     rows = _load_csv(data_dir / "steps_to_solve.csv")
 
-    # Filter: solved=1, held-out c2+c3
+    # Filter: solved=1, c1 only (includes both combined_results c1 and final_matrix c1)
+    # Exclude swe-search and soft (non-strict) variants via STEP_GROUPS membership.
+    _EXCLUDE_GROUPS = {"swe-search"}
+
     rows_f = [r for r in rows
-              if r["solved"] in ("1", "True") and r["case_set"] in ("c2", "c3")]
+              if r["solved"] in ("1", "True") and r["case_set"] == "c1"
+              and STEP_GROUPS.get(r["variant"], "swe-search") not in _EXCLUDE_GROUPS]
 
     if not rows_f:
-        print("fig_d: no solved instances in c2+c3")
+        print("fig_d: no solved instances in c1")
         return
 
     # Bins of width 2, steps 1–18
@@ -413,22 +429,23 @@ def fig_steps_to_solve(data_dir: pathlib.Path, out_dir: pathlib.Path, fmt: str) 
     bin_labels  = [f"{b}–{b+BIN_W-1}" for b in bin_starts]
     n_bins      = len(bin_starts)
 
-    # Count per group and per run_id (for normalization)
+    # Denominator: unique run_ids per group across all c1 rows (not just solved)
     group_counts:  dict[str, list[int]] = {}
     group_run_ids: dict[str, set[str]]  = defaultdict(set)
 
-    # Also collect run_ids from all c2+c3 rows (not just solved) for correct denominator
-    rows_c23 = [r for r in rows if r["case_set"] in ("c2", "c3")
-                and STEP_GROUPS.get(r["variant"], "swe-search") != "swe-search"]
-    for r in rows_c23:
+    for r in rows:
+        if r["case_set"] != "c1":
+            continue
         g = STEP_GROUPS.get(r["variant"], "swe-search")
+        if g in _EXCLUDE_GROUPS:
+            continue
         group_run_ids[g].add(r["run_id"])
 
     for r in rows_f:
         v     = r["variant"]
         g     = STEP_GROUPS.get(v, "swe-search")
         steps = int(r["steps_used"])
-        if steps > MAX_STEP:
+        if steps > MAX_STEP or steps < 1:
             continue
         if g not in group_counts:
             group_counts[g] = [0] * n_bins
@@ -443,7 +460,7 @@ def fig_steps_to_solve(data_dir: pathlib.Path, out_dir: pathlib.Path, fmt: str) 
         n = len(group_run_ids[g]) or 1
         group_avgs[g] = [c / n for c in counts]
 
-    # Drop groups with no solves after filtering
+    # Drop groups with no solves
     group_avgs = {g: v for g, v in group_avgs.items() if any(v)}
     group_avgs = {g: v for g, v in group_avgs.items() if g != "swe-search"}
 
@@ -451,9 +468,9 @@ def fig_steps_to_solve(data_dir: pathlib.Path, out_dir: pathlib.Path, fmt: str) 
         print("fig_d: no data after grouping")
         return
 
-    fig, ax = plt.subplots(figsize=(10, 5))
-    x        = np.arange(n_bins)
     n_groups = len(group_avgs)
+    fig, ax = plt.subplots(figsize=(max(12, n_groups * 1.2), 5.5))
+    x        = np.arange(n_bins)
     bar_width = 0.8 / n_groups
 
     for i, (g, avgs) in enumerate(group_avgs.items()):
@@ -470,9 +487,13 @@ def fig_steps_to_solve(data_dir: pathlib.Path, out_dir: pathlib.Path, fmt: str) 
     ax.set_axisbelow(True)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
-    ax.legend(fontsize=9, framealpha=0.9, loc="upper right")
-    ax.set_title("Steps-to-Solve Distribution by Agent Configuration (c2+c3, avg per agent)",
-                 fontsize=12, fontweight="bold", pad=10)
+    ax.legend(fontsize=8.5, framealpha=0.9, loc="upper right",
+              ncol=2 if n_groups > 6 else 1)
+    ax.set_title(
+        "Steps-to-Solve Distribution by Agent Configuration\n"
+        "(c1, 20 instances, avg solved per agent; strict variants only)",
+        fontsize=12, fontweight="bold", pad=10,
+    )
 
     fig.tight_layout()
     out = out_dir / f"fig_d_steps_to_solve.{fmt}"
