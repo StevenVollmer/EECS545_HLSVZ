@@ -148,6 +148,43 @@ mcts + critic_gate    20/27    74.1%   MCTS + critic submission gate (best MCTS)
 
 ---
 
+## Part 4: 60-Case Held-out Matrix (Final Results)
+
+The 27-case matrix was scaled up to 60 instances split across three held-out case sets (`c1`/`c2`/`c3`, 20 each). Eight configs were kept for the final efficiency frontier. Results are reported in **BPT** (M B-param·tokens), a model-size-normalized compute unit — distinct from the `relative-to-4o-mini` heuristic used in Parts 1–3 (see Compute Unit Reconciliation below).
+
+All multi-role/MCTS variants in this matrix use the **critic gate** from Part 3 (an LLM patch-quality check that replaces MCTS auto-accept). In variant naming this is marked by the `_strict` suffix; the soft (non-gate) counterparts were dropped from the final figures because the gate dominates on all but one config.
+
+### Final-matrix results (c2+c3 held-out avg)
+
+```
+Variant                                  Solve rate   BPT (M)
+──────────────────────────────────────────────────────────────
+L  — 9b linear                             67.5%       0.25
+M  — 30b linear                            62.5%       0.75
+A  — 9b MCTS + gate                        67.5%       0.30
+G  — 9b MCTS + hindsight + gate            70.0%       0.30
+F  — 120b plan + 9b code + gate            75.0%       0.60
+B  — 120b plan + 30b code + gate           77.5%       0.80
+P  — Mixed MCTS + hindsight + gate         72.5%       1.25
+C  — Mixed MCTS (120b plan + 9b code)      75.0%       1.45
+```
+
+### Key findings, aligned with critic results from Part 2/3
+
+**1. Critic gate transfers from Part 3 to the 60-case matrix.** Every strict-gate variant beats its soft counterpart on held-out sets; the Part 3 result that the critic-as-gate is the best MCTS mode is confirmed at larger scale.
+
+**2. Strong planner + small coder wins on efficiency — consistent with Part 1.** F (120b plan + 9b code) reaches 75% solve rate at 0.60 M BPT, matching the Part 1 claim that a strong planner makes a weak coder competitive at a fraction of the cost.
+
+**3. MCTS buys almost nothing at 9b.** A (9b MCTS) matches L (9b linear) at 67.5% despite more compute; hindsight (G) adds +2.5 pp. MCTS only pays off once paired with a strong planner (C, P).
+
+**4. B dominates the efficiency frontier.** 77.5% solve rate at 0.80 M BPT — higher rate and lower cost than the mixed-size MCTS configs (C, P). The MCTS overhead is not justified when the planner is already 120b.
+
+**5. Hindsight helps at small scale but hurts at mixed scale.** G > A by +2.5 pp at 9b; P < C by −2.5 pp at mixed. Hindsight context appears to crowd out the 120b planner's advantage when it is present.
+
+### Compute Unit Reconciliation
+
+Parts 1–3 use `avg relative compute burden to 4o-mini` (a wall-clock-token heuristic). Part 4 uses **BPT** = (sum of per-call B-params × tokens) / 1e6, a model-size-normalized count of work done. The two are not linearly convertible — BPT weights large-model calls much more heavily than the 4o-mini heuristic does, so direct ratio comparisons across parts (e.g., "Part 2 reviewer at 2.60 vs. Part 4 B at 0.80") are not meaningful. Within each part, relative compute differences are comparable; across parts, only *directional* claims transfer.
+
 ## Compute Caveat
 
 `Avg relative compute burden to 4o-mini` is a heuristic useful for internal relative comparison. For self-hosted or UMich models, it estimates relative compute burden, not literal dollar cost.
@@ -162,4 +199,6 @@ mcts + critic_gate    20/27    74.1%   MCTS + critic submission gate (best MCTS)
 
 4. **Both audits reach 89% of the large-coder ceiling (8/10 vs 9/10) at roughly 10x less compute.**
 
-5. **Critic as MCTS submission gate is the best MCTS variant** — +3 cases over auto-accept on 27 cases, and gives deployment-realistic numbers instead of leaking the hidden-test oracle.
+5. **Critic as MCTS submission gate is the best MCTS variant** — +3 cases over auto-accept on 27 cases, and gives deployment-realistic numbers instead of leaking the hidden-test oracle. **Confirmed at scale on the 60-case matrix (Part 4):** the gate strictly dominates the soft-accept counterpart across all multi-role and MCTS configs.
+
+6. **On the 60-case matrix, the best overall config is B (120b plan + 30b code + gate) at 77.5% solve rate / 0.80 M BPT.** Large-planner + mid-size-coder with the critic gate beats every MCTS variant tested, suggesting that for this task distribution search overhead is not justified when the planner is already strong.

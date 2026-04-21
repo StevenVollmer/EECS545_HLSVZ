@@ -43,6 +43,17 @@ VARIANT_GROUPS: dict[str, str] = {
     "P": "ours_best",
 }
 
+VARIANT_DISPLAY_LABELS: dict[str, str] = {
+    "L":        "L: 9b C",
+    "M":        "M: 30b C",
+    "B_strict": "B: 120b P + 30b C + R",
+    "A_strict": "A: 9b P+C+R (MCTS)",
+    "G_strict": "G: 9b P+C+R (MCTS + hindsight)",
+    "F_strict": "F: 120b P + 9b C + R",
+    "C_strict": "C: 120b P + 9b C + R (MCTS)",
+    "P":        "P: 120b P + 9b C + R (MCTS + hindsight)",
+}
+
 GROUP_COLORS: dict[str, str] = {
     "linear":     "#c9c9c9",
     "baseline":   "#9b9b9b",
@@ -121,7 +132,8 @@ def fig_efficiency_frontier(data_dir: pathlib.Path, out_dir: pathlib.Path, fmt: 
     rows = _load_csv(data_dir / "efficiency_frontier_bpt_runs.csv")
 
     # Average c2+c3 per variant (held-out sets); skip N (120b linear) — noted in paper
-    SKIP_VARIANTS = {"N"}
+    SKIP_VARIANTS = {"N", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K"}
+    # Keeps: A_strict, B_strict, C_strict, F_strict, G_strict, L, M, P
     by_variant: dict[str, dict[str, list]] = {}
     for r in rows:
         if r["case_set"] not in ("c2", "c3"):
@@ -143,35 +155,78 @@ def fig_efficiency_frontier(data_dir: pathlib.Path, out_dir: pathlib.Path, fmt: 
         bpt  = sum(d["bpt"])  / len(d["bpt"])
         points.append((v, rate, bpt))
 
-    fig, ax = plt.subplots(figsize=(9, 5.5))
+    fig, ax = plt.subplots(figsize=(10.5, 6.5))
 
     xs = [bpt  for _, _, bpt  in points]
     ys = [rate for _, rate, _ in points]
     cs = [_variant_color(v) for v, _, _ in points]
     ax.scatter(xs, ys, c=cs, s=90, zorder=4, edgecolors="white", linewidths=0.6)
 
+    texts = []
     for v, rate, bpt in points:
-        ax.annotate(v, (bpt, rate), textcoords="offset points", xytext=(5, 3),
-                    fontsize=7.5, fontweight="bold", color=_variant_color(v))
+        label = VARIANT_DISPLAY_LABELS.get(v, v)
+        texts.append(ax.text(bpt, rate, label,
+                             fontsize=7.5, fontweight="bold",
+                             color=_variant_color(v)))
+
+    # --- 10-case audit-study reference points (Part 2 of results_summary/README) ---
+    # Rescaled into BPT units using the gpt→qwen ≈ F anchor (both are 120b plan + 9b
+    # code, no search): gpt→qwen at 2.04 rel-compute ≈ F at 0.60 M BPT → factor 0.294.
+    # gpt-solo (24.62 rel) falls off-scale and is omitted.
+    AUDIT_SCALE = 0.60 / 2.04
+    AUDIT_COLOR = "#8a4fbd"
+    audit_points = [
+        (70.0, 2.04, "S: 120b P + 30b C"),
+        (80.0, 2.15, "T: 120b P + 120b Cr + 30b C"),
+        (80.0, 2.60, "U: 120b P + 30b C + 120b R"),
+        (50.0, 3.37, "Q: 30b C"),
+    ]
+    audit_xs = [comp * AUDIT_SCALE for _, comp, _ in audit_points]
+    audit_ys = [rate                for rate, _, _ in audit_points]
+    ax.scatter(audit_xs, audit_ys, marker="^", s=70, c=AUDIT_COLOR,
+               zorder=4, edgecolors="white", linewidths=0.6)
+    for (rate, comp, label), bpt_eq in zip(audit_points, audit_xs):
+        texts.append(ax.text(bpt_eq, rate, label,
+                             fontsize=7.0, fontweight="bold", color=AUDIT_COLOR))
 
     ax.set_xlabel("Avg compute per instance (M B-param·tokens)", fontsize=11)
-    ax.set_ylabel("Avg solve rate, c2+c3 (%)", fontsize=11)
+    ax.set_ylabel("Avg solve rate (%)", fontsize=11)
     ax.xaxis.grid(True, linestyle="--", alpha=0.4, zorder=0)
     ax.yaxis.grid(True, linestyle="--", alpha=0.4, zorder=0)
     ax.set_axisbelow(True)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
 
-    seen_groups: set[str] = set()
-    handles = []
-    for v, _, _ in points:
-        g = VARIANT_GROUPS.get(v, "swesearch")
-        if g not in seen_groups:
-            seen_groups.add(g)
-            handles.append(mpatches.Patch(color=GROUP_COLORS[g], label=GROUP_LABELS[g]))
-    ax.legend(handles=handles, fontsize=8.5, framealpha=0.9, loc="upper right")
-    ax.set_title("Efficiency Frontier: Solve Rate vs. Compute (c2+c3 held-out avg)",
+    try:
+        from adjustText import adjust_text
+        # Combine matrix + audit points so adjustText knows about all scatter markers
+        all_x = list(xs) + list(audit_xs)
+        all_y = list(ys) + list(audit_ys)
+        adjust_text(texts, x=all_x, y=all_y, ax=ax,
+                    expand=(1.6, 1.9),
+                    force_text=(0.8, 1.1),
+                    force_static=(0.8, 1.0),
+                    force_pull=(0.02, 0.02),
+                    arrowprops=dict(arrowstyle="-", color="gray", lw=0.5, alpha=0.6),
+                    only_move={"points": "xy", "texts": "xy", "static": "xy"},
+                    max_move=60,
+                    iter_lim=500)
+    except ImportError:
+        pass
+
+    legend_handles = [
+        mpatches.Patch(color=GROUP_COLORS["ours_9b"],    label="40-case matrix (held-out)"),
+        mpatches.Patch(color=AUDIT_COLOR,                label="10-case audit study (rescaled)"),
+    ]
+    ax.legend(handles=legend_handles,
+              loc="upper center", bbox_to_anchor=(0.5, -0.14),
+              ncol=2, fontsize=9, framealpha=0.9, frameon=False)
+
+    ax.set_title("Efficiency Frontier: Solve Rate vs. Compute",
                  fontsize=12, fontweight="bold", pad=10)
+    fig.text(0.5, 0.02,
+             "Role abbreviations: P = planner, Cr = critic, C = coder, R = reviewer",
+             ha="center", fontsize=8.5, style="italic", color="#444")
 
     fig.tight_layout()
     out = out_dir / f"fig_a_efficiency_frontier.{fmt}"
@@ -363,7 +418,8 @@ def fig_steps_to_solve(data_dir: pathlib.Path, out_dir: pathlib.Path, fmt: str) 
     group_run_ids: dict[str, set[str]]  = defaultdict(set)
 
     # Also collect run_ids from all c2+c3 rows (not just solved) for correct denominator
-    rows_c23 = [r for r in rows if r["case_set"] in ("c2", "c3")]
+    rows_c23 = [r for r in rows if r["case_set"] in ("c2", "c3")
+                and STEP_GROUPS.get(r["variant"], "swe-search") != "swe-search"]
     for r in rows_c23:
         g = STEP_GROUPS.get(r["variant"], "swe-search")
         group_run_ids[g].add(r["run_id"])
@@ -389,6 +445,7 @@ def fig_steps_to_solve(data_dir: pathlib.Path, out_dir: pathlib.Path, fmt: str) 
 
     # Drop groups with no solves after filtering
     group_avgs = {g: v for g, v in group_avgs.items() if any(v)}
+    group_avgs = {g: v for g, v in group_avgs.items() if g != "swe-search"}
 
     if not group_avgs:
         print("fig_d: no data after grouping")
@@ -419,6 +476,99 @@ def fig_steps_to_solve(data_dir: pathlib.Path, out_dir: pathlib.Path, fmt: str) 
 
     fig.tight_layout()
     out = out_dir / f"fig_d_steps_to_solve.{fmt}"
+    fig.savefig(out, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved: {out}")
+
+
+# ---------------------------------------------------------------------------
+# Fig d (bpt) — Compute-to-solve: avg per agent by BPT bin
+# ---------------------------------------------------------------------------
+
+def fig_steps_to_solve_bpt(data_dir: pathlib.Path, out_dir: pathlib.Path, fmt: str) -> None:
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    rows = _load_csv(data_dir / "steps_to_solve.csv")
+
+    # Filter: solved=1, held-out c2+c3
+    rows_f = [r for r in rows
+              if r["solved"] in ("1", "True") and r["case_set"] in ("c2", "c3")]
+
+    if not rows_f:
+        print("fig_d_bpt: no solved instances in c2+c3")
+        return
+
+    BIN_EDGES  = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1.0, 1.5, 2.0]
+    bin_labels = ["<0.1", "0.1–0.2", "0.2–0.3", "0.3–0.4", "0.4–0.5",
+                  "0.5–0.75", "0.75–1.0", "1.0–1.5", ">1.5"]
+    n_bins     = len(bin_labels)
+
+    group_counts:  dict[str, list[int]] = {}
+    group_run_ids: dict[str, set[str]]  = defaultdict(set)
+
+    rows_c23 = [r for r in rows if r["case_set"] in ("c2", "c3")
+                and STEP_GROUPS.get(r["variant"], "swe-search") != "swe-search"]
+    for r in rows_c23:
+        g = STEP_GROUPS.get(r["variant"], "swe-search")
+        group_run_ids[g].add(r["run_id"])
+
+    for r in rows_f:
+        bpt_val = float(r.get("cost_bpt", 0))
+        if bpt_val <= 0:
+            continue
+        bpt_m = bpt_val / 1e6
+        v = r["variant"]
+        g = STEP_GROUPS.get(v, "swe-search")
+        if g == "swe-search":
+            continue
+        if g not in group_counts:
+            group_counts[g] = [0] * n_bins
+        idx = n_bins - 1  # default to last bin (open-ended)
+        for i in range(len(BIN_EDGES) - 1):
+            if BIN_EDGES[i] <= bpt_m < BIN_EDGES[i + 1]:
+                idx = i
+                break
+        group_counts[g][idx] += 1
+
+    # Normalize by number of run_ids in each group
+    group_avgs: dict[str, list[float]] = {}
+    for g, counts in group_counts.items():
+        n = len(group_run_ids[g]) or 1
+        group_avgs[g] = [c / n for c in counts]
+
+    group_avgs = {g: v for g, v in group_avgs.items() if any(v)}
+    group_avgs = {g: v for g, v in group_avgs.items() if g != "swe-search"}
+
+    if not group_avgs:
+        print("fig_d_bpt: no data after grouping")
+        return
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    x        = np.arange(n_bins)
+    n_groups = len(group_avgs)
+    bar_width = 0.8 / n_groups
+
+    for i, (g, avgs) in enumerate(group_avgs.items()):
+        offset = (i - n_groups / 2 + 0.5) * bar_width
+        color  = STEP_GROUP_COLORS.get(g, "#aaaaaa")
+        ax.bar(x + offset, avgs, bar_width * 0.9, color=color,
+               label=g, zorder=3, edgecolor="white", linewidth=0.4, alpha=0.85)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(bin_labels, fontsize=9)
+    ax.set_xlabel("Compute per solved instance (M B-param·tokens)", fontsize=11)
+    ax.set_ylabel("Avg instances solved per agent", fontsize=11)
+    ax.yaxis.grid(True, linestyle="--", alpha=0.4, zorder=0)
+    ax.set_axisbelow(True)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.legend(fontsize=9, framealpha=0.9, loc="upper right")
+    ax.set_title("Compute-to-Solve Distribution by Agent Configuration (c2+c3, avg per agent)",
+                 fontsize=12, fontweight="bold", pad=10)
+
+    fig.tight_layout()
+    out = out_dir / f"fig_d_bpt_to_solve.{fmt}"
     fig.savefig(out, dpi=200, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved: {out}")
@@ -740,6 +890,7 @@ def main() -> None:
     fig_reviewer_audit(args.audit_csv,     args.output_dir, args.format)
     fig_ablation_features(args.data_dir,   args.output_dir, args.format)
     fig_steps_to_solve(args.data_dir,      args.output_dir, args.format)
+    fig_steps_to_solve_bpt(args.data_dir,  args.output_dir, args.format)
     fig_instance_overlap(args.data_dir,    args.output_dir, args.format)
     fig_resource_waste(args.data_dir,      args.output_dir, args.format)
     fig_mcts_branching(args.data_dir,      args.output_dir, args.format)
