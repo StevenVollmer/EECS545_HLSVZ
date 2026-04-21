@@ -7,8 +7,6 @@ set -euo pipefail
 RUNNER="python3 SWE-agent/scripts/combined/run_combined.py"
 OUT="combined_results"
 
-rm -rf "$OUT/L_c1_9b_linear" "$OUT/L_c2_9b_linear" "$OUT/L_c3_9b_linear"
-
 BASE=(
     --model qwen3.5:9b --api-base http://localhost:11434 --api-key ollama
     --num-ctx 32768 --max-tokens 384
@@ -20,9 +18,8 @@ BASE=(
     --instances-type file
 )
 
-for cs in c1 c2 c3; do
+for cs in c2 c3; do
     case "$cs" in
-        c1) CASES="SWE-agent/custom_cases"   ;;
         c2) CASES="SWE-agent/custom_cases_2" ;;
         c3) CASES="SWE-agent/custom_cases_3" ;;
     esac

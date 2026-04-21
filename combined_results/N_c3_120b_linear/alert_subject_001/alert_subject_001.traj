@@ -1,0 +1,978 @@
+{
+  "turns": [
+    {
+      "turn": 1,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/utils/subject.py",
+            "start_line": 1,
+            "end_line": 200
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/utils/subject.py",
+            "start_line": 1,
+            "end_line": 200
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/utils/subject.py:\n     1\tdef _title_word(word: str) -> str:\n     2\t    lowered = word.strip().lower()\n     3\t    return lowered[:1].upper() + lowered[1:]\n     4\t\n     5\t\n     6\tdef format_service_name(service: str) -> str:\n     7\t    slash_parts = []\n     8\t    for segment in service.split('/'):\n     9\t        slash_parts.append('-'.join(_title_word(piece) for piece in segment.split('-')))\n    10\t    return '/'.join(slash_parts)",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 2,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "tests/test_alert_subject.py",
+            "start_line": 1,
+            "end_line": 200
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "tests/test_alert_subject.py",
+            "start_line": 1,
+            "end_line": 200
+          },
+          "output": "Here's the result of running `cat -n` on /repo/tests/test_alert_subject.py:\n     1\tfrom app.main import alert_subject_preview, export_severity\n     2\tfrom app.utils.subject import format_service_name\n     3\t\n     4\t\n     5\tdef test_export_severity_uppercase() -> None:\n     6\t    assert export_severity('p2') == 'severity=P2'\n     7\t\n     8\t\n     9\tdef test_format_service_name_simple() -> None:\n    10\t    assert format_service_name('billing-core') == 'Billing-Core'\n    11\t\n    12\t\n    13\tdef test_alert_subject_simple_service() -> None:\n    14\t    assert alert_subject_preview('search', 'p3') == 'P3: Search alert'",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 3,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/main.py",
+            "start_line": 1,
+            "end_line": 200
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/main.py",
+            "start_line": 1,
+            "end_line": 200
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/main.py:\n     1\tfrom app.utils.subject import format_service_name\n     2\t\n     3\t\n     4\tdef alert_subject_preview(service: str, severity: str) -> str:\n     5\t    return f\"{severity.upper()}: {format_service_name(service)} alert\"\n     6\t\n     7\t\n     8\tdef export_severity(severity: str) -> str:\n     9\t    return f\"severity={severity.upper()}\"",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 4,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/utils/subject.py",
+            "old_str": "def _title_word(word: str) -> str:\n    lowered = word.strip().lower()\n    return lowered[:1].upper() + lowered[1:]",
+            "new_str": "def _title_word(word: str) -> str:\n    # Capitalize first letter and any letter following an apostrophe\n    lowered = word.strip().lower()\n    import re\n    return re.sub(r\"\\b\\w\", lambda m: m.group().upper(), lowered)"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/utils/subject.py",
+            "old_str": "def _title_word(word: str) -> str:\n    lowered = word.strip().lower()\n    return lowered[:1].upper() + lowered[1:]",
+            "new_str": "def _title_word(word: str) -> str:\n    # Capitalize first letter and any letter following an apostrophe\n    lowered = word.strip().lower()\n    import re\n    return re.sub(r\"\\b\\w\", lambda m: m.group().upper(), lowered)"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/utils/subject.py:\n     1\tdef _title_word(word: str) -> str:\n     2\t    # Capitalize first letter and any letter following an apostrophe\n     3\t    lowered = word.strip().lower()\n     4\t    import re\n     5\t    return re.sub(r\"\\b\\w\", lambda m: m.group().upper(), lowered)\n     6\t\n     7\t\n     8\tdef format_service_name(service: str) -> str:\n     9\t    slash_parts = []\n    10\t    for segment in service.split('/'):\n    11\t        slash_parts.append('-'.join(_title_word(piece) for piece in segment.split('-')))\n    12\t    return '/'.join(slash_parts)",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 5,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "pytest -q"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "pytest -q"
+          },
+          "output": "\n==================================== ERRORS ====================================\n_________________ ERROR collecting tests/test_alert_subject.py _________________\nImportError while importing test module '/repo/tests/test_alert_subject.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n/usr/local/lib/python3.11/importlib/__init__.py:126: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_alert_subject.py:1: in <module>\n    from app.main import alert_subject_preview, export_severity\nE   ModuleNotFoundError: No module named 'app'\n=========================== short test summary info ============================\nERROR tests/test_alert_subject.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.25s",
+          "is_error": true,
+          "exit_code": 2
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 6,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/__init__.py",
+            "start_line": 1,
+            "end_line": 200
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/__init__.py",
+            "start_line": 1,
+            "end_line": 200
+          },
+          "output": "IndexError: list index out of range",
+          "is_error": true,
+          "exit_code": null
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 7,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "sed -n '1,200p' app/__init__.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "sed -n '1,200p' app/__init__.py"
+          },
+          "output": "(no output)",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 8,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "ls -R"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "ls -R"
+          },
+          "output": ".:\napp  scripts  tests\n\n./app:\n__init__.py  __pycache__  main.py  utils\n\n./app/__pycache__:\n__init__.cpython-312.pyc  main.cpython-312.pyc\n\n./app/utils:\n__pycache__  subject.py\n\n./app/utils/__pycache__:\nsubject.cpython-312.pyc\n\n./scripts:\n__pycache__  demo_alert.py\n\n./scripts/__pycache__:\ndemo_alert.cpython-312.pyc\n\n./tests:\n__pycache__  test_alert_subject.py\n\n./tests/__pycache__:\ntest_alert_subject.cpython-312.pyc",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 9,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python - <<'PY'\nimport sys, os; print(os.getcwd()); print(sys.path[:5])\nPY"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python - <<'PY'\nimport sys, os; print(os.getcwd()); print(sys.path[:5])\nPY"
+          },
+          "output": "/repo\n['', '/usr/local/lib/python311.zip', '/usr/local/lib/python3.11', '/usr/local/lib/python3.11/lib-dynload', '/usr/local/lib/python3.11/site-packages']",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 10,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python - <<'PY'\nimport importlib, sys, os\nprint('cwd', os.getcwd())\ntry:\n    import app.main as m\n    print('import ok')\nexcept Exception as e:\n    print('error', e)\nPY"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python - <<'PY'\nimport importlib, sys, os\nprint('cwd', os.getcwd())\ntry:\n    import app.main as m\n    print('import ok')\nexcept Exception as e:\n    print('error', e)\nPY"
+          },
+          "output": "cwd /repo\nimport ok",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 11,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "tests/test_alert_subject.py",
+            "start_line": 1,
+            "end_line": 200
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "tests/test_alert_subject.py",
+            "start_line": 1,
+            "end_line": 200
+          },
+          "output": "Here's the result of running `cat -n` on /repo/tests/test_alert_subject.py:\n     1\tfrom app.main import alert_subject_preview, export_severity\n     2\tfrom app.utils.subject import format_service_name\n     3\t\n     4\t\n     5\tdef test_export_severity_uppercase() -> None:\n     6\t    assert export_severity('p2') == 'severity=P2'\n     7\t\n     8\t\n     9\tdef test_format_service_name_simple() -> None:\n    10\t    assert format_service_name('billing-core') == 'Billing-Core'\n    11\t\n    12\t\n    13\tdef test_alert_subject_simple_service() -> None:\n    14\t    assert alert_subject_preview('search', 'p3') == 'P3: Search alert'",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 12,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "tests/test_alert_subject.py",
+            "start_line": 200,
+            "end_line": 400
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "tests/test_alert_subject.py",
+            "start_line": 200,
+            "end_line": 400
+          },
+          "output": "IndexError: list index out of range",
+          "is_error": true,
+          "exit_code": null
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 13,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "tests/test_alert_subject.py",
+            "start_line": 1,
+            "end_line": 400
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "tests/test_alert_subject.py",
+            "start_line": 1,
+            "end_line": 400
+          },
+          "output": "Here's the result of running `cat -n` on /repo/tests/test_alert_subject.py:\n     1\tfrom app.main import alert_subject_preview, export_severity\n     2\tfrom app.utils.subject import format_service_name\n     3\t\n     4\t\n     5\tdef test_export_severity_uppercase() -> None:\n     6\t    assert export_severity('p2') == 'severity=P2'\n     7\t\n     8\t\n     9\tdef test_format_service_name_simple() -> None:\n    10\t    assert format_service_name('billing-core') == 'Billing-Core'\n    11\t\n    12\t\n    13\tdef test_alert_subject_simple_service() -> None:\n    14\t    assert alert_subject_preview('search', 'p3') == 'P3: Search alert'",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 14,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "sed -n '400,800p' tests/test_alert_subject.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "sed -n '400,800p' tests/test_alert_subject.py"
+          },
+          "output": "(no output)",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 15,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/utils/subject.py",
+            "start_line": 1,
+            "end_line": 200
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/utils/subject.py",
+            "start_line": 1,
+            "end_line": 200
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/utils/subject.py:\n     1\tdef _title_word(word: str) -> str:\n     2\t    # Capitalize first letter and any letter following an apostrophe\n     3\t    lowered = word.strip().lower()\n     4\t    import re\n     5\t    return re.sub(r\"\\b\\w\", lambda m: m.group().upper(), lowered)\n     6\t\n     7\t\n     8\tdef format_service_name(service: str) -> str:\n     9\t    slash_parts = []\n    10\t    for segment in service.split('/'):\n    11\t        slash_parts.append('-'.join(_title_word(piece) for piece in segment.split('-')))\n    12\t    return '/'.join(slash_parts)",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 16,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python - <<'PY'\nimport re\ns=\"john's-service\"\nprint(re.sub(r\"\\b\\w\", lambda m: m.group().upper(), s.lower()))\nPY"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python - <<'PY'\nimport re\ns=\"john's-service\"\nprint(re.sub(r\"\\b\\w\", lambda m: m.group().upper(), s.lower()))\nPY"
+          },
+          "output": "John'S-Service",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 17,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/utils/subject.py",
+            "old_str": "def _title_word(word: str) -> str:\n    # Capitalize first letter and any letter following an apostrophe\n    lowered = word.strip().lower()\n    import re\n    return re.sub(r\"\\b\\w\", lambda m: m.group().upper(), lowered)",
+            "new_str": "def _title_word(word: str) -> str:\n    # Capitalize only the first character of the word\n    lowered = word.strip().lower()\n    if not lowered:\n        return ''\n    return lowered[:1].upper() + lowered[1:]"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/utils/subject.py",
+            "old_str": "def _title_word(word: str) -> str:\n    # Capitalize first letter and any letter following an apostrophe\n    lowered = word.strip().lower()\n    import re\n    return re.sub(r\"\\b\\w\", lambda m: m.group().upper(), lowered)",
+            "new_str": "def _title_word(word: str) -> str:\n    # Capitalize only the first character of the word\n    lowered = word.strip().lower()\n    if not lowered:\n        return ''\n    return lowered[:1].upper() + lowered[1:]"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/utils/subject.py:\n     1\tdef _title_word(word: str) -> str:\n     2\t    # Capitalize only the first character of the word\n     3\t    lowered = word.strip().lower()\n     4\t    if not lowered:\n     5\t        return ''\n     6\t    return lowered[:1].upper() + lowered[1:]\n     7\t\n     8\t\n     9\tdef format_service_name(service: str) -> str:\n    10\t    slash_parts = []\n    11\t    for segment in service.split('/'):\n    12\t        slash_parts.append('-'.join(_title_word(piece) for piece in segment.split('-')))\n    13\t    return '/'.join(slash_parts)",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 18,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "pytest -q"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "pytest -q"
+          },
+          "output": "\n==================================== ERRORS ====================================\n_________________ ERROR collecting tests/test_alert_subject.py _________________\nImportError while importing test module '/repo/tests/test_alert_subject.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n/usr/local/lib/python3.11/importlib/__init__.py:126: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_alert_subject.py:1: in <module>\n    from app.main import alert_subject_preview, export_severity\nE   ModuleNotFoundError: No module named 'app'\n=========================== short test summary info ============================\nERROR tests/test_alert_subject.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.26s",
+          "is_error": true,
+          "exit_code": 2
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    }
+  ],
+  "stats": {
+    "input_tokens": 55025,
+    "output_tokens": 3547,
+    "turns": 18,
+    "tool_calls": 20,
+    "iterations": 18,
+    "tree_nodes_created": 19,
+    "best_node_depth": 18,
+    "best_node_value": 0.0,
+    "value_fn_tokens_in": 0,
+    "value_fn_tokens_out": 0
+  },
+  "loop_state": {
+    "executable_edit_made": true,
+    "validation_passed": false,
+    "validation_attempted_after_edit": true,
+    "diff_checked": false,
+    "successful_post_edit_commands": [
+      "ls -R",
+      "python - <<'PY'\nimport importlib, sys, os\nprint('cwd', os.getcwd())\ntry:\n    import app.main as m\n    print('import ok')\nexcept Exception as e:\n    print('error', e)\nPY",
+      "python - <<'PY'\nimport re\ns=\"john's-service\"\nprint(re.sub(r\"\\b\\w\", lambda m: m.group().upper(), s.lower()))\nPY",
+      "python - <<'PY'\nimport sys, os; print(os.getcwd()); print(sys.path[:5])\nPY",
+      "sed -n '1,200p' app/__init__.py",
+      "sed -n '400,800p' tests/test_alert_subject.py"
+    ],
+    "satisfied_success_checks": [
+      "manual_repro_is_fixed",
+      "tests_still_pass_after_fix"
+    ],
+    "changed_files": [
+      "app/utils/subject.py"
+    ]
+  },
+  "stopped_reason": "max_iterations",
+  "submitted": false,
+  "submission_summary": "",
+  "patch": "diff --git a/app/utils/subject.py b/app/utils/subject.py\nindex e6b80f6..bba506e 100644\n--- a/app/utils/subject.py\n+++ b/app/utils/subject.py\n@@ -1,5 +1,8 @@\n def _title_word(word: str) -> str:\n+    # Capitalize only the first character of the word\n     lowered = word.strip().lower()\n+    if not lowered:\n+        return ''\n     return lowered[:1].upper() + lowered[1:]\n \n \n",
+  "info": {
+    "submission": "",
+    "submitted": false,
+    "submission_summary": "",
+    "stopped_reason": "max_iterations"
+  },
+  "auto_finalized": false,
+  "mcts_meta": {
+    "model": "openai/openai/gpt-oss-120b",
+    "value_model": null,
+    "hindsight_feedback": false,
+    "dead_branch_feedback_count": 0,
+    "iterations": 18,
+    "expansion_candidates": 1,
+    "edit_vote_samples": 1,
+    "ucb_c": 1.414,
+    "root_visits": 18,
+    "early_branching": false,
+    "early_branch_depth": 2
+  },
+  "vote_summary": [
+    {
+      "depth": 4,
+      "action": "str_replace",
+      "winner_votes": 1,
+      "total_samples": 1,
+      "unique_candidates": 1
+    },
+    {
+      "depth": 17,
+      "action": "str_replace",
+      "winner_votes": 1,
+      "total_samples": 1,
+      "unique_candidates": 1
+    }
+  ],
+  "mcts_tree": {
+    "nodes": [
+      {
+        "id": "0",
+        "parent_id": null,
+        "depth": 0,
+        "action_name": null,
+        "action_args_preview": "",
+        "visits": 18,
+        "mean_value": 7.15,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0",
+        "parent_id": "0",
+        "depth": 1,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"app/utils/subject.py\", \"start_line\": 1, \"end_line\": 200}",
+        "visits": 18,
+        "mean_value": 7.15,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0",
+        "parent_id": "0.0",
+        "depth": 2,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"tests/test_alert_subject.py\", \"start_line\": 1, \"end_line\": 200}",
+        "visits": 17,
+        "mean_value": 7.57,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0",
+        "parent_id": "0.0.0",
+        "depth": 3,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"app/main.py\", \"start_line\": 1, \"end_line\": 200}",
+        "visits": 16,
+        "mean_value": 8.04,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0",
+        "parent_id": "0.0.0.0",
+        "depth": 4,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"app/utils/subject.py\", \"old_str\": \"def _title_word(word: str) -> str:\\",
+        "visits": 15,
+        "mean_value": 8.58,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 2,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 1,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"def _title_word(word: str) -> str:\\n    # Capitalize first letter and any letter following an apostrophe\\n    lowered = word.strip().lower()\\n    import re\\n    return re.sub(r\\\"\\\\b\\\\w\\\", lambda m: m.group().upper(), lowered)\", \"old_str\": \"def _title_word(word: str) -> str:\\n    lowered = word.strip().lower()\\n    return lowered[:1].upper() + lowered[1:]\", \"path\": \"app/utils/subject.py\"}, \"name\": \"str_replace\"}": 1
+        },
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0",
+        "depth": 5,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"pytest -q\"}",
+        "visits": 14,
+        "mean_value": 7.74,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 2,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 2,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0",
+        "depth": 6,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"app/__init__.py\", \"start_line\": 1, \"end_line\": 200}",
+        "visits": 13,
+        "mean_value": 6.88,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 2,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 3,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0",
+        "depth": 7,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"sed -n '1,200p' app/__init__.py\"}",
+        "visits": 12,
+        "mean_value": 6.13,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 2,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 4,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0",
+        "depth": 8,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"ls -R\"}",
+        "visits": 11,
+        "mean_value": 5.29,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 2,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 5,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0",
+        "depth": 9,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python - <<'PY'\\nimport sys, os; print(os.getcwd()); print(sys.path",
+        "visits": 10,
+        "mean_value": 4.49,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 2,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 6,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0",
+        "depth": 10,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python - <<'PY'\\nimport importlib, sys, os\\nprint('cwd', os.getcwd(",
+        "visits": 9,
+        "mean_value": 3.72,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 2,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 7,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0.0",
+        "depth": 11,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"tests/test_alert_subject.py\", \"start_line\": 1, \"end_line\": 200}",
+        "visits": 8,
+        "mean_value": 2.99,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 2,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 8,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0.0.0",
+        "depth": 12,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"tests/test_alert_subject.py\", \"start_line\": 200, \"end_line\": 400}",
+        "visits": 7,
+        "mean_value": 2.29,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 2,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 9,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "depth": 13,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"tests/test_alert_subject.py\", \"start_line\": 1, \"end_line\": 400}",
+        "visits": 6,
+        "mean_value": 1.75,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 2,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 10,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "depth": 14,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"sed -n '400,800p' tests/test_alert_subject.py\"}",
+        "visits": 5,
+        "mean_value": 1.16,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 2,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 11,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "depth": 15,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"app/utils/subject.py\", \"start_line\": 1, \"end_line\": 200}",
+        "visits": 4,
+        "mean_value": 0.63,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 2,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 12,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "depth": 16,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python - <<'PY'\\nimport re\\ns=\\\"john's-service\\\"\\nprint(re.sub(r\\\"\\",
+        "visits": 3,
+        "mean_value": 0.2,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 2,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 13,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "depth": 17,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"app/utils/subject.py\", \"old_str\": \"def _title_word(word: str) -> str:\\",
+        "visits": 2,
+        "mean_value": 0.0,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 2,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 14,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"def _title_word(word: str) -> str:\\n    # Capitalize only the first character of the word\\n    lowered = word.strip().lower()\\n    if not lowered:\\n        return ''\\n    return lowered[:1].upper() + lowered[1:]\", \"old_str\": \"def _title_word(word: str) -> str:\\n    # Capitalize first letter and any letter following an apostrophe\\n    lowered = word.strip().lower()\\n    import re\\n    return re.sub(r\\\"\\\\b\\\\w\\\", lambda m: m.group().upper(), lowered)\", \"path\": \"app/utils/subject.py\"}, \"name\": \"str_replace\"}": 1
+        },
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "depth": 18,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"pytest -q\"}",
+        "visits": 1,
+        "mean_value": 0.0,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 2,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 15,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      }
+    ],
+    "result_node_id": "0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0"
+  },
+  "agent_architecture": "single",
+  "architecture": "single",
+  "role_model_stats": {
+    "coder": {
+      "model": "openai/openai/gpt-oss-120b",
+      "input_tokens": 55025,
+      "output_tokens": 3547,
+      "turns": 18,
+      "tool_calls": 20,
+      "iterations": 18,
+      "tree_nodes_created": 19,
+      "best_node_depth": 18,
+      "best_node_value": 0.0,
+      "value_fn_tokens_in": 0,
+      "value_fn_tokens_out": 0
+    }
+  },
+  "planner_handoff": {},
+  "review_feedback": {},
+  "coder_rounds": [],
+  "instance_id": "alert_subject_001",
+  "duration_seconds": 160.53
+}

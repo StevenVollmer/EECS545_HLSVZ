@@ -1,0 +1,28 @@
+diff --git a/app/main.py b/app/main.py
+index 63dc3e6..02ccc8b 100644
+--- a/app/main.py
++++ b/app/main.py
+@@ -2,7 +2,10 @@ from app.utils.rates import format_transfer_rate
+ 
+ 
+ def transfer_digest_preview(owner: str, rate: float) -> str:
+-    titled = owner[:1].upper() + owner[1:]
++    # Capitalize first character of each hyphen-separated segment, preserving case elsewhere
++    segments = owner.split('-')
++    titled_segments = [seg[:1].upper() + seg[1:] if seg else '' for seg in segments]
++    titled = '-'.join(titled_segments)
+     return f"Transfer for {titled} at {format_transfer_rate(rate)}"
+ 
+ 
+diff --git a/app/utils/rates.py b/app/utils/rates.py
+index b858c7d..e2e2da2 100644
+--- a/app/utils/rates.py
++++ b/app/utils/rates.py
+@@ -1,4 +1,5 @@
+ def format_transfer_rate(rate: float) -> str:
+-    if 0 < rate < 0.01:
+-        return '0.0%'
++    # Removed special case that forced low rates to 0.0%
++    # Now always format with one decimal place
++
+     return f"{rate * 100:.1f}%"

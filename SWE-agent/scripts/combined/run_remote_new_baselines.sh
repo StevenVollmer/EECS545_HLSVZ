@@ -60,7 +60,7 @@ if [[ "$GROUP" == "30b" ]]; then
     MODEL="openai/Qwen/Qwen3-VL-30B-A3B-Instruct"
     API_BASE="http://promaxgb10-d668.eecs.umich.edu:8000/v1"
     API_KEY="api_RPnuSxgxJQamqW04ma9uJW27vc4TyBdy"
-    MODEL_FLAGS=(--model "$MODEL" --api-base "$API_BASE" --api-key "$API_KEY" --max-tokens 1024)
+    MODEL_FLAGS=(--model "$MODEL" --api-base "$API_BASE" --api-key "$API_KEY" --max-tokens 1024 --no-native-tools)
 
     run M_c1_30b_linear "$C1" "${MODEL_FLAGS[@]}" "${LINEAR_FLAGS[@]}"
     run M_c2_30b_linear "$C2" "${MODEL_FLAGS[@]}" "${LINEAR_FLAGS[@]}"

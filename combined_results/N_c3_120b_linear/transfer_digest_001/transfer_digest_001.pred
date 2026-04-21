@@ -1,0 +1,5 @@
+{
+  "model_name_or_path": "N_c3_120b_linear",
+  "instance_id": "transfer_digest_001",
+  "model_patch": "diff --git a/app/main.py b/app/main.py\nindex 63dc3e6..02ccc8b 100644\n--- a/app/main.py\n+++ b/app/main.py\n@@ -2,7 +2,10 @@ from app.utils.rates import format_transfer_rate\n \n \n def transfer_digest_preview(owner: str, rate: float) -> str:\n-    titled = owner[:1].upper() + owner[1:]\n+    # Capitalize first character of each hyphen-separated segment, preserving case elsewhere\n+    segments = owner.split('-')\n+    titled_segments = [seg[:1].upper() + seg[1:] if seg else '' for seg in segments]\n+    titled = '-'.join(titled_segments)\n     return f\"Transfer for {titled} at {format_transfer_rate(rate)}\"\n \n \ndiff --git a/app/utils/rates.py b/app/utils/rates.py\nindex b858c7d..e2e2da2 100644\n--- a/app/utils/rates.py\n+++ b/app/utils/rates.py\n@@ -1,4 +1,5 @@\n def format_transfer_rate(rate: float) -> str:\n-    if 0 < rate < 0.01:\n-        return '0.0%'\n+    # Removed special case that forced low rates to 0.0%\n+    # Now always format with one decimal place\n+\n     return f\"{rate * 100:.1f}%\"\n"
+}

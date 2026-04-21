@@ -1,0 +1,42 @@
+diff --git a/app/utils/labels.py b/app/utils/labels.py
+index 4ef7164..4c0aab5 100644
+--- a/app/utils/labels.py
++++ b/app/utils/labels.py
+@@ -3,10 +3,20 @@ def normalize_route_label(owner: str) -> str:
+ 
+ 
+ def format_timeline_label(owner: str) -> str:
+-    sections = []
+-    for section in owner.split("/"):
+-        words = []
+-        for word in section.strip().split("-"):
+-            words.append(word[:1].upper() + word[1:].lower())
+-        sections.append("-".join(words))
+-    return "/".join(sections)
++    """Format an owner string for timeline captions.
+++
+++    The owner string may contain sections separated by ``/`` and words
+++    separated by ``-``. Each word should be title‑cased while preserving any
+++    apostrophes (e.g. ``o'neil`` → ``O'Neil``). Leading/trailing whitespace is
+++    ignored.
+++    """
+++    sections = []
+++    for section in owner.split('/'):
+++        words = []
+++        for word in section.strip().split('-'):
+++            # Preserve apostrophes while capitalising each sub‑part.
+++            parts = word.split("'")
+++            capitalised = "'".join(p[:1].upper() + p[1:].lower() if p else '' for p in parts)
+++            words.append(capitalised)
+++        sections.append('-'.join(words))
+++    return '/'.join(sections)
+diff --git a/tests/test_label_helpers.py b/tests/test_label_helpers.py
+index e7b7e6f..c8eb0ee 100644
+--- a/tests/test_label_helpers.py
++++ b/tests/test_label_helpers.py
+@@ -1,3 +1,5 @@
++import sys, os
++sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+ from app.utils.labels import format_timeline_label
+ 
+ 

@@ -1,0 +1,21 @@
+diff --git a/app/utils/names.py b/app/utils/names.py
+index 16d0add..c7fb935 100644
+--- a/app/utils/names.py
++++ b/app/utils/names.py
+@@ -1,3 +1,14 @@
+ def lead_display_name(lead: str) -> str:
+-    cleaned = '-'.join(part.strip().lower() for part in lead.split('-'))
+-    return cleaned[:1].upper() + cleaned[1:]
++    """Return a properly formatted lead display name.
++
++    Handles hyphens and apostrophes by capitalizing the first character of each
++    sub‑word. For example, "d'arcy-lee" becomes "D'Arcy-Lee".
++    """
++    import re
++    # Normalize to lower case
++    cleaned = lead.lower()
++    # Capitalize after start, hyphen, or apostrophe
++    def _cap(match: re.Match) -> str:
++        return match.group(1) + match.group(2).upper()
++    return re.sub(r"(^|[-'])([a-z])", _cap, cleaned)
++

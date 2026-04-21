@@ -2,475 +2,710 @@
 """Generate paper figures from combined-agent ablation results.
 
 Figures produced:
-  fig1_main_results.pdf    — Grouped bar: A/B/C solve rate on c1, c2, c3
-                             (the paper's headline comparison)
-  fig2_ablation.pdf        — Horizontal bar: all variants ranked by avg solve rate,
-                             color-coded by what each adds over the baseline
-  fig3_efficiency.pdf      — Scatter: solve rate vs. estimated USD cost,
-                             per variant (avg over available test sets)
-  fig4_token_breakdown.pdf — Stacked bar: token share by role for key variants
+  fig_a_efficiency_frontier  — Scatter: solve rate vs BPT (c2+c3 held-out avg)
+  fig_b_reviewer_audit       — Stacked bar: TP/FP/FN/TN % by reviewer model size
+  fig_c_ablation_features    — Dual panel: accuracy lift + % efficiency change per feature
+  fig_d_steps_to_solve       — Histogram: avg solved per agent by iteration bin, by group
+  fig_e_instance_overlap     — Venn diagram: solved/failed instance overlap for A/B/C
+  fig_f_resource_waste       — Dual histogram: compute distribution for solved vs failed
+  fig_g_mcts_branching       — MCTS search depth and branching analysis
 
-Usage:
-  python plot_results.py [--output-dir figures/] [--format pdf|png]
+Usage (from project root):
+  python SWE-agent/scripts/combined/plot_results.py \\
+      --data-dir Summary_Data \\
+      --audit-csv combined_results/reviewer_audits/audit_results.csv \\
+      --output-dir combined_results/figures \\
+      --format png
 """
 from __future__ import annotations
 
 import argparse
 import csv
+import math
 import pathlib
 import sys
+from collections import defaultdict
+from typing import Any
 
 # ---------------------------------------------------------------------------
-# Pull eval data from eval_combined
+# Variant / group metadata
 # ---------------------------------------------------------------------------
 
-_HERE = pathlib.Path(__file__).parent
-sys.path.insert(0, str(_HERE))
-from eval_combined import load_all_runs, _aggregate, COMBINED_RUNS, RunSummary  # noqa: E402
-
-# ---------------------------------------------------------------------------
-# Variant metadata: display label, color group, description
-# ---------------------------------------------------------------------------
-
-VARIANT_META = {
-    # id prefix         label                      group         description
-    "K_c1": ("K  bare swe-search",            "baseline",   "Bare UCB1+value+hindsight, no our techniques"),
-    "K_c2": ("K  bare swe-search",            "baseline",   ""),
-    "A_c3": ("A  9b MCTS (ours)",             "ours_9b",    "Our techniques, 9b only"),
-    "G_c1": ("G  9b + hindsight",             "ours_9b",    "9b + cross-branch feedback"),
-    "G_c2": ("G  9b + hindsight",             "ours_9b",    ""),
-    "H_c1": ("H  9b + value fn",              "ours_9b",    "9b self-eval value function"),
-    "H_c2": ("H  9b + value fn",              "ours_9b",    ""),
-    "I_c1": ("I  9b + full swe-search",       "swesearch",  "9b + value + hindsight (swe-search replication)"),
-    "I_c2": ("I  9b + full swe-search",       "swesearch",  ""),
-    "F_c1": ("F  9b coder + 120b planner",    "ours_mixed", "Mixed sizes, 9b coder, no value fn"),
-    "F_c2": ("F  9b coder + 120b planner",    "ours_mixed", ""),
-    "J_c1": ("J  30b flat + swe-search",      "swesearch",  "30b all roles + value + hindsight"),
-    "J_c2": ("J  30b flat + swe-search",      "swesearch",  ""),
-    "B_c1": ("B  Rafe linear (120b→30b)",     "baseline",   "Rafe's best: 120b plan + 30b coder, no search"),
-    "B_c2": ("B  Rafe linear (120b→30b)",     "baseline",   ""),
-    "B_c3": ("B  Rafe linear (120b→30b)",     "baseline",   ""),
-    "D_c1": ("D  mixed + value fn",           "ours_mixed", "C + 30b value function"),
-    "D_c2": ("D  mixed + value fn",           "ours_mixed", ""),
-    "E_c1": ("E  mixed + value + hindsight",  "ours_mixed", "C + value + hindsight"),
-    "E_c2": ("E  mixed + value + hindsight",  "ours_mixed", ""),
-    "C_c1": ("C  mixed MCTS (ours best)",     "ours_best",  "Our best: 120b plan/review + 30b coder MCTS"),
-    "C_c2": ("C  mixed MCTS (ours best)",     "ours_best",  ""),
-    "C_c3": ("C  mixed MCTS (ours best)",     "ours_best",  ""),
+VARIANT_GROUPS: dict[str, str] = {
+    "L": "linear",       "M": "linear",       "N": "linear",
+    "B": "baseline",     "B_strict": "baseline",
+    "H": "swesearch",    "I": "swesearch",     "J": "swesearch",  "K": "swesearch",
+    "A": "ours_9b",      "A_strict": "ours_9b",
+    "G": "ours_9b",      "G_strict": "ours_9b",
+    "F": "ours_mixed",   "F_strict": "ours_mixed",
+    "C": "ours_mixed",   "C_strict": "ours_mixed",
+    "D": "ours_mixed",   "E": "ours_mixed",
+    "P": "ours_best",
 }
 
-GROUP_COLORS = {
-    "baseline":   "#9b9b9b",   # grey
-    "swesearch":  "#e8a838",   # amber
-    "ours_9b":    "#5b9bd5",   # blue
-    "ours_mixed": "#70ad47",   # green
-    "ours_best":  "#c00000",   # red — our champion
+GROUP_COLORS: dict[str, str] = {
+    "linear":     "#c9c9c9",
+    "baseline":   "#9b9b9b",
+    "swesearch":  "#e8a838",
+    "ours_9b":    "#5b9bd5",
+    "ours_mixed": "#70ad47",
+    "ours_best":  "#c00000",
 }
 
-GROUP_LABELS = {
-    "baseline":   "Baselines",
+GROUP_LABELS: dict[str, str] = {
+    "linear":     "Linear baselines (L/M/N)",
+    "baseline":   "Multi-role linear (B)",
     "swesearch":  "swe-search variants",
-    "ours_9b":    "Our techniques (9b)",
-    "ours_mixed": "Our techniques (mixed)",
-    "ours_best":  "Our best (C)",
+    "ours_9b":    "9b MCTS (ours)",
+    "ours_mixed": "Mixed-size (ours)",
+    "ours_best":  "Best combined (P)",
 }
 
-# Canonical ordering for ablation (worst → best)
-ABLATION_ORDER = ["K","I","J","H","G","F","B","A","D","E","C"]
+FEATURE_NAMES: dict[str, str] = {
+    "mcts":        "MCTS search",
+    "planner":     "Planner role",
+    "reviewer":    "Reviewer role",
+    "strict_gate": "Strict reviewer gate",
+    "hindsight":   "Hindsight feedback",
+    "value_fn":    "Value function",
+}
+
+# Groups used for steps-to-solve aggregation (fig_d)
+STEP_GROUPS: dict[str, str] = {
+    "A": "9b MCTS",              "A_strict": "9b MCTS",
+    "G": "9b MCTS",              "G_strict": "9b MCTS",
+    "C": "Mixed MCTS",           "C_strict": "Mixed MCTS",
+    "D": "Mixed MCTS",           "E": "Mixed MCTS",    "P": "Mixed MCTS",
+    "B": "Multi-role linear",    "B_strict": "Multi-role linear",
+    "F": "9b+120b",              "F_strict": "9b+120b",
+    "L": "Linear (size)",        "M": "Linear (size)", "N": "Linear (size)",
+    "H": "swe-search",           "I": "swe-search",    "J": "swe-search",  "K": "swe-search",
+}
+
+STEP_GROUP_COLORS: dict[str, str] = {
+    "9b MCTS":           "#5b9bd5",
+    "Mixed MCTS":        "#c00000",
+    "Multi-role linear": "#9b9b9b",
+    "9b+120b":           "#a4c2f4",
+    "Linear (size)":     "#c9c9c9",
+    "swe-search":        "#e8a838",
+}
+
+# Variants tracked in mcts_branch_stats (MCTS variants only)
+MCTS_VARIANTS = {"A", "A_strict", "C", "C_strict", "E", "G", "G_strict", "P"}
+
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _prefix(run_id: str) -> str:
-    """Return first token (e.g. 'C_c1_mixed_mcts' → 'C_c1')."""
-    parts = run_id.split("_")
-    # handle 'B_c1_rafe_linear' → 'B_c1'
-    if len(parts) >= 2:
-        return f"{parts[0]}_{parts[1]}"
-    return parts[0]
-
-
-def _set_label(run_id: str) -> str:
-    p = _prefix(run_id)
-    if "c1" in p: return "c1"
-    if "c2" in p: return "c2"
-    if "c3" in p: return "c3"
-    return "?"
-
-
-def _variant_letter(run_id: str) -> str:
-    return run_id.split("_")[0]
-
-
-def _build_lookup(summaries: list[RunSummary]) -> dict[str, RunSummary]:
-    return {_prefix(s.run_id): s for s in summaries}
-
-
-def _load_summaries_from_csv(path: pathlib.Path) -> list[RunSummary]:
-    summaries: list[RunSummary] = []
+def _load_csv(path: pathlib.Path) -> list[dict[str, Any]]:
     with open(path, newline="") as f:
-        for row in csv.DictReader(f):
-            summaries.append(
-                RunSummary(
-                    run_id=row["run_id"],
-                    solved=int(row["solved"]),
-                    total=int(row["total"]),
-                    solve_rate=float(row["solve_rate"]),
-                    avg_compute=float(row["avg_compute"]),
-                    compute_per_solve=float(row["compute_per_solve"]) if row["compute_per_solve"] != "inf" else float("inf"),
-                    avg_tokens_in=float(row["avg_tokens_in"]),
-                    avg_tokens_out=float(row["avg_tokens_out"]),
-                    avg_planner_tokens=float(row["avg_planner_tokens"]),
-                    avg_coder_tokens=float(row["avg_coder_tokens"]),
-                    avg_reviewer_tokens=float(row["avg_reviewer_tokens"]),
-                    avg_value_tokens=float(row["avg_value_tokens"]),
-                    avg_tree_nodes=float(row["avg_tree_nodes"]),
-                    avg_best_depth=float(row["avg_best_depth"]),
-                    avg_duration_s=float(row["avg_duration_s"]),
-                    coder_model=row.get("coder_model", ""),
-                    planner_model=row.get("planner_model", ""),
-                )
-            )
-    return summaries
+        return list(csv.DictReader(f))
+
+
+def _variant_color(variant: str) -> str:
+    group = VARIANT_GROUPS.get(variant, "swesearch")
+    return GROUP_COLORS[group]
 
 
 # ---------------------------------------------------------------------------
-# Figure 1: Main results (A / B / C across c1, c2, c3)
+# Fig a — Efficiency frontier: solve rate vs BPT (no Pareto overlay)
 # ---------------------------------------------------------------------------
 
-def fig_main_results(summaries: list[RunSummary], out_dir: pathlib.Path, fmt: str) -> None:
+def fig_efficiency_frontier(data_dir: pathlib.Path, out_dir: pathlib.Path, fmt: str) -> None:
     import matplotlib.pyplot as plt
     import matplotlib.patches as mpatches
     import numpy as np
 
-    lkp = _build_lookup(summaries)
-    variants = ["A", "B", "C"]
-    sets     = ["c1", "c2", "c3"]
-    set_labels = {"c1": "Custom Set 1\n(development)", "c2": "Custom Set 2\n(held-out dev)",
-                  "c3": "Custom Set 3\n(held-out final)"}
-    colors = {
-        "A": "#5b9bd5",
-        "B": "#9b9b9b",
-        "C": "#c00000",
-    }
-    variant_labels = {
-        "A": "A  9b MCTS (ours)",
-        "B": "B  Rafe linear",
-        "C": "C  Mixed MCTS (ours)",
-    }
+    rows = _load_csv(data_dir / "efficiency_frontier_bpt_runs.csv")
 
-    fig, ax = plt.subplots(figsize=(8, 4.5))
-    x = np.arange(len(sets))
-    width = 0.22
-    offsets = [-width, 0, width]
-
-    for i, v in enumerate(variants):
-        rates = []
-        for s in sets:
-            key = f"{v}_{s}"
-            if key in lkp and lkp[key].total > 0:
-                rates.append(lkp[key].solve_rate * 100)
-            else:
-                rates.append(None)
-
-        xs, ys = zip(*[(x[j] + offsets[i], r) for j, r in enumerate(rates) if r is not None])
-        bars = ax.bar(xs, ys, width=width * 0.92, color=colors[v], label=variant_labels[v],
-                      zorder=3, edgecolor="white", linewidth=0.5)
-        for bar, y in zip(bars, ys):
-            ax.text(bar.get_x() + bar.get_width() / 2, y + 1.2, f"{y:.0f}%",
-                    ha="center", va="bottom", fontsize=8, fontweight="bold", color=colors[v])
-
-    ax.set_xticks(x)
-    ax.set_xticklabels([set_labels[s] for s in sets], fontsize=10)
-    ax.set_ylabel("Solve rate (%)", fontsize=11)
-    ax.set_ylim(0, 105)
-    ax.set_yticks(range(0, 101, 20))
-    ax.yaxis.grid(True, linestyle="--", alpha=0.5, zorder=0)
-    ax.set_axisbelow(True)
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-
-    # Shade c3 to indicate held-out
-    ax.axvspan(1.5, 2.5, alpha=0.06, color="gold", zorder=0)
-    ax.text(2, 102, "held-out", ha="center", fontsize=8, color="#aa8800", style="italic")
-
-    ax.legend(loc="lower right", fontsize=9, framealpha=0.9)
-    ax.set_title("Solve Rate: Baseline (A, B) vs. Our Best (C)", fontsize=12, fontweight="bold", pad=10)
-
-    fig.tight_layout()
-    out = out_dir / f"fig1_main_results.{fmt}"
-    fig.savefig(out, dpi=200, bbox_inches="tight")
-    plt.close(fig)
-    print(f"Saved: {out}")
-
-
-# ---------------------------------------------------------------------------
-# Figure 2: Full ablation bar chart
-# ---------------------------------------------------------------------------
-
-def fig_ablation(summaries: list[RunSummary], out_dir: pathlib.Path, fmt: str) -> None:
-    import matplotlib.pyplot as plt
-    import matplotlib.patches as mpatches
-    import numpy as np
-
-    # Average c1+c2 for each variant letter
-    by_letter: dict[str, list[float]] = {}
-    for s in summaries:
-        letter = _variant_letter(s.run_id)
-        test_set = _set_label(s.run_id)
-        if test_set in ("c1", "c2") and s.total > 0:
-            by_letter.setdefault(letter, []).append(s.solve_rate * 100)
-
-    # Build ordered list (best solve rate first)
-    rows = []
-    for letter in sorted(by_letter.keys()):
-        if letter not in by_letter:
+    # Average c2+c3 per variant (held-out sets); skip N (120b linear) — noted in paper
+    SKIP_VARIANTS = {"N"}
+    by_variant: dict[str, dict[str, list]] = {}
+    for r in rows:
+        if r["case_set"] not in ("c2", "c3"):
             continue
-        rates = by_letter[letter]
-        avg = sum(rates) / len(rates)
-        # Pair with average cost for tradeoff annotation
-        costs = [
-            s.avg_compute
-            for s in summaries
-            if _variant_letter(s.run_id) == letter and _set_label(s.run_id) in ("c1", "c2")
-        ]
-        avg_cost = sum(costs) / len(costs) if costs else 0.0
-        # Look up group for color
-        sample_key = next((k for k in VARIANT_META if k.startswith(letter + "_c1")), None)
-        group = VARIANT_META[sample_key][1] if sample_key else "baseline"
-        label = VARIANT_META[sample_key][0] if sample_key else letter
-        rows.append((label, avg, avg_cost, GROUP_COLORS[group], group))
+        v = r["variant"]
+        if v in SKIP_VARIANTS:
+            continue
+        d = by_variant.setdefault(v, {"rate": [], "bpt": []})
+        d["rate"].append(float(r["solve_rate"]) * 100)
+        d["bpt"].append(float(r["avg_cost_bpt"]) / 1e6)
 
-    rows.sort(key=lambda r: r[1], reverse=True)
-
-    if not rows:
-        print("No ablation data available yet.")
+    if not by_variant:
+        print("fig_a: no c2+c3 data found")
         return
-
-    labels, values, costs, colors, groups = zip(*rows)
-    y = np.arange(len(labels))
-
-    fig, ax = plt.subplots(figsize=(9, 0.55 * len(labels) + 2))
-    bars = ax.barh(y, values, color=colors, edgecolor="white", linewidth=0.5, zorder=3)
-
-    for bar, val, cost in zip(bars, values, costs):
-        ax.text(val + 0.5, bar.get_y() + bar.get_height() / 2,
-                f"{val:.0f}%  (${cost:.4f})", va="center", ha="left", fontsize=8.5, fontweight="bold")
-
-    ax.set_yticks(y)
-    ax.set_yticklabels(labels, fontsize=9)
-    ax.set_xlim(0, 105)
-    ax.set_xticks(range(0, 101, 20))
-    ax.set_xlabel("Avg solve rate, c1+c2 (%)", fontsize=11)
-    ax.xaxis.grid(True, linestyle="--", alpha=0.4, zorder=0)
-    ax.set_axisbelow(True)
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-
-    # Legend
-    seen = {}
-    for g in groups:
-        if g not in seen:
-            seen[g] = mpatches.Patch(color=GROUP_COLORS[g], label=GROUP_LABELS[g])
-    ax.legend(handles=list(seen.values()), loc="lower right", fontsize=8.5, framealpha=0.9)
-    ax.set_title("Ablation: Avg Solve Rate (c1+c2), annotated with Avg Cost", fontsize=12, fontweight="bold", pad=10)
-
-    fig.tight_layout()
-    out = out_dir / f"fig2_ablation.{fmt}"
-    fig.savefig(out, dpi=200, bbox_inches="tight")
-    plt.close(fig)
-    print(f"Saved: {out}")
-
-
-# ---------------------------------------------------------------------------
-# Figure 3: Efficiency scatter (solve rate vs. estimated USD cost)
-# ---------------------------------------------------------------------------
-
-def fig_efficiency(summaries: list[RunSummary], out_dir: pathlib.Path, fmt: str) -> None:
-    import matplotlib.pyplot as plt
-    import matplotlib.lines as mlines
-    import numpy as np
-
-    # Average c1+c2 per variant
-    by_letter: dict[str, dict] = {}
-    for s in summaries:
-        letter = _variant_letter(s.run_id)
-        test_set = _set_label(s.run_id)
-        if test_set in ("c1", "c2") and s.total > 0 and s.avg_compute > 0:
-            d = by_letter.setdefault(letter, {"rates": [], "costs": []})
-            d["rates"].append(s.solve_rate * 100)
-            d["costs"].append(s.avg_compute)
 
     points = []
-    for letter, d in by_letter.items():
-        rate = sum(d["rates"]) / len(d["rates"])
-        cost = sum(d["costs"]) / len(d["costs"])
-        sample_key = next((k for k in VARIANT_META if k.startswith(letter + "_c1")), None)
-        group = VARIANT_META[sample_key][1] if sample_key else "baseline"
-        short_label = letter
-        points.append((cost, rate, GROUP_COLORS[group], short_label, group))
+    for v, d in by_variant.items():
+        rate = sum(d["rate"]) / len(d["rate"])
+        bpt  = sum(d["bpt"])  / len(d["bpt"])
+        points.append((v, rate, bpt))
 
-    if not points:
-        print("No efficiency data available.")
-        return
+    fig, ax = plt.subplots(figsize=(9, 5.5))
 
-    sorted_points = sorted(points, key=lambda x: x[0])
-    costs, rates, colors, labels, groups = zip(*sorted_points)
+    xs = [bpt  for _, _, bpt  in points]
+    ys = [rate for _, rate, _ in points]
+    cs = [_variant_color(v) for v, _, _ in points]
+    ax.scatter(xs, ys, c=cs, s=90, zorder=4, edgecolors="white", linewidths=0.6)
 
-    fig, ax = plt.subplots(figsize=(8, 5))
-    ax.scatter(costs, rates, c=colors, s=130, zorder=4, edgecolors="white", linewidths=0.8)
+    for v, rate, bpt in points:
+        ax.annotate(v, (bpt, rate), textcoords="offset points", xytext=(5, 3),
+                    fontsize=7.5, fontweight="bold", color=_variant_color(v))
 
-    for x, y, c, lbl in zip(costs, rates, colors, labels):
-        ax.annotate(lbl, (x, y), textcoords="offset points", xytext=(6, 4),
-                    fontsize=9, fontweight="bold", color=c)
-
-    # Efficiency frontier (Pareto-optimal points in cost-min, rate-max space)
-    pts_sorted = sorted(zip(costs, rates, labels), key=lambda p: p[0])
-    frontier_x, frontier_y = [pts_sorted[0][0]], [pts_sorted[0][1]]
-    frontier_labels = [pts_sorted[0][2]]
-    for cx, cy, lbl in pts_sorted[1:]:
-        if cy >= frontier_y[-1]:
-            frontier_x.append(cx)
-            frontier_y.append(cy)
-            frontier_labels.append(lbl)
-    if len(frontier_x) > 1:
-        ax.plot(frontier_x, frontier_y, "k--", alpha=0.25, linewidth=1.2, zorder=2, label="Pareto frontier")
-        ax.scatter(frontier_x, frontier_y, marker="*", s=180, c="gold", edgecolors="black", linewidths=0.6, zorder=5)
-
-    ax.set_xlabel("Avg estimated cost per instance (USD)", fontsize=11)
-    ax.set_ylabel("Avg solve rate, c1+c2 (%)", fontsize=11)
-    ax.set_ylim(40, 95)
+    ax.set_xlabel("Avg compute per instance (M B-param·tokens)", fontsize=11)
+    ax.set_ylabel("Avg solve rate, c2+c3 (%)", fontsize=11)
     ax.xaxis.grid(True, linestyle="--", alpha=0.4, zorder=0)
     ax.yaxis.grid(True, linestyle="--", alpha=0.4, zorder=0)
     ax.set_axisbelow(True)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
 
-    import matplotlib.patches as mpatches
-    seen = {}
-    for g in groups:
-        if g not in seen:
-            seen[g] = mpatches.Patch(color=GROUP_COLORS[g], label=GROUP_LABELS[g])
-    handles = list(seen.values())
-    if len(frontier_x) > 1:
-        handles.append(mlines.Line2D([], [], color="k", linestyle="--", alpha=0.4, label="Pareto frontier"))
-    ax.legend(handles=handles, fontsize=8.5, framealpha=0.9)
-    ax.set_title("Efficiency Frontier: Solve Rate vs. Cost (c1+c2 avg)", fontsize=12, fontweight="bold", pad=10)
+    seen_groups: set[str] = set()
+    handles = []
+    for v, _, _ in points:
+        g = VARIANT_GROUPS.get(v, "swesearch")
+        if g not in seen_groups:
+            seen_groups.add(g)
+            handles.append(mpatches.Patch(color=GROUP_COLORS[g], label=GROUP_LABELS[g]))
+    ax.legend(handles=handles, fontsize=8.5, framealpha=0.9, loc="upper right")
+    ax.set_title("Efficiency Frontier: Solve Rate vs. Compute (c2+c3 held-out avg)",
+                 fontsize=12, fontweight="bold", pad=10)
 
     fig.tight_layout()
-    out = out_dir / f"fig3_efficiency.{fmt}"
+    out = out_dir / f"fig_a_efficiency_frontier.{fmt}"
     fig.savefig(out, dpi=200, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved: {out}")
 
 
 # ---------------------------------------------------------------------------
-# Figure 4: Token breakdown by role (key variants only)
+# Fig b — Reviewer outcomes: TP / FP / FN / TN as % of evaluations
 # ---------------------------------------------------------------------------
 
-def fig_token_breakdown(summaries: list[RunSummary], out_dir: pathlib.Path, fmt: str) -> None:
+def fig_reviewer_audit(audit_csv: pathlib.Path, out_dir: pathlib.Path, fmt: str) -> None:
     import matplotlib.pyplot as plt
     import numpy as np
 
-    KEY_VARIANTS = ["A", "B", "C", "F", "G", "K"]
-    lkp = _build_lookup(summaries)
+    rows = _load_csv(audit_csv)
+    sizes = ["9b", "30b", "120b"]
 
-    rows = []
-    for v in KEY_VARIANTS:
-        # prefer c1, fallback c2
-        s = lkp.get(f"{v}_c1") or lkp.get(f"{v}_c2")
-        if s is None or s.total == 0:
+    agg: dict[str, dict[str, int]] = {s: {"tp": 0, "fp": 0, "fn": 0, "tn": 0} for s in sizes}
+    for r in rows:
+        sz = r.get("reviewer_size", "")
+        if sz not in agg:
             continue
-        total_tok = s.avg_planner_tokens + s.avg_coder_tokens + s.avg_reviewer_tokens + s.avg_value_tokens
-        if total_tok == 0:
-            continue
-        sample_key = next((k for k in VARIANT_META if k.startswith(v + "_c1")), None)
-        label = VARIANT_META[sample_key][0] if sample_key else v
-        rows.append((label, s.avg_planner_tokens, s.avg_coder_tokens,
-                     s.avg_reviewer_tokens, s.avg_value_tokens))
+        for k in ("tp", "fp", "fn", "tn"):
+            agg[sz][k] += int(r.get(k, 0))
 
-    if not rows:
-        print("No token breakdown data available.")
-        return
+    # Compute % of total evaluations for each outcome
+    pcts: dict[str, dict[str, float]] = {}
+    for sz in sizes:
+        total = sum(agg[sz].values())
+        pcts[sz] = {k: agg[sz][k] / total * 100 for k in ("tp", "fp", "fn", "tn")}
 
-    labels, plan_t, code_t, rev_t, val_t = zip(*rows) if rows else ([], [], [], [], [])
-    y = np.arange(len(labels))
+    # Order: Good accepts (TP), Good rejects (TN), False accepts (FP), False rejects (FN)
+    outcomes     = ["tp",             "tn",             "fp",              "fn"]
+    labels_out   = ["Good accepts",   "Good rejects",   "False accepts",   "False rejects"]
+    colors_out   = ["#70ad47",        "#a9d18e",        "#e8a838",         "#c00000"]
 
-    fig, ax = plt.subplots(figsize=(9, 0.65 * len(labels) + 2))
-    totals = [p + c + r + v for p, c, r, v in zip(plan_t, code_t, rev_t, val_t)]
+    x = np.arange(len(sizes))
+    width = 0.55
+    bottoms = np.zeros(len(sizes))
 
-    b1 = ax.barh(y, plan_t, label="Planner",      color="#4472c4", edgecolor="white", linewidth=0.3)
-    b2 = ax.barh(y, code_t, left=plan_t,           label="Coder",   color="#ed7d31", edgecolor="white", linewidth=0.3)
-    left2 = [p + c for p, c in zip(plan_t, code_t)]
-    b3 = ax.barh(y, rev_t, left=left2,             label="Reviewer",color="#a9d18e", edgecolor="white", linewidth=0.3)
-    left3 = [l + r for l, r in zip(left2, rev_t)]
-    b4 = ax.barh(y, val_t, left=left3,             label="Value fn",color="#ffc000", edgecolor="white", linewidth=0.3)
+    fig, ax = plt.subplots(figsize=(7, 4.5))
+    bars_by_outcome: dict[str, Any] = {}
+    for outcome, label, color in zip(outcomes, labels_out, colors_out):
+        vals = np.array([pcts[s][outcome] for s in sizes])
+        bars_by_outcome[outcome] = ax.bar(
+            x, vals, width, bottom=bottoms,
+            color=color, label=label, zorder=3, edgecolor="white", linewidth=0.5
+        )
+        # Annotate segments that are large enough to label
+        for i, (v, b) in enumerate(zip(vals, bottoms)):
+            if v >= 4:
+                ax.text(x[i], b + v / 2, f"{v:.0f}%",
+                        ha="center", va="center", fontsize=9, fontweight="bold", color="white")
+        bottoms = bottoms + vals
 
-    for i, tot in enumerate(totals):
-        ax.text(tot + tot * 0.01, y[i], f"{tot/1000:.0f}k", va="center", ha="left", fontsize=8)
-
-    ax.set_yticks(y)
-    ax.set_yticklabels(labels, fontsize=9)
-    ax.set_xlabel("Avg tokens per instance", fontsize=11)
-    ax.xaxis.grid(True, linestyle="--", alpha=0.4, zorder=0)
+    ax.set_xticks(x)
+    ax.set_xticklabels([f"{s} reviewer" for s in sizes], fontsize=10)
+    ax.set_ylabel("% of evaluations", fontsize=11)
+    ax.set_ylim(0, 108)
+    ax.yaxis.grid(True, linestyle="--", alpha=0.3, zorder=0)
     ax.set_axisbelow(True)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.legend(loc="lower right", fontsize=9, framealpha=0.9)
-    ax.set_title("Token Usage by Role (avg per instance, c1)", fontsize=12, fontweight="bold", pad=10)
+    ax.set_title("Reviewer Accuracy by Model Size\n(blind evaluation — no oracle test access)",
+                 fontsize=12, fontweight="bold", pad=10)
 
     fig.tight_layout()
-    out = out_dir / f"fig4_token_breakdown.{fmt}"
+    out = out_dir / f"fig_b_reviewer_audit.{fmt}"
     fig.savefig(out, dpi=200, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved: {out}")
 
 
 # ---------------------------------------------------------------------------
-# Figure 5: set-by-set variant heatmap
+# Fig c — Ablation feature impact (dual panel, efficiency normalized to %)
 # ---------------------------------------------------------------------------
 
-def fig_set_heatmap(summaries: list[RunSummary], out_dir: pathlib.Path, fmt: str) -> None:
+def fig_ablation_features(data_dir: pathlib.Path, out_dir: pathlib.Path, fmt: str) -> None:
     import matplotlib.pyplot as plt
     import numpy as np
 
-    variants = sorted({_variant_letter(s.run_id) for s in summaries if _set_label(s.run_id) in ("c1", "c2", "c3")})
-    sets = ["c1", "c2", "c3"]
-    matrix = []
-    for v in variants:
-        row = []
-        for st in sets:
-            s = next((x for x in summaries if _variant_letter(x.run_id) == v and _set_label(x.run_id) == st), None)
-            row.append((s.solve_rate * 100.0) if s else np.nan)
-        matrix.append(row)
+    rows = _load_csv(data_dir / "ablation_features.csv")
 
-    if not matrix:
-        print("No set heatmap data available.")
+    # Sort by feature_effect_solve descending
+    rows_sorted = sorted(rows, key=lambda r: float(r["feature_effect_solve"]), reverse=True)
+
+    labels      = [FEATURE_NAMES.get(r["feature"], r["feature"]) for r in rows_sorted]
+    effect_acc  = [float(r["feature_effect_solve"]) * 100 for r in rows_sorted]
+    low_power   = [bool(r.get("low_power_warning", "")) for r in rows_sorted]
+
+    # Normalize efficiency: % reduction in BPT/solve vs. baseline (feature off)
+    # Positive = feature is more efficient (cheaper per solve) vs. without it
+    # Negative = feature adds compute burden per solve
+    effect_eff_pct = []
+    for r in rows_sorted:
+        on_val  = float(r["mean_bpt_per_solve_on"])
+        off_val = float(r["mean_bpt_per_solve_off"])
+        pct = (off_val - on_val) / off_val * 100 if off_val > 0 else 0.0
+        effect_eff_pct.append(pct)
+
+    y = np.arange(len(labels))
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 0.6 * len(labels) + 2.5), sharey=True)
+    fig.subplots_adjust(wspace=0.05)
+
+    def _bar_colors(vals: list[float]) -> list[str]:
+        return ["#70ad47" if v >= 0 else "#c00000" for v in vals]
+
+    # Left: accuracy lift
+    bars1 = ax1.barh(y, effect_acc, color=_bar_colors(effect_acc),
+                     edgecolor="white", linewidth=0.4, zorder=3)
+    for bar, val, lp in zip(bars1, effect_acc, low_power):
+        sign   = "+" if val >= 0 else ""
+        suffix = "*" if lp else ""
+        ax1.text(val + (0.3 if val >= 0 else -0.3), bar.get_y() + bar.get_height() / 2,
+                 f"{sign}{val:.1f}pp{suffix}", va="center",
+                 ha="left" if val >= 0 else "right", fontsize=8.5, fontweight="bold")
+    ax1.axvline(0, color="black", linewidth=0.8, zorder=2)
+    ax1.set_xlabel("Accuracy lift (percentage points)", fontsize=10)
+    ax1.set_title("Solve Rate Impact", fontsize=11, fontweight="bold")
+    ax1.xaxis.grid(True, linestyle="--", alpha=0.4, zorder=0)
+    ax1.set_axisbelow(True)
+    ax1.spines["top"].set_visible(False)
+    ax1.spines["right"].set_visible(False)
+
+    # Right: efficiency impact (% change in BPT/solve vs baseline)
+    bars2 = ax2.barh(y, effect_eff_pct, color=_bar_colors(effect_eff_pct),
+                     edgecolor="white", linewidth=0.4, zorder=3)
+    for bar, val, lp in zip(bars2, effect_eff_pct, low_power):
+        sign   = "+" if val >= 0 else ""
+        suffix = "*" if lp else ""
+        ax2.text(val + (2 if val >= 0 else -2), bar.get_y() + bar.get_height() / 2,
+                 f"{sign}{val:.0f}%{suffix}", va="center",
+                 ha="left" if val >= 0 else "right", fontsize=8.5, fontweight="bold")
+    ax2.axvline(0, color="black", linewidth=0.8, zorder=2)
+    ax2.set_xlabel("% reduction in BPT/solve vs. baseline\n(positive = more efficient per solved instance)", fontsize=10)
+    ax2.set_title("Efficiency Impact", fontsize=11, fontweight="bold")
+    ax2.xaxis.grid(True, linestyle="--", alpha=0.4, zorder=0)
+    ax2.set_axisbelow(True)
+    ax2.spines["top"].set_visible(False)
+    ax2.spines["right"].set_visible(False)
+
+    ax1.set_yticks(y)
+    ax1.set_yticklabels(labels, fontsize=10)
+
+    if any(low_power):
+        fig.text(0.5, 0.01, "* low statistical power (n < 3 runs)",
+                 ha="center", fontsize=8, style="italic", color="gray")
+
+    fig.suptitle("Feature Ablation: Impact on Solve Rate and Compute Efficiency",
+                 fontsize=13, fontweight="bold", y=1.02)
+    fig.tight_layout()
+    out = out_dir / f"fig_c_ablation_features.{fmt}"
+    fig.savefig(out, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved: {out}")
+
+
+# ---------------------------------------------------------------------------
+# Fig d — Steps-to-solve: avg per agent by bin (bin=2, max=18)
+# ---------------------------------------------------------------------------
+
+def fig_steps_to_solve(data_dir: pathlib.Path, out_dir: pathlib.Path, fmt: str) -> None:
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    rows = _load_csv(data_dir / "steps_to_solve.csv")
+
+    # Filter: solved=1, held-out c2+c3
+    rows_f = [r for r in rows
+              if r["solved"] in ("1", "True") and r["case_set"] in ("c2", "c3")]
+
+    if not rows_f:
+        print("fig_d: no solved instances in c2+c3")
         return
 
-    arr = np.array(matrix, dtype=float)
-    fig, ax = plt.subplots(figsize=(6.5, 0.5 * len(variants) + 2))
-    im = ax.imshow(arr, cmap="YlGn", aspect="auto", vmin=45, vmax=90)
-    ax.set_xticks(np.arange(len(sets)))
-    ax.set_xticklabels(sets)
-    ax.set_yticks(np.arange(len(variants)))
-    ax.set_yticklabels(variants)
-    ax.set_xlabel("Case set")
-    ax.set_ylabel("Variant")
-    ax.set_title("Per-set solve rates by variant (%)", fontsize=12, fontweight="bold", pad=10)
+    # Bins of width 2, steps 1–18
+    BIN_W    = 2
+    MAX_STEP = 18
+    bin_starts  = list(range(1, MAX_STEP + 1, BIN_W))   # [1,3,5,...,17]
+    bin_labels  = [f"{b}–{b+BIN_W-1}" for b in bin_starts]
+    n_bins      = len(bin_starts)
 
-    for i in range(arr.shape[0]):
-        for j in range(arr.shape[1]):
-            if not np.isnan(arr[i, j]):
-                ax.text(j, i, f"{arr[i, j]:.0f}", ha="center", va="center", fontsize=8, color="black")
+    # Count per group and per run_id (for normalization)
+    group_counts:  dict[str, list[int]] = {}
+    group_run_ids: dict[str, set[str]]  = defaultdict(set)
 
-    cbar = fig.colorbar(im, ax=ax, fraction=0.035, pad=0.03)
-    cbar.set_label("Solve rate (%)")
+    # Also collect run_ids from all c2+c3 rows (not just solved) for correct denominator
+    rows_c23 = [r for r in rows if r["case_set"] in ("c2", "c3")]
+    for r in rows_c23:
+        g = STEP_GROUPS.get(r["variant"], "swe-search")
+        group_run_ids[g].add(r["run_id"])
+
+    for r in rows_f:
+        v     = r["variant"]
+        g     = STEP_GROUPS.get(v, "swe-search")
+        steps = int(r["steps_used"])
+        if steps > MAX_STEP:
+            continue
+        if g not in group_counts:
+            group_counts[g] = [0] * n_bins
+        for i, b in enumerate(bin_starts):
+            if b <= steps <= b + BIN_W - 1:
+                group_counts[g][i] += 1
+                break
+
+    # Normalize by number of run_ids in each group
+    group_avgs: dict[str, list[float]] = {}
+    for g, counts in group_counts.items():
+        n = len(group_run_ids[g]) or 1
+        group_avgs[g] = [c / n for c in counts]
+
+    # Drop groups with no solves after filtering
+    group_avgs = {g: v for g, v in group_avgs.items() if any(v)}
+
+    if not group_avgs:
+        print("fig_d: no data after grouping")
+        return
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    x        = np.arange(n_bins)
+    n_groups = len(group_avgs)
+    bar_width = 0.8 / n_groups
+
+    for i, (g, avgs) in enumerate(group_avgs.items()):
+        offset = (i - n_groups / 2 + 0.5) * bar_width
+        color  = STEP_GROUP_COLORS.get(g, "#aaaaaa")
+        ax.bar(x + offset, avgs, bar_width * 0.9, color=color,
+               label=g, zorder=3, edgecolor="white", linewidth=0.4, alpha=0.85)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(bin_labels, fontsize=9)
+    ax.set_xlabel("Steps used to solve (iteration bin)", fontsize=11)
+    ax.set_ylabel("Avg instances solved per agent", fontsize=11)
+    ax.yaxis.grid(True, linestyle="--", alpha=0.4, zorder=0)
+    ax.set_axisbelow(True)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.legend(fontsize=9, framealpha=0.9, loc="upper right")
+    ax.set_title("Steps-to-Solve Distribution by Agent Configuration (c2+c3, avg per agent)",
+                 fontsize=12, fontweight="bold", pad=10)
 
     fig.tight_layout()
-    out = out_dir / f"fig5_set_heatmap.{fmt}"
-    fig.savefig(out, dpi=220, bbox_inches="tight")
+    out = out_dir / f"fig_d_steps_to_solve.{fmt}"
+    fig.savefig(out, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved: {out}")
+
+
+# ---------------------------------------------------------------------------
+# Fig e — Instance overlap (Venn diagram) — fixed region ordering
+# ---------------------------------------------------------------------------
+
+def fig_instance_overlap(data_dir: pathlib.Path, out_dir: pathlib.Path, fmt: str) -> None:
+    import matplotlib.pyplot as plt
+
+    rows     = _load_csv(data_dir / "instance_overlap_wide.csv")
+    rows_f   = [r for r in rows if r["case_set"] in ("c2", "c3")]
+
+    def _venn_subsets(col_a: str, col_b: str, col_c: str,
+                      pos: str = "1") -> tuple[int, ...]:
+        """Return venn3 7-tuple (Abc,aBc,ABc,abC,AbC,aBC,ABC) for solved (pos='1') or failed."""
+        neg = "0" if pos == "1" else "1"
+        a = {r["instance_id"] for r in rows_f if r.get(col_a, neg) == pos}
+        b = {r["instance_id"] for r in rows_f if r.get(col_b, neg) == pos}
+        c = {r["instance_id"] for r in rows_f if r.get(col_c, neg) == pos}
+        abc     = len(a & b & c)
+        ab_only = len(a & b) - abc
+        ac_only = len(a & c) - abc
+        bc_only = len(b & c) - abc
+        only_a  = len(a - b - c)
+        only_b  = len(b - a - c)
+        only_c  = len(c - a - b)
+        # venn3 order: Abc, aBc, ABc, abC, AbC, aBC, ABC
+        return (only_a, only_b, ab_only, only_c, ac_only, bc_only, abc)
+
+    try:
+        from matplotlib_venn import venn3_unweighted
+        has_venn = True
+    except ImportError:
+        has_venn = False
+
+    if not has_venn:
+        _fig_overlap_fallback(data_dir, out_dir, fmt)
+        return
+
+    solved_sub = _venn_subsets("A", "B", "C", pos="1")
+    failed_sub = _venn_subsets("A", "B", "C", pos="0")
+    n_total    = len(rows_f)
+
+    fig, (ax_s, ax_f) = plt.subplots(1, 2, figsize=(12, 5.5))
+
+    venn3_unweighted(subsets=solved_sub,
+          set_labels=("A\n9b MCTS", "B\nMulti-role\nlinear", "C\nMixed MCTS"),
+          set_colors=("#5b9bd5", "#9b9b9b", "#c00000"), alpha=0.55, ax=ax_s)
+    ax_s.set_title(f"Instances Solved (c2+c3, n={n_total})",
+                   fontsize=10, fontweight="bold")
+
+    venn3_unweighted(subsets=failed_sub,
+          set_labels=("A\n9b MCTS", "B\nMulti-role\nlinear", "C\nMixed MCTS"),
+          set_colors=("#5b9bd5", "#9b9b9b", "#c00000"), alpha=0.55, ax=ax_f)
+    ax_f.set_title(f"Instances Failed (c2+c3, n={n_total})",
+                   fontsize=10, fontweight="bold")
+
+    fig.suptitle("Instance Overlap: Which Problems Each Agent Solved vs. Failed",
+                 fontsize=12, fontweight="bold", y=1.01)
+    fig.tight_layout()
+    out = out_dir / f"fig_e_instance_overlap.{fmt}"
+    fig.savefig(out, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved: {out}")
+
+
+def _fig_overlap_fallback(data_dir: pathlib.Path, out_dir: pathlib.Path, fmt: str) -> None:
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    rows   = _load_csv(data_dir / "instance_overlap_pairwise.csv")
+    rows_f = [r for r in rows if r["case_set"] in ("c2", "c3")]
+
+    pair_jac: dict[tuple[str, str], list[float]] = {}
+    for r in rows_f:
+        key = (r["variant_a"], r["variant_b"])
+        pair_jac.setdefault(key, []).append(float(r["jaccard"]))
+    pair_avg = {k: sum(v) / len(v) for k, v in pair_jac.items()}
+
+    variants = sorted({v for a, b in pair_avg for v in (a, b)})
+    mat = np.zeros((len(variants), len(variants)))
+    for i, a in enumerate(variants):
+        for j, b in enumerate(variants):
+            mat[i, j] = pair_avg.get((a, b), pair_avg.get((b, a), 0.0 if i != j else 1.0))
+
+    fig, ax = plt.subplots(figsize=(10, 8))
+    im = ax.imshow(mat, cmap="Blues", vmin=0, vmax=1)
+    ax.set_xticks(range(len(variants)))
+    ax.set_yticks(range(len(variants)))
+    ax.set_xticklabels(variants, rotation=45, ha="right", fontsize=8)
+    ax.set_yticklabels(variants, fontsize=8)
+    for i in range(len(variants)):
+        for j in range(len(variants)):
+            ax.text(j, i, f"{mat[i,j]:.2f}", ha="center", va="center", fontsize=6)
+    fig.colorbar(im, ax=ax, label="Jaccard similarity (solved)")
+    ax.set_title("Pairwise Instance Overlap (c2+c3)", fontsize=12, fontweight="bold")
+    fig.tight_layout()
+    out = out_dir / f"fig_e_instance_overlap.{fmt}"
+    fig.savefig(out, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved (fallback heatmap): {out}")
+
+
+# ---------------------------------------------------------------------------
+# Fig f — Resource waste: solved vs failed compute distributions
+# ---------------------------------------------------------------------------
+
+def fig_resource_waste(data_dir: pathlib.Path, out_dir: pathlib.Path, fmt: str) -> None:
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    rows   = _load_csv(data_dir / "resource_waste.csv")
+    rows_f = [r for r in rows if r["case_set"] in ("c2", "c3")]
+
+    solved_steps = [int(r["steps_used"])       for r in rows_f if r["solved"] == "1"]
+    failed_steps = [int(r["steps_used"])       for r in rows_f if r["solved"] == "0"]
+    solved_bpt   = [float(r["cost_bpt"]) / 1e6 for r in rows_f
+                    if r["solved"] == "1" and float(r["cost_bpt"]) > 0]
+    failed_bpt   = [float(r["cost_bpt"]) / 1e6 for r in rows_f
+                    if r["solved"] == "0" and float(r["cost_bpt"]) > 0]
+
+    if not solved_steps or not failed_steps:
+        print("fig_f: insufficient data")
+        return
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+    alpha   = 0.65
+    color_s = "#4472c4"
+    color_f = "#c00000"
+
+    # Left: steps
+    step_bins = range(0, 21, 2)
+    ax1.hist(solved_steps, bins=step_bins, color=color_s, alpha=alpha, label="Solved", zorder=3)
+    ax1.hist(failed_steps, bins=step_bins, color=color_f, alpha=alpha, label="Failed", zorder=3)
+    med_s = float(np.median(solved_steps))
+    med_f = float(np.median(failed_steps))
+    ax1.axvline(med_s, color=color_s, linestyle="--", linewidth=1.5,
+                label=f"Solved median={med_s:.0f}")
+    ax1.axvline(med_f, color=color_f, linestyle="--", linewidth=1.5,
+                label=f"Failed median={med_f:.0f}")
+    ax1.set_xlabel("Steps used", fontsize=11)
+    ax1.set_ylabel("Instance count", fontsize=11)
+    ax1.set_title("Iterations: Solved vs Failed", fontsize=11, fontweight="bold")
+    ax1.legend(fontsize=8.5, framealpha=0.9)
+    ax1.yaxis.grid(True, linestyle="--", alpha=0.4, zorder=0)
+    ax1.set_axisbelow(True)
+    ax1.spines["top"].set_visible(False)
+    ax1.spines["right"].set_visible(False)
+
+    # Right: BPT (log scale)
+    if solved_bpt and failed_bpt:
+        log_min = math.floor(math.log10(min(min(solved_bpt), min(failed_bpt))))
+        log_max = math.ceil( math.log10(max(max(solved_bpt), max(failed_bpt))))
+        bpt_bins = __import__("numpy").logspace(log_min, log_max, 20)
+        ax2.hist(solved_bpt, bins=bpt_bins, color=color_s, alpha=alpha, label="Solved", zorder=3)
+        ax2.hist(failed_bpt, bins=bpt_bins, color=color_f, alpha=alpha, label="Failed", zorder=3)
+        med_s_bpt = float(np.median(solved_bpt))
+        med_f_bpt = float(np.median(failed_bpt))
+        ax2.axvline(med_s_bpt, color=color_s, linestyle="--", linewidth=1.5,
+                    label=f"Solved median={med_s_bpt:.2f}M")
+        ax2.axvline(med_f_bpt, color=color_f, linestyle="--", linewidth=1.5,
+                    label=f"Failed median={med_f_bpt:.2f}M")
+        ratio = med_f_bpt / med_s_bpt if med_s_bpt > 0 else float("nan")
+        ax2.set_xscale("log")
+        ax2.set_xlabel("Compute per instance (M B-param·tokens, log scale)", fontsize=11)
+        ax2.set_ylabel("Instance count", fontsize=11)
+        ax2.set_title(f"Compute: Solved vs Failed  (failed uses {ratio:.1f}× median)",
+                      fontsize=11, fontweight="bold")
+        ax2.legend(fontsize=8.5, framealpha=0.9)
+        ax2.yaxis.grid(True, linestyle="--", alpha=0.4, zorder=0)
+        ax2.set_axisbelow(True)
+        ax2.spines["top"].set_visible(False)
+        ax2.spines["right"].set_visible(False)
+
+    fig.suptitle("Resource Waste: Compute Distribution for Successful vs. Failed Runs (c2+c3)",
+                 fontsize=12, fontweight="bold", y=1.01)
+    fig.tight_layout()
+    out = out_dir / f"fig_f_resource_waste.{fmt}"
+    fig.savefig(out, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved: {out}")
+
+
+# ---------------------------------------------------------------------------
+# Fig g — MCTS branching: search depth and solve timing
+# ---------------------------------------------------------------------------
+
+def fig_mcts_branching(data_dir: pathlib.Path, out_dir: pathlib.Path, fmt: str) -> None:
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    rows = _load_csv(data_dir / "mcts_branch_stats.csv")
+    if not rows:
+        print("fig_g: mcts_branch_stats.csv empty")
+        return
+
+    # -- Panel 1: histogram of tree_nodes, solved vs failed ----------------
+    solved_nodes = [int(r["tree_nodes"]) for r in rows if r["solved"] == "True"]
+    failed_nodes = [int(r["tree_nodes"]) for r in rows if r["solved"] == "False"]
+
+    # -- Panel 2: per-variant avg tree_nodes, solved vs failed -------------
+    var_data: dict[str, dict[str, list[int]]] = {}
+    for r in rows:
+        v  = r["run_id"].split("_")[0]
+        # Aggregate A/A_strict → A, C/C_strict → C etc.
+        v_key = v.split("_")[0]  # strip _strict suffix for display grouping
+        # Keep full variant name for separation
+        key = r["run_id"].split("_c")[0]   # e.g. A_strict, C, G
+        d   = var_data.setdefault(key, {"solved": [], "failed": []})
+        nodes = int(r["tree_nodes"])
+        if r["solved"] == "True":
+            d["solved"].append(nodes)
+        else:
+            d["failed"].append(nodes)
+
+    # Sort variants by avg solved nodes
+    var_keys = sorted(var_data.keys(),
+                      key=lambda k: (sum(var_data[k]["solved"]) / max(len(var_data[k]["solved"]), 1)))
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+
+    color_s = "#4472c4"
+    color_f = "#c00000"
+
+    # Left: overlapping histograms
+    node_bins = range(1, 25, 1)
+    ax1.hist(solved_nodes, bins=node_bins, color=color_s, alpha=0.65,
+             label=f"Solved (n={len(solved_nodes)})", zorder=3)
+    ax1.hist(failed_nodes, bins=node_bins, color=color_f, alpha=0.65,
+             label=f"Failed (n={len(failed_nodes)})", zorder=3)
+    med_s = float(np.median(solved_nodes)) if solved_nodes else 0
+    med_f = float(np.median(failed_nodes)) if failed_nodes else 0
+    ax1.axvline(med_s, color=color_s, linestyle="--", linewidth=1.8,
+                label=f"Solved median={med_s:.0f}")
+    ax1.axvline(med_f, color=color_f, linestyle="--", linewidth=1.8,
+                label=f"Failed median={med_f:.0f}")
+    ax1.set_xlabel("MCTS tree nodes explored", fontsize=11)
+    ax1.set_ylabel("Instance count", fontsize=11)
+    ax1.set_title("Search Effort: Solved vs Failed\n(nodes = total steps explored in tree)",
+                  fontsize=11, fontweight="bold")
+    ax1.legend(fontsize=9, framealpha=0.9)
+    ax1.yaxis.grid(True, linestyle="--", alpha=0.4, zorder=0)
+    ax1.set_axisbelow(True)
+    ax1.spines["top"].set_visible(False)
+    ax1.spines["right"].set_visible(False)
+
+    # Right: grouped bar per variant — avg nodes for solved vs failed
+    x = np.arange(len(var_keys))
+    width = 0.38
+    avg_s = [sum(var_data[k]["solved"]) / max(len(var_data[k]["solved"]), 1)
+             for k in var_keys]
+    avg_f = [sum(var_data[k]["failed"]) / max(len(var_data[k]["failed"]), 1)
+             for k in var_keys]
+    n_s   = [len(var_data[k]["solved"]) for k in var_keys]
+    n_f   = [len(var_data[k]["failed"]) for k in var_keys]
+
+    bars_s = ax2.bar(x - width / 2, avg_s, width * 0.92, color=color_s, alpha=0.8,
+                     label="Solved", zorder=3, edgecolor="white")
+    bars_f = ax2.bar(x + width / 2, avg_f, width * 0.92, color=color_f, alpha=0.8,
+                     label="Failed", zorder=3, edgecolor="white")
+
+    for bar, val, n in zip(bars_s, avg_s, n_s):
+        ax2.text(bar.get_x() + bar.get_width() / 2, val + 0.2,
+                 f"{val:.1f}\n(n={n})", ha="center", va="bottom", fontsize=7.5, color=color_s)
+    for bar, val, n in zip(bars_f, avg_f, n_f):
+        ax2.text(bar.get_x() + bar.get_width() / 2, val + 0.2,
+                 f"{val:.1f}\n(n={n})", ha="center", va="bottom", fontsize=7.5, color=color_f)
+
+    ax2.set_xticks(x)
+    ax2.set_xticklabels(var_keys, fontsize=9, rotation=20, ha="right")
+    ax2.set_ylabel("Avg tree nodes explored", fontsize=11)
+    ax2.set_title("Avg Search Effort by Variant\n(solved find answer early; failed exhaust budget)",
+                  fontsize=11, fontweight="bold")
+    ax2.legend(fontsize=9, framealpha=0.9)
+    ax2.yaxis.grid(True, linestyle="--", alpha=0.4, zorder=0)
+    ax2.set_axisbelow(True)
+    ax2.spines["top"].set_visible(False)
+    ax2.spines["right"].set_visible(False)
+
+    fig.suptitle("MCTS Search Behavior: Successful vs. Failed Instances",
+                 fontsize=12, fontweight="bold", y=1.01)
+    fig.tight_layout()
+    out = out_dir / f"fig_g_mcts_branching.{fmt}"
+    fig.savefig(out, dpi=200, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved: {out}")
 
@@ -482,36 +717,32 @@ def fig_set_heatmap(summaries: list[RunSummary], out_dir: pathlib.Path, fmt: str
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--output-dir", type=pathlib.Path, default=pathlib.Path("figures"))
-    parser.add_argument("--format", choices=["pdf", "png", "svg"], default="pdf")
-    parser.add_argument("--combined-root", type=pathlib.Path, default=COMBINED_RUNS)
-    parser.add_argument("--results-csv", type=pathlib.Path, default=None,
-                        help="Use an existing results.csv/final_results.csv instead of loading runs")
+    parser.add_argument("--data-dir",   type=pathlib.Path, default=pathlib.Path("Summary_Data"),
+                        help="Directory containing Summary_Data CSVs")
+    parser.add_argument("--audit-csv",  type=pathlib.Path,
+                        default=pathlib.Path("combined_results/reviewer_audits/audit_results.csv"))
+    parser.add_argument("--output-dir", type=pathlib.Path,
+                        default=pathlib.Path("combined_results/figures"))
+    parser.add_argument("--format",     choices=["pdf", "png", "svg"], default="png")
     args = parser.parse_args()
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
-
-    if args.results_csv:
-        print(f"Loading summaries from CSV: {args.results_csv}", file=sys.stderr)
-        summaries = _load_summaries_from_csv(args.results_csv)
-    else:
-        print("Loading runs…", file=sys.stderr)
-        all_runs = load_all_runs(args.combined_root)
-        summaries = [_aggregate(instances) for instances in all_runs.values()]
 
     try:
         import matplotlib
         matplotlib.use("Agg")
     except ImportError:
-        print("matplotlib not found — install it with: pip install matplotlib", file=sys.stderr)
+        print("matplotlib not found — pip install matplotlib", file=sys.stderr)
         sys.exit(1)
 
     print("Generating figures…")
-    fig_main_results(summaries,    args.output_dir, args.format)
-    fig_ablation(summaries,        args.output_dir, args.format)
-    fig_efficiency(summaries,      args.output_dir, args.format)
-    fig_token_breakdown(summaries, args.output_dir, args.format)
-    fig_set_heatmap(summaries,     args.output_dir, args.format)
+    fig_efficiency_frontier(args.data_dir, args.output_dir, args.format)
+    fig_reviewer_audit(args.audit_csv,     args.output_dir, args.format)
+    fig_ablation_features(args.data_dir,   args.output_dir, args.format)
+    fig_steps_to_solve(args.data_dir,      args.output_dir, args.format)
+    fig_instance_overlap(args.data_dir,    args.output_dir, args.format)
+    fig_resource_waste(args.data_dir,      args.output_dir, args.format)
+    fig_mcts_branching(args.data_dir,      args.output_dir, args.format)
     print(f"\nAll figures written to: {args.output_dir}/")
 
 

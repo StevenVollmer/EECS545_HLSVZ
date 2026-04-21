@@ -1,0 +1,965 @@
+{
+  "turns": [
+    {
+      "turn": 1,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "pytest -q tests/test_backlog_health.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "pytest -q tests/test_backlog_health.py"
+          },
+          "output": "\n==================================== ERRORS ====================================\n________________ ERROR collecting tests/test_backlog_health.py _________________\nImportError while importing test module '/repo/tests/test_backlog_health.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n/usr/local/lib/python3.11/importlib/__init__.py:126: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_backlog_health.py:1: in <module>\n    from app.models.task import Task\nE   ModuleNotFoundError: No module named 'app'\n=========================== short test summary info ============================\nERROR tests/test_backlog_health.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.24s",
+          "is_error": true,
+          "exit_code": 2
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 2,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "ls -R"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "ls -R"
+          },
+          "output": ".:\napp  tests\n\n./app:\n__init__.py  __pycache__  models  presenters  services\tutils\n\n./app/__pycache__:\n__init__.cpython-312.pyc\n\n./app/models:\n__init__.py  __pycache__  task.py\n\n./app/models/__pycache__:\n__init__.cpython-312.pyc  task.cpython-312.pyc\n\n./app/presenters:\n__init__.py  __pycache__  health_presenter.py\n\n./app/presenters/__pycache__:\n__init__.cpython-312.pyc  health_presenter.cpython-312.pyc\n\n./app/services:\n__init__.py  __pycache__  backlog_service.py\n\n./app/services/__pycache__:\n__init__.cpython-312.pyc  backlog_service.cpython-312.pyc\n\n./app/utils:\n__init__.py  __pycache__  labels.py\n\n./app/utils/__pycache__:\n__init__.cpython-312.pyc  labels.cpython-312.pyc\n\n./tests:\n__pycache__  test_backlog_health.py\n\n./tests/__pycache__:\ntest_backlog_health.cpython-312.pyc",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 3,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python - <<'PY'\nimport sys, os\nprint('cwd', os.getcwd())\nprint('sys.path', sys.path[:5])\nimport app\nprint('imported', app)\nPY"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python - <<'PY'\nimport sys, os\nprint('cwd', os.getcwd())\nprint('sys.path', sys.path[:5])\nimport app\nprint('imported', app)\nPY"
+          },
+          "output": "cwd /repo\nsys.path ['', '/usr/local/lib/python311.zip', '/usr/local/lib/python3.11', '/usr/local/lib/python3.11/lib-dynload', '/usr/local/lib/python3.11/site-packages']\nimported <module 'app' from '/repo/app/__init__.py'>",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 4,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "tests/test_backlog_health.py",
+            "start_line": 1,
+            "end_line": 200
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "tests/test_backlog_health.py",
+            "start_line": 1,
+            "end_line": 200
+          },
+          "output": "Here's the result of running `cat -n` on /repo/tests/test_backlog_health.py:\n     1\tfrom app.models.task import Task\n     2\tfrom app.presenters.health_presenter import render_health\n     3\tfrom app.services.backlog_service import blocked_task_count\n     4\t\n     5\t\n     6\tdef test_blocked_task_count_excludes_archived_tasks() -> None:\n     7\t    tasks = [\n     8\t        Task(\"Ops cleanup\", blocked=True, archived=False),\n     9\t        Task(\"Retired epic\", blocked=True, archived=True),\n    10\t    ]\n    11\t    assert blocked_task_count(tasks) == 1\n    12\t\n    13\t\n    14\tdef test_presenter_uses_service_output() -> None:\n    15\t    assert render_health([Task(\"Ops cleanup\", blocked=True, archived=False)]) == \"active blockers: 1 task\"\n    16\t\n    17\t\n    18\tdef test_non_matching_rows_do_not_count() -> None:\n    19\t    assert blocked_task_count([Task(\"Docs\", blocked=False, archived=False)]) == 0",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 5,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "conftest.py",
+            "old_str": "",
+            "new_str": "import sys, os\nsys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))\n"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "conftest.py",
+            "old_str": "",
+            "new_str": "import sys, os\nsys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))\n"
+          },
+          "output": "FileNotFoundError: [Errno 2] No such file or directory: '/repo/conftest.py'",
+          "is_error": true,
+          "exit_code": null
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 6,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: conftest.py\n+import sys\n+import os\n+\n+# Ensure the repository root is on the Python path when pytest runs.\n+repo_root = os.path.abspath(os.path.dirname(__file__))\n+if repo_root not in sys.path:\n+    sys.path.insert(0, repo_root)\n+\n*** End Patch\nPATCH"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: conftest.py\n+import sys\n+import os\n+\n+# Ensure the repository root is on the Python path when pytest runs.\n+repo_root = os.path.abspath(os.path.dirname(__file__))\n+if repo_root not in sys.path:\n+    sys.path.insert(0, repo_root)\n+\n*** End Patch\nPATCH"
+          },
+          "output": "bash: apply_patch: command not found",
+          "is_error": true,
+          "exit_code": 127
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 7,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/services/backlog_service.py",
+            "start_line": 1,
+            "end_line": 200
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/services/backlog_service.py",
+            "start_line": 1,
+            "end_line": 200
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/services/backlog_service.py:\n     1\tfrom app.models.task import Task\n     2\t\n     3\t\n     4\tdef blocked_task_count(tasks: list[Task]) -> int:\n     5\t    return len([task for task in tasks if task.blocked])",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 8,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/presenters/health_presenter.py",
+            "start_line": 1,
+            "end_line": 200
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/presenters/health_presenter.py",
+            "start_line": 1,
+            "end_line": 200
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/presenters/health_presenter.py:\n     1\tfrom app.models.task import Task\n     2\tfrom app.services.backlog_service import blocked_task_count\n     3\tfrom app.utils.labels import render_count_label\n     4\t\n     5\t\n     6\tdef render_health(tasks: list[Task]) -> str:\n     7\t    return render_count_label(\"active blockers\", blocked_task_count(tasks), \"task\")",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 9,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/models/task.py",
+            "start_line": 1,
+            "end_line": 200
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/models/task.py",
+            "start_line": 1,
+            "end_line": 200
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/models/task.py:\n     1\tfrom dataclasses import dataclass\n     2\t\n     3\t\n     4\t@dataclass\n     5\tclass Task:\n     6\t    title: str\n     7\t    blocked: bool = True\n     8\t    archived: bool = False",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 10,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/services/backlog_service.py",
+            "old_str": "def blocked_task_count(tasks: list[Task]) -> int:\n    return len([task for task in tasks if task.blocked])",
+            "new_str": "def blocked_task_count(tasks: list[Task]) -> int:\n    # Count only tasks that are blocked and not archived\n    return len([task for task in tasks if task.blocked and not task.archived])"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/services/backlog_service.py",
+            "old_str": "def blocked_task_count(tasks: list[Task]) -> int:\n    return len([task for task in tasks if task.blocked])",
+            "new_str": "def blocked_task_count(tasks: list[Task]) -> int:\n    # Count only tasks that are blocked and not archived\n    return len([task for task in tasks if task.blocked and not task.archived])"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/services/backlog_service.py:\n     1\tfrom app.models.task import Task\n     2\t\n     3\t\n     4\tdef blocked_task_count(tasks: list[Task]) -> int:\n     5\t    # Count only tasks that are blocked and not archived\n     6\t    return len([task for task in tasks if task.blocked and not task.archived])",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 11,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "pytest -q"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "pytest -q"
+          },
+          "output": "\n==================================== ERRORS ====================================\n________________ ERROR collecting tests/test_backlog_health.py _________________\nImportError while importing test module '/repo/tests/test_backlog_health.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n/usr/local/lib/python3.11/importlib/__init__.py:126: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_backlog_health.py:1: in <module>\n    from app.models.task import Task\nE   ModuleNotFoundError: No module named 'app'\n=========================== short test summary info ============================\nERROR tests/test_backlog_health.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.27s",
+          "is_error": true,
+          "exit_code": 2
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 12,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: conftest.py\n+import sys\n+import os\n+\n+repo_root = os.path.abspath(os.path.dirname(__file__))\n+if repo_root not in sys.path:\n+    sys.path.insert(0, repo_root)\n+\n*** End Patch\nPATCH"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: conftest.py\n+import sys\n+import os\n+\n+repo_root = os.path.abspath(os.path.dirname(__file__))\n+if repo_root not in sys.path:\n+    sys.path.insert(0, repo_root)\n+\n*** End Patch\nPATCH"
+          },
+          "output": "bash: apply_patch: command not found",
+          "is_error": true,
+          "exit_code": 127
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 13,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: conftest.py\n+import sys\n+import os\n+\n+repo_root = os.path.abspath(os.path.dirname(__file__))\n+if repo_root not in sys.path:\n+    sys.path.insert(0, repo_root)\n+\n*** End Patch\nPATCH"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: conftest.py\n+import sys\n+import os\n+\n+repo_root = os.path.abspath(os.path.dirname(__file__))\n+if repo_root not in sys.path:\n+    sys.path.insert(0, repo_root)\n+\n*** End Patch\nPATCH"
+          },
+          "output": "bash: apply_patch: command not found",
+          "is_error": true,
+          "exit_code": 127
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 14,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "printf '%s\n' 'import sys' 'import os' '' 'repo_root = os.path.abspath(os.path.dirname(__file__))' 'if repo_root not in sys.path:' '    sys.path.insert(0, repo_root)' > conftest.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "printf '%s\n' 'import sys' 'import os' '' 'repo_root = os.path.abspath(os.path.dirname(__file__))' 'if repo_root not in sys.path:' '    sys.path.insert(0, repo_root)' > conftest.py"
+          },
+          "output": "(no output)",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 15,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "pytest -q"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "pytest -q"
+          },
+          "output": "\n==================================== ERRORS ====================================\n________________ ERROR collecting tests/test_backlog_health.py _________________\nImportError while importing test module '/repo/tests/test_backlog_health.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n/usr/local/lib/python3.11/importlib/__init__.py:126: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_backlog_health.py:1: in <module>\n    from app.models.task import Task\nE   ModuleNotFoundError: No module named 'app'\n=========================== short test summary info ============================\nERROR tests/test_backlog_health.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.30s",
+          "is_error": true,
+          "exit_code": 2
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 16,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/__init__.py",
+            "start_line": 1,
+            "end_line": 200
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/__init__.py",
+            "start_line": 1,
+            "end_line": 200
+          },
+          "output": "IndexError: list index out of range",
+          "is_error": true,
+          "exit_code": null
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 17,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "ls -a"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "ls -a"
+          },
+          "output": ".  ..  .git  .pytest_cache  app  tests",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 18,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/__init__.py",
+            "start_line": 1,
+            "end_line": 200
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/__init__.py",
+            "start_line": 1,
+            "end_line": 200
+          },
+          "output": "IndexError: list index out of range",
+          "is_error": true,
+          "exit_code": null
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    }
+  ],
+  "stats": {
+    "input_tokens": 56664,
+    "output_tokens": 3278,
+    "turns": 18,
+    "tool_calls": 19,
+    "iterations": 18,
+    "tree_nodes_created": 19,
+    "best_node_depth": 18,
+    "best_node_value": 4.623610100344326,
+    "value_fn_tokens_in": 0,
+    "value_fn_tokens_out": 0
+  },
+  "loop_state": {
+    "executable_edit_made": true,
+    "validation_passed": false,
+    "validation_attempted_after_edit": true,
+    "diff_checked": false,
+    "successful_post_edit_commands": [
+      "ls -a",
+      "printf '%s\n' 'import sys' 'import os' '' 'repo_root = os.path.abspath(os.path.dirname(__file__))' 'if repo_root not in sys.path:' '    sys.path.insert(0, repo_root)' > conftest.py"
+    ],
+    "satisfied_success_checks": [
+      "backlog_health_passes"
+    ],
+    "changed_files": [
+      "app/services/backlog_service.py"
+    ]
+  },
+  "stopped_reason": "max_iterations",
+  "submitted": false,
+  "submission_summary": "",
+  "patch": "diff --git a/app/services/backlog_service.py b/app/services/backlog_service.py\nindex b115bca..6786273 100644\n--- a/app/services/backlog_service.py\n+++ b/app/services/backlog_service.py\n@@ -2,4 +2,5 @@ from app.models.task import Task\n \n \n def blocked_task_count(tasks: list[Task]) -> int:\n-    return len([task for task in tasks if task.blocked])\n+    # Count only tasks that are blocked and not archived\n+    return len([task for task in tasks if task.blocked and not task.archived])\n",
+  "info": {
+    "submission": "",
+    "submitted": false,
+    "submission_summary": "",
+    "stopped_reason": "max_iterations"
+  },
+  "auto_finalized": false,
+  "mcts_meta": {
+    "model": "openai/openai/gpt-oss-120b",
+    "value_model": null,
+    "hindsight_feedback": false,
+    "dead_branch_feedback_count": 0,
+    "iterations": 18,
+    "expansion_candidates": 1,
+    "edit_vote_samples": 1,
+    "ucb_c": 1.414,
+    "root_visits": 18,
+    "early_branching": false,
+    "early_branch_depth": 2
+  },
+  "vote_summary": [
+    {
+      "depth": 5,
+      "action": "str_replace",
+      "winner_votes": 1,
+      "total_samples": 1,
+      "unique_candidates": 1
+    },
+    {
+      "depth": 10,
+      "action": "str_replace",
+      "winner_votes": 1,
+      "total_samples": 1,
+      "unique_candidates": 1
+    }
+  ],
+  "mcts_tree": {
+    "nodes": [
+      {
+        "id": "0",
+        "parent_id": null,
+        "depth": 0,
+        "action_name": null,
+        "action_args_preview": "",
+        "visits": 18,
+        "mean_value": 5.25,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0",
+        "parent_id": "0",
+        "depth": 1,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"pytest -q tests/test_backlog_health.py\"}",
+        "visits": 18,
+        "mean_value": 5.25,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0",
+        "parent_id": "0.0",
+        "depth": 2,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"ls -R\"}",
+        "visits": 17,
+        "mean_value": 5.56,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0",
+        "parent_id": "0.0.0",
+        "depth": 3,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python - <<'PY'\\nimport sys, os\\nprint('cwd', os.getcwd())\\nprint('",
+        "visits": 16,
+        "mean_value": 5.91,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0",
+        "parent_id": "0.0.0.0",
+        "depth": 4,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"tests/test_backlog_health.py\", \"start_line\": 1, \"end_line\": 200}",
+        "visits": 15,
+        "mean_value": 6.3,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0",
+        "depth": 5,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"conftest.py\", \"old_str\": \"\", \"new_str\": \"import sys, os\\nsys.path.inse",
+        "visits": 14,
+        "mean_value": 6.75,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"import sys, os\\nsys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))\\n\", \"old_str\": \"\", \"path\": \"conftest.py\"}, \"name\": \"str_replace\"}": 1
+        },
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0",
+        "depth": 6,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"apply_patch <<'PATCH'\\n*** Begin Patch\\n*** Add File: conftest.py\\n",
+        "visits": 13,
+        "mean_value": 7.27,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0",
+        "depth": 7,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"app/services/backlog_service.py\", \"start_line\": 1, \"end_line\": 200}",
+        "visits": 12,
+        "mean_value": 7.88,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0",
+        "depth": 8,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"app/presenters/health_presenter.py\", \"start_line\": 1, \"end_line\": 200}",
+        "visits": 11,
+        "mean_value": 8.6,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0",
+        "depth": 9,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"app/models/task.py\", \"start_line\": 1, \"end_line\": 200}",
+        "visits": 10,
+        "mean_value": 9.45,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0",
+        "depth": 10,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"app/services/backlog_service.py\", \"old_str\": \"def blocked_task_count(t",
+        "visits": 9,
+        "mean_value": 10.51,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 1,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"def blocked_task_count(tasks: list[Task]) -> int:\\n    # Count only tasks that are blocked and not archived\\n    return len([task for task in tasks if task.blocked and not task.archived])\", \"old_str\": \"def blocked_task_count(tasks: list[Task]) -> int:\\n    return len([task for task in tasks if task.blocked])\", \"path\": \"app/services/backlog_service.py\"}, \"name\": \"str_replace\"}": 1
+        },
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0.0",
+        "depth": 11,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"pytest -q\"}",
+        "visits": 8,
+        "mean_value": 9.7,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 2,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0.0.0",
+        "depth": 12,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"apply_patch <<'PATCH'\\n*** Begin Patch\\n*** Add File: conftest.py\\n",
+        "visits": 7,
+        "mean_value": 8.84,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 3,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "depth": 13,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"apply_patch <<'PATCH'\\n*** Begin Patch\\n*** Add File: conftest.py\\n",
+        "visits": 6,
+        "mean_value": 8.11,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 4,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "depth": 14,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"printf '%s\\n' 'import sys' 'import os' '' 'repo_root = os.path.absp",
+        "visits": 5,
+        "mean_value": 7.58,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 5,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "depth": 15,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"pytest -q\"}",
+        "visits": 4,
+        "mean_value": 6.7,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 6,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "depth": 16,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"app/__init__.py\", \"start_line\": 1, \"end_line\": 200}",
+        "visits": 3,
+        "mean_value": 5.98,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 7,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "depth": 17,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"ls -a\"}",
+        "visits": 2,
+        "mean_value": 5.59,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 8,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "depth": 18,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"app/__init__.py\", \"start_line\": 1, \"end_line\": 200}",
+        "visits": 1,
+        "mean_value": 4.62,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 9,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      }
+    ],
+    "result_node_id": "0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0"
+  },
+  "agent_architecture": "single",
+  "architecture": "single",
+  "role_model_stats": {
+    "coder": {
+      "model": "openai/openai/gpt-oss-120b",
+      "input_tokens": 56664,
+      "output_tokens": 3278,
+      "turns": 18,
+      "tool_calls": 19,
+      "iterations": 18,
+      "tree_nodes_created": 19,
+      "best_node_depth": 18,
+      "best_node_value": 4.623610100344326,
+      "value_fn_tokens_in": 0,
+      "value_fn_tokens_out": 0
+    }
+  },
+  "planner_handoff": {},
+  "review_feedback": {},
+  "coder_rounds": [],
+  "instance_id": "backlog_health_medium_c3_001",
+  "duration_seconds": 149.08
+}

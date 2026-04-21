@@ -1,0 +1,829 @@
+{
+  "turns": [
+    {
+      "turn": 1,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "sed -n '1,200p' tests/test_transfer_digest.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "sed -n '1,200p' tests/test_transfer_digest.py"
+          },
+          "output": "from app.main import export_owner_code, transfer_digest_preview\nfrom app.utils.rates import format_transfer_rate\n\n\ndef test_export_owner_code_uppercase() -> None:\n    assert export_owner_code('ops-team') == 'owner=OPS-TEAM'\n\n\ndef test_format_transfer_rate_regular_precision() -> None:\n    assert format_transfer_rate(0.125) == '12.5%'\n\n\ndef test_transfer_digest_preview_regular_rate() -> None:\n    assert transfer_digest_preview(\"o'neil-ward\", 0.032) == \"Transfer for O'neil-Ward at 3.2%\"",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 2,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/main.py",
+            "start_line": 1,
+            "end_line": 200
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/main.py",
+            "start_line": 1,
+            "end_line": 200
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/main.py:\n     1\tfrom app.utils.rates import format_transfer_rate\n     2\t\n     3\t\n     4\tdef transfer_digest_preview(owner: str, rate: float) -> str:\n     5\t    titled = owner[:1].upper() + owner[1:]\n     6\t    return f\"Transfer for {titled} at {format_transfer_rate(rate)}\"\n     7\t\n     8\t\n     9\tdef export_owner_code(owner: str) -> str:\n    10\t    return f\"owner={owner.upper()}\"",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 3,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/utils/rates.py",
+            "start_line": 1,
+            "end_line": 200
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/utils/rates.py",
+            "start_line": 1,
+            "end_line": 200
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/utils/rates.py:\n     1\tdef format_transfer_rate(rate: float) -> str:\n     2\t    if 0 < rate < 0.01:\n     3\t        return '0.0%'\n     4\t    return f\"{rate * 100:.1f}%\"",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 4,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/utils/rates.py",
+            "old_str": "    if 0 < rate < 0.01:\n        return '0.0%'",
+            "new_str": "    # Removed special case that forced low rates to 0.0%\n    # Now always format with one decimal place\n"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/utils/rates.py",
+            "old_str": "    if 0 < rate < 0.01:\n        return '0.0%'",
+            "new_str": "    # Removed special case that forced low rates to 0.0%\n    # Now always format with one decimal place\n"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/utils/rates.py:\n     1\tdef format_transfer_rate(rate: float) -> str:\n     2\t    # Removed special case that forced low rates to 0.0%\n     3\t    # Now always format with one decimal place\n     4\t\n     5\t    return f\"{rate * 100:.1f}%\"",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 5,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "pytest -q"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "pytest -q"
+          },
+          "output": "\n==================================== ERRORS ====================================\n________________ ERROR collecting tests/test_transfer_digest.py ________________\nImportError while importing test module '/repo/tests/test_transfer_digest.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n/usr/local/lib/python3.11/importlib/__init__.py:126: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntests/test_transfer_digest.py:1: in <module>\n    from app.main import export_owner_code, transfer_digest_preview\nE   ModuleNotFoundError: No module named 'app'\n=========================== short test summary info ============================\nERROR tests/test_transfer_digest.py\n!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.25s",
+          "is_error": true,
+          "exit_code": 2
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 6,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "PYTHONPATH=. pytest -q"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "PYTHONPATH=. pytest -q"
+          },
+          "output": "..F                                                                      [100%]\n=================================== FAILURES ===================================\n__________________ test_transfer_digest_preview_regular_rate ___________________\n\n    def test_transfer_digest_preview_regular_rate() -> None:\n>       assert transfer_digest_preview(\"o'neil-ward\", 0.032) == \"Transfer for O'neil-Ward at 3.2%\"\nE       AssertionError: assert 'Transfer for...-ward at 3.2%' == 'Transfer for...-Ward at 3.2%'\nE         \nE         - Transfer for O'neil-Ward at 3.2%\nE         ?                     ^\nE         + Transfer for O'neil-ward at 3.2%\nE         ?                     ^\n\ntests/test_transfer_digest.py:14: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_transfer_digest.py::test_transfer_digest_preview_regular_rate - AssertionError: assert 'Transfer for...-ward at 3.2%' == 'Transfer for...-W...\n1 failed, 2 passed in 0.11s",
+          "is_error": true,
+          "exit_code": 1
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 7,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/main.py",
+            "old_str": "def transfer_digest_preview(owner: str, rate: float) -> str:\n    titled = owner[:1].upper() + owner[1:]\n    return f\"Transfer for {titled} at {format_transfer_rate(rate)}\"",
+            "new_str": "def transfer_digest_preview(owner: str, rate: float) -> str:\n    # Capitalize first character of each hyphen-separated segment, preserving case elsewhere\n    segments = owner.split('-')\n    titled_segments = [seg[:1].upper() + seg[1:] if seg else '' for seg in segments]\n    titled = '-'.join(titled_segments)\n    return f\"Transfer for {titled} at {format_transfer_rate(rate)}\""
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/main.py",
+            "old_str": "def transfer_digest_preview(owner: str, rate: float) -> str:\n    titled = owner[:1].upper() + owner[1:]\n    return f\"Transfer for {titled} at {format_transfer_rate(rate)}\"",
+            "new_str": "def transfer_digest_preview(owner: str, rate: float) -> str:\n    # Capitalize first character of each hyphen-separated segment, preserving case elsewhere\n    segments = owner.split('-')\n    titled_segments = [seg[:1].upper() + seg[1:] if seg else '' for seg in segments]\n    titled = '-'.join(titled_segments)\n    return f\"Transfer for {titled} at {format_transfer_rate(rate)}\""
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/main.py:\n     1\tfrom app.utils.rates import format_transfer_rate\n     2\t\n     3\t\n     4\tdef transfer_digest_preview(owner: str, rate: float) -> str:\n     5\t    # Capitalize first character of each hyphen-separated segment, preserving case elsewhere\n     6\t    segments = owner.split('-')\n     7\t    titled_segments = [seg[:1].upper() + seg[1:] if seg else '' for seg in segments]\n     8\t    titled = '-'.join(titled_segments)\n     9\t    return f\"Transfer for {titled} at {format_transfer_rate(rate)}\"\n    10\t\n    11\t\n    12\tdef export_owner_code(owner: str) -> str:\n    13\t    return f\"owner={owner.upper()}\"",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 8,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "PYTHONPATH=. pytest -q"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "PYTHONPATH=. pytest -q"
+          },
+          "output": "...                                                                      [100%]\n3 passed in 0.02s",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 9,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python scripts/demo_transfer.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python scripts/demo_transfer.py"
+          },
+          "output": "Transfer for O'neil-Ward at 0.8%",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 10,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/utils/rates.py",
+            "start_line": 1,
+            "end_line": 200
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/utils/rates.py",
+            "start_line": 1,
+            "end_line": 200
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/utils/rates.py:\n     1\tdef format_transfer_rate(rate: float) -> str:\n     2\t    # Removed special case that forced low rates to 0.0%\n     3\t    # Now always format with one decimal place\n     4\t\n     5\t    return f\"{rate * 100:.1f}%\"",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 11,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "submit",
+          "arguments": {
+            "summary": "Fixed transfer rate formatting to avoid rounding low rates to zero and corrected owner name capitalization for hyphenated segments."
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "submit",
+          "arguments": {
+            "summary": "Fixed transfer rate formatting to avoid rounding low rates to zero and corrected owner name capitalization for hyphenated segments."
+          },
+          "output": "Do not submit yet. Inspect `git diff` first.",
+          "is_error": true,
+          "exit_code": null
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 12,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "git diff"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "git diff"
+          },
+          "output": "diff --git a/app/main.py b/app/main.py\nindex 63dc3e6..02ccc8b 100644\n--- a/app/main.py\n+++ b/app/main.py\n@@ -2,7 +2,10 @@ from app.utils.rates import format_transfer_rate\n \n \n def transfer_digest_preview(owner: str, rate: float) -> str:\n-    titled = owner[:1].upper() + owner[1:]\n+    # Capitalize first character of each hyphen-separated segment, preserving case elsewhere\n+    segments = owner.split('-')\n+    titled_segments = [seg[:1].upper() + seg[1:] if seg else '' for seg in segments]\n+    titled = '-'.join(titled_segments)\n     return f\"Transfer for {titled} at {format_transfer_rate(rate)}\"\n \n \ndiff --git a/app/utils/rates.py b/app/utils/rates.py\nindex b858c7d..e2e2da2 100644\n--- a/app/utils/rates.py\n+++ b/app/utils/rates.py\n@@ -1,4 +1,5 @@\n def format_transfer_rate(rate: float) -> str:\n-    if 0 < rate < 0.01:\n-        return '0.0%'\n+    # Removed special case that forced low rates to 0.0%\n+    # Now always format with one decimal place\n+\n     return f\"{rate * 100:.1f}%\"",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 13,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/main.py",
+            "start_line": 200,
+            "end_line": 400
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/main.py",
+            "start_line": 200,
+            "end_line": 400
+          },
+          "output": "IndexError: list index out of range",
+          "is_error": true,
+          "exit_code": null
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 14,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/main.py",
+            "start_line": 1,
+            "end_line": 200
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/main.py",
+            "start_line": 1,
+            "end_line": 200
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/main.py:\n     1\tfrom app.utils.rates import format_transfer_rate\n     2\t\n     3\t\n     4\tdef transfer_digest_preview(owner: str, rate: float) -> str:\n     5\t    # Capitalize first character of each hyphen-separated segment, preserving case elsewhere\n     6\t    segments = owner.split('-')\n     7\t    titled_segments = [seg[:1].upper() + seg[1:] if seg else '' for seg in segments]\n     8\t    titled = '-'.join(titled_segments)\n     9\t    return f\"Transfer for {titled} at {format_transfer_rate(rate)}\"\n    10\t\n    11\t\n    12\tdef export_owner_code(owner: str) -> str:\n    13\t    return f\"owner={owner.upper()}\"",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 15,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "submit",
+          "arguments": {
+            "summary": "Fixed low rate rounding by always formatting with one decimal place and improved owner name capitalization for hyphenated segments while preserving uppercase export."
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "submit",
+          "arguments": {
+            "summary": "Fixed low rate rounding by always formatting with one decimal place and improved owner name capitalization for hyphenated segments while preserving uppercase export."
+          },
+          "output": "Submission recorded. Summary: Fixed low rate rounding by always formatting with one decimal place and improved owner name capitalization for hyphenated segments while preserving uppercase export.",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    }
+  ],
+  "stats": {
+    "input_tokens": 46332,
+    "output_tokens": 2683,
+    "turns": 15,
+    "tool_calls": 17,
+    "iterations": 18,
+    "tree_nodes_created": 16,
+    "best_node_depth": 15,
+    "best_node_value": 27.22980113288193,
+    "value_fn_tokens_in": 0,
+    "value_fn_tokens_out": 0
+  },
+  "loop_state": {
+    "executable_edit_made": true,
+    "validation_passed": true,
+    "validation_attempted_after_edit": true,
+    "diff_checked": true,
+    "successful_post_edit_commands": [
+      "PYTHONPATH=. pytest -q",
+      "git diff",
+      "python scripts/demo_transfer.py"
+    ],
+    "satisfied_success_checks": [
+      "manual_repro_is_fixed",
+      "tests_still_pass_after_fix"
+    ],
+    "changed_files": [
+      "app/main.py",
+      "app/utils/rates.py"
+    ]
+  },
+  "stopped_reason": "submitted",
+  "submitted": true,
+  "submission_summary": "Fixed low rate rounding by always formatting with one decimal place and improved owner name capitalization for hyphenated segments while preserving uppercase export.",
+  "patch": "diff --git a/app/main.py b/app/main.py\nindex 63dc3e6..02ccc8b 100644\n--- a/app/main.py\n+++ b/app/main.py\n@@ -2,7 +2,10 @@ from app.utils.rates import format_transfer_rate\n \n \n def transfer_digest_preview(owner: str, rate: float) -> str:\n-    titled = owner[:1].upper() + owner[1:]\n+    # Capitalize first character of each hyphen-separated segment, preserving case elsewhere\n+    segments = owner.split('-')\n+    titled_segments = [seg[:1].upper() + seg[1:] if seg else '' for seg in segments]\n+    titled = '-'.join(titled_segments)\n     return f\"Transfer for {titled} at {format_transfer_rate(rate)}\"\n \n \ndiff --git a/app/utils/rates.py b/app/utils/rates.py\nindex b858c7d..e2e2da2 100644\n--- a/app/utils/rates.py\n+++ b/app/utils/rates.py\n@@ -1,4 +1,5 @@\n def format_transfer_rate(rate: float) -> str:\n-    if 0 < rate < 0.01:\n-        return '0.0%'\n+    # Removed special case that forced low rates to 0.0%\n+    # Now always format with one decimal place\n+\n     return f\"{rate * 100:.1f}%\"\n",
+  "info": {
+    "submission": "diff --git a/app/main.py b/app/main.py\nindex 63dc3e6..02ccc8b 100644\n--- a/app/main.py\n+++ b/app/main.py\n@@ -2,7 +2,10 @@ from app.utils.rates import format_transfer_rate\n \n \n def transfer_digest_preview(owner: str, rate: float) -> str:\n-    titled = owner[:1].upper() + owner[1:]\n+    # Capitalize first character of each hyphen-separated segment, preserving case elsewhere\n+    segments = owner.split('-')\n+    titled_segments = [seg[:1].upper() + seg[1:] if seg else '' for seg in segments]\n+    titled = '-'.join(titled_segments)\n     return f\"Transfer for {titled} at {format_transfer_rate(rate)}\"\n \n \ndiff --git a/app/utils/rates.py b/app/utils/rates.py\nindex b858c7d..e2e2da2 100644\n--- a/app/utils/rates.py\n+++ b/app/utils/rates.py\n@@ -1,4 +1,5 @@\n def format_transfer_rate(rate: float) -> str:\n-    if 0 < rate < 0.01:\n-        return '0.0%'\n+    # Removed special case that forced low rates to 0.0%\n+    # Now always format with one decimal place\n+\n     return f\"{rate * 100:.1f}%\"\n",
+    "submitted": true,
+    "submission_summary": "Fixed low rate rounding by always formatting with one decimal place and improved owner name capitalization for hyphenated segments while preserving uppercase export.",
+    "stopped_reason": "submitted"
+  },
+  "auto_finalized": false,
+  "mcts_meta": {
+    "model": "openai/openai/gpt-oss-120b",
+    "value_model": null,
+    "hindsight_feedback": false,
+    "dead_branch_feedback_count": 0,
+    "iterations": 18,
+    "expansion_candidates": 1,
+    "edit_vote_samples": 1,
+    "ucb_c": 1.414,
+    "root_visits": 15,
+    "early_branching": false,
+    "early_branch_depth": 2
+  },
+  "vote_summary": [
+    {
+      "depth": 4,
+      "action": "str_replace",
+      "winner_votes": 1,
+      "total_samples": 1,
+      "unique_candidates": 1
+    },
+    {
+      "depth": 7,
+      "action": "str_replace",
+      "winner_votes": 1,
+      "total_samples": 1,
+      "unique_candidates": 1
+    }
+  ],
+  "mcts_tree": {
+    "nodes": [
+      {
+        "id": "0",
+        "parent_id": null,
+        "depth": 0,
+        "action_name": null,
+        "action_args_preview": "",
+        "visits": 15,
+        "mean_value": 12.88,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0",
+        "parent_id": "0",
+        "depth": 1,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"sed -n '1,200p' tests/test_transfer_digest.py\"}",
+        "visits": 15,
+        "mean_value": 12.88,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0",
+        "parent_id": "0.0",
+        "depth": 2,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"app/main.py\", \"start_line\": 1, \"end_line\": 200}",
+        "visits": 14,
+        "mean_value": 13.8,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0",
+        "parent_id": "0.0.0",
+        "depth": 3,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"app/utils/rates.py\", \"start_line\": 1, \"end_line\": 200}",
+        "visits": 13,
+        "mean_value": 14.86,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0",
+        "parent_id": "0.0.0.0",
+        "depth": 4,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"app/utils/rates.py\", \"old_str\": \"    if 0 < rate < 0.01:\\n        retu",
+        "visits": 12,
+        "mean_value": 16.1,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 1,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"    # Removed special case that forced low rates to 0.0%\\n    # Now always format with one decimal place\\n\", \"old_str\": \"    if 0 < rate < 0.01:\\n        return '0.0%'\", \"path\": \"app/utils/rates.py\"}, \"name\": \"str_replace\"}": 1
+        },
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0",
+        "depth": 5,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"pytest -q\"}",
+        "visits": 11,
+        "mean_value": 16.51,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 2,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0",
+        "depth": 6,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"PYTHONPATH=. pytest -q\"}",
+        "visits": 10,
+        "mean_value": 17.13,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 3,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0",
+        "depth": 7,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"app/main.py\", \"old_str\": \"def transfer_digest_preview(owner: str, rate",
+        "visits": 9,
+        "mean_value": 18.21,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 2,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 4,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"def transfer_digest_preview(owner: str, rate: float) -> str:\\n    # Capitalize first character of each hyphen-separated segment, preserving case elsewhere\\n    segments = owner.split('-')\\n    titled_segments = [seg[:1].upper() + seg[1:] if seg else '' for seg in segments]\\n    titled = '-'.join(titled_segments)\\n    return f\\\"Transfer for {titled} at {format_transfer_rate(rate)}\\\"\", \"old_str\": \"def transfer_digest_preview(owner: str, rate: float) -> str:\\n    titled = owner[:1].upper() + owner[1:]\\n    return f\\\"Transfer for {titled} at {format_transfer_rate(rate)}\\\"\", \"path\": \"app/main.py\"}, \"name\": \"str_replace\"}": 1
+        },
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0",
+        "depth": 8,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"PYTHONPATH=. pytest -q\"}",
+        "visits": 8,
+        "mean_value": 18.56,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 2,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 5,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0",
+        "depth": 9,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python scripts/demo_transfer.py\"}",
+        "visits": 7,
+        "mean_value": 17.97,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 2,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 6,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0",
+        "depth": 10,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"app/utils/rates.py\", \"start_line\": 1, \"end_line\": 200}",
+        "visits": 6,
+        "mean_value": 17.54,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 2,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 7,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0.0",
+        "depth": 11,
+        "action_name": "submit",
+        "action_args_preview": "{\"summary\": \"Fixed transfer rate formatting to avoid rounding low rates to zero ",
+        "visits": 5,
+        "mean_value": 17.36,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 2,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 8,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0.0.0",
+        "depth": 12,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"git diff\"}",
+        "visits": 4,
+        "mean_value": 17.77,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 2,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 9,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "depth": 13,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"app/main.py\", \"start_line\": 200, \"end_line\": 400}",
+        "visits": 3,
+        "mean_value": 18.14,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 2,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 10,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "depth": 14,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"app/main.py\", \"start_line\": 1, \"end_line\": 200}",
+        "visits": 2,
+        "mean_value": 20.14,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 2,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 11,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0.0.0.0.0.0",
+        "depth": 15,
+        "action_name": "submit",
+        "action_args_preview": "{\"summary\": \"Fixed low rate rounding by always formatting with one decimal place",
+        "visits": 1,
+        "mean_value": 27.23,
+        "llm_value": null,
+        "submitted": true,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 2,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 12,
+        "has_nonempty_patch": true,
+        "stopped_reason": "submitted",
+        "vote_counts": {},
+        "on_result_path": true
+      }
+    ],
+    "result_node_id": "0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0"
+  },
+  "agent_architecture": "single",
+  "architecture": "single",
+  "role_model_stats": {
+    "coder": {
+      "model": "openai/openai/gpt-oss-120b",
+      "input_tokens": 46332,
+      "output_tokens": 2683,
+      "turns": 15,
+      "tool_calls": 17,
+      "iterations": 18,
+      "tree_nodes_created": 16,
+      "best_node_depth": 15,
+      "best_node_value": 27.22980113288193,
+      "value_fn_tokens_in": 0,
+      "value_fn_tokens_out": 0
+    }
+  },
+  "planner_handoff": {},
+  "review_feedback": {},
+  "coder_rounds": [],
+  "instance_id": "transfer_digest_001",
+  "duration_seconds": 132.81
+}

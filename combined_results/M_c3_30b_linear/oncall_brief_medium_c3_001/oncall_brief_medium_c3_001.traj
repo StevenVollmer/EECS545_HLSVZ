@@ -1,0 +1,486 @@
+{
+  "turns": [
+    {
+      "turn": 1,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q tests/test_oncall_brief.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q tests/test_oncall_brief.py"
+          },
+          "output": "F..                                                                      [100%]\n=================================== FAILURES ===================================\n__________ test_active_unacked_count_excludes_acknowledged_incidents ___________\n\n    def test_active_unacked_count_excludes_acknowledged_incidents() -> None:\n        incidents = [\n            Incident(\"INC-7\", active=True, acknowledged=False),\n            Incident(\"INC-8\", active=True, acknowledged=True),\n        ]\n>       assert active_unacked_count(incidents) == 1\nE       AssertionError: assert 2 == 1\nE        +  where 2 = active_unacked_count([Incident(key='INC-7', active=True, acknowledged=False), Incident(key='INC-8', active=True, acknowledged=True)])\n\ntests/test_oncall_brief.py:11: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_oncall_brief.py::test_active_unacked_count_excludes_acknowledged_incidents - AssertionError: assert 2 == 1\n1 failed, 2 passed in 0.11s",
+          "is_error": true,
+          "exit_code": 1
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 2,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/models/incident.py",
+            "start_line": 1,
+            "end_line": 20
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/models/incident.py",
+            "start_line": 1,
+            "end_line": 20
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/models/incident.py:\n     1\tfrom dataclasses import dataclass\n     2\t\n     3\t\n     4\t@dataclass\n     5\tclass Incident:\n     6\t    key: str\n     7\t    active: bool = True\n     8\t    acknowledged: bool = False",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 3,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/services/incident_service.py",
+            "start_line": 1,
+            "end_line": 30
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/services/incident_service.py",
+            "start_line": 1,
+            "end_line": 30
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/services/incident_service.py:\n     1\tfrom app.models.incident import Incident\n     2\t\n     3\t\n     4\tdef active_unacked_count(incidents: list[Incident]) -> int:\n     5\t    return len([incident for incident in incidents if incident.active])",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 4,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/services/incident_service.py",
+            "old_str": "def active_unacked_count(incidents: list[Incident]) -> int:\n    return len([incident for incident in incidents if incident.active])",
+            "new_str": "def active_unacked_count(incidents: list[Incident]) -> int:\n    return len([incident for incident in incidents if incident.active and not incident.acknowledged])"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/services/incident_service.py",
+            "old_str": "def active_unacked_count(incidents: list[Incident]) -> int:\n    return len([incident for incident in incidents if incident.active])",
+            "new_str": "def active_unacked_count(incidents: list[Incident]) -> int:\n    return len([incident for incident in incidents if incident.active and not incident.acknowledged])"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/services/incident_service.py:\n     1\tfrom app.models.incident import Incident\n     2\t\n     3\t\n     4\tdef active_unacked_count(incidents: list[Incident]) -> int:\n     5\t    return len([incident for incident in incidents if incident.active and not incident.acknowledged])",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 5,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q"
+          },
+          "output": "...                                                                      [100%]\n3 passed in 0.02s",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 6,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "submit",
+          "arguments": {
+            "summary": "Fixed active_unacked_count to exclude acknowledged incidents by filtering on not acknowledged."
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "submit",
+          "arguments": {
+            "summary": "Fixed active_unacked_count to exclude acknowledged incidents by filtering on not acknowledged."
+          },
+          "output": "Do not submit yet. Inspect `git diff` first.",
+          "is_error": true,
+          "exit_code": null
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 7,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "git diff"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "git diff"
+          },
+          "output": "diff --git a/app/services/incident_service.py b/app/services/incident_service.py\nindex 5acde16..984980e 100644\n--- a/app/services/incident_service.py\n+++ b/app/services/incident_service.py\n@@ -2,4 +2,4 @@ from app.models.incident import Incident\n \n \n def active_unacked_count(incidents: list[Incident]) -> int:\n-    return len([incident for incident in incidents if incident.active])\n+    return len([incident for incident in incidents if incident.active and not incident.acknowledged])",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 8,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "submit",
+          "arguments": {
+            "summary": "Fixed active_unacked_count to exclude acknowledged incidents by filtering on not acknowledged."
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "submit",
+          "arguments": {
+            "summary": "Fixed active_unacked_count to exclude acknowledged incidents by filtering on not acknowledged."
+          },
+          "output": "Submission recorded. Summary: Fixed active_unacked_count to exclude acknowledged incidents by filtering on not acknowledged.",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    }
+  ],
+  "stats": {
+    "input_tokens": 15211,
+    "output_tokens": 1279,
+    "turns": 8,
+    "tool_calls": 8,
+    "iterations": 18,
+    "tree_nodes_created": 9,
+    "best_node_depth": 8,
+    "best_node_value": 44.673371487948664,
+    "value_fn_tokens_in": 0,
+    "value_fn_tokens_out": 0
+  },
+  "loop_state": {
+    "executable_edit_made": true,
+    "validation_passed": true,
+    "validation_attempted_after_edit": true,
+    "diff_checked": true,
+    "successful_post_edit_commands": [
+      "git diff",
+      "python -m pytest -q"
+    ],
+    "satisfied_success_checks": [
+      "oncall_brief_passes"
+    ],
+    "changed_files": [
+      "app/services/incident_service.py"
+    ]
+  },
+  "stopped_reason": "submitted",
+  "submitted": true,
+  "submission_summary": "Fixed active_unacked_count to exclude acknowledged incidents by filtering on not acknowledged.",
+  "patch": "diff --git a/app/services/incident_service.py b/app/services/incident_service.py\nindex 5acde16..984980e 100644\n--- a/app/services/incident_service.py\n+++ b/app/services/incident_service.py\n@@ -2,4 +2,4 @@ from app.models.incident import Incident\n \n \n def active_unacked_count(incidents: list[Incident]) -> int:\n-    return len([incident for incident in incidents if incident.active])\n+    return len([incident for incident in incidents if incident.active and not incident.acknowledged])\n",
+  "info": {
+    "submission": "diff --git a/app/services/incident_service.py b/app/services/incident_service.py\nindex 5acde16..984980e 100644\n--- a/app/services/incident_service.py\n+++ b/app/services/incident_service.py\n@@ -2,4 +2,4 @@ from app.models.incident import Incident\n \n \n def active_unacked_count(incidents: list[Incident]) -> int:\n-    return len([incident for incident in incidents if incident.active])\n+    return len([incident for incident in incidents if incident.active and not incident.acknowledged])\n",
+    "submitted": true,
+    "submission_summary": "Fixed active_unacked_count to exclude acknowledged incidents by filtering on not acknowledged.",
+    "stopped_reason": "submitted"
+  },
+  "auto_finalized": false,
+  "mcts_meta": {
+    "model": "openai/Qwen/Qwen3-VL-30B-A3B-Instruct",
+    "value_model": null,
+    "hindsight_feedback": false,
+    "dead_branch_feedback_count": 0,
+    "iterations": 18,
+    "expansion_candidates": 1,
+    "edit_vote_samples": 1,
+    "ucb_c": 1.414,
+    "root_visits": 8,
+    "early_branching": false,
+    "early_branch_depth": 2
+  },
+  "vote_summary": [
+    {
+      "depth": 4,
+      "action": "str_replace",
+      "winner_votes": 1,
+      "total_samples": 1,
+      "unique_candidates": 1
+    }
+  ],
+  "mcts_tree": {
+    "nodes": [
+      {
+        "id": "0",
+        "parent_id": null,
+        "depth": 0,
+        "action_name": null,
+        "action_args_preview": "",
+        "visits": 8,
+        "mean_value": 18.65,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0",
+        "parent_id": "0",
+        "depth": 1,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q tests/test_oncall_brief.py\"}",
+        "visits": 8,
+        "mean_value": 18.65,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0",
+        "parent_id": "0.0",
+        "depth": 2,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"app/models/incident.py\", \"start_line\": 1, \"end_line\": 20}",
+        "visits": 7,
+        "mean_value": 21.32,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0",
+        "parent_id": "0.0.0",
+        "depth": 3,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"app/services/incident_service.py\", \"start_line\": 1, \"end_line\": 30}",
+        "visits": 6,
+        "mean_value": 24.87,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0",
+        "parent_id": "0.0.0.0",
+        "depth": 4,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"app/services/incident_service.py\", \"old_str\": \"def active_unacked_coun",
+        "visits": 5,
+        "mean_value": 29.84,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 1,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"def active_unacked_count(incidents: list[Incident]) -> int:\\n    return len([incident for incident in incidents if incident.active and not incident.acknowledged])\", \"old_str\": \"def active_unacked_count(incidents: list[Incident]) -> int:\\n    return len([incident for incident in incidents if incident.active])\", \"path\": \"app/services/incident_service.py\"}, \"name\": \"str_replace\"}": 1
+        },
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0",
+        "depth": 5,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q\"}",
+        "visits": 4,
+        "mean_value": 32.21,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 2,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0",
+        "depth": 6,
+        "action_name": "submit",
+        "action_args_preview": "{\"summary\": \"Fixed active_unacked_count to exclude acknowledged incidents by fil",
+        "visits": 3,
+        "mean_value": 32.93,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 3,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0",
+        "depth": 7,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"git diff\"}",
+        "visits": 2,
+        "mean_value": 36.07,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 4,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0",
+        "depth": 8,
+        "action_name": "submit",
+        "action_args_preview": "{\"summary\": \"Fixed active_unacked_count to exclude acknowledged incidents by fil",
+        "visits": 1,
+        "mean_value": 44.67,
+        "llm_value": null,
+        "submitted": true,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 5,
+        "has_nonempty_patch": true,
+        "stopped_reason": "submitted",
+        "vote_counts": {},
+        "on_result_path": true
+      }
+    ],
+    "result_node_id": "0.0.0.0.0.0.0.0.0"
+  },
+  "agent_architecture": "single",
+  "architecture": "single",
+  "role_model_stats": {
+    "coder": {
+      "model": "openai/Qwen/Qwen3-VL-30B-A3B-Instruct",
+      "input_tokens": 15211,
+      "output_tokens": 1279,
+      "turns": 8,
+      "tool_calls": 8,
+      "iterations": 18,
+      "tree_nodes_created": 9,
+      "best_node_depth": 8,
+      "best_node_value": 44.673371487948664,
+      "value_fn_tokens_in": 0,
+      "value_fn_tokens_out": 0
+    }
+  },
+  "planner_handoff": {},
+  "review_feedback": {},
+  "coder_rounds": [],
+  "instance_id": "oncall_brief_medium_c3_001",
+  "duration_seconds": 81.62
+}

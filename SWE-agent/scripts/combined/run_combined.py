@@ -643,12 +643,16 @@ class MCTSAgentLoop:
         value_api_base: str | None = None,
         value_api_key: str | None = None,
         hindsight_feedback: bool = False,
+<<<<<<< HEAD
         # --- Critic gate (replaces auto-accept) ---
         critic_gate: bool = False,
         critic_model: str | None = None,
         critic_api_base: str | None = None,
         critic_api_key: str | None = None,
         planner_handoff: dict[str, Any] | None = None,
+=======
+        native_tools: bool = True,
+>>>>>>> 651c482 (All collection runs complete. Mid-development of plotting scripts)
     ):
         self.model = model
         self.api_base = api_base
@@ -680,6 +684,7 @@ class MCTSAgentLoop:
         self.value_api_base = value_api_base or api_base
         self.value_api_key = value_api_key or api_key
         self.hindsight_feedback = hindsight_feedback
+        self.native_tools = native_tools
         self.allow_auto_finalize = True   # set to False via --no-auto-finalize
         self._dead_branch_feedback: list[str] = []
         self._value_tokens_in: int = 0
@@ -1141,11 +1146,12 @@ class MCTSAgentLoop:
         }
         if self.model.startswith("ollama/"):
             kwargs["reasoning_effort"] = "high" if self.thinking_mode else "none"
-        else:
+        elif self.native_tools:
             # Non-ollama (remote) models: use native tool calling so the model
             # has a structured way to express actions. Without TOOL_SCHEMAS the
             # 120b model buries its response in <think> blocks and returns empty
             # content, causing parse failures on every turn.
+            # Requires vLLM launched with --enable-auto-tool-choice --tool-call-parser.
             kwargs["tools"] = TOOL_SCHEMAS
             kwargs["tool_choice"] = "auto"
         if self.num_ctx is not None:
@@ -2048,10 +2054,17 @@ def parse_args() -> argparse.Namespace:
                              "(default: on). Use --no-auto-finalize for fair single-agent baselines.")
     parser.add_argument("--hindsight-feedback", action=argparse.BooleanOptionalAction, default=False,
                         help="Inject dead-branch failure summaries into sibling branches (combined agent)")
+<<<<<<< HEAD
     parser.add_argument("--plan-critic", action=argparse.BooleanOptionalAction, default=False,
                         help="Run adversarial critic on planner handoff; revise plan if rejected.")
     parser.add_argument("--critic-gate", action=argparse.BooleanOptionalAction, default=False,
                         help="Use critic as submission gate: replace auto-accept with critic evaluation of patch quality.")
+=======
+    parser.add_argument("--native-tools", action=argparse.BooleanOptionalAction, default=True,
+                        help="Send OpenAI-style tools+tool_choice to the model (default: on). "
+                             "Use --no-native-tools for vLLM servers started without "
+                             "--enable-auto-tool-choice / --tool-call-parser.")
+>>>>>>> 651c482 (All collection runs complete. Mid-development of plotting scripts)
 
     # Instances
     parser.add_argument("--instances-type", choices=["swe_bench", "file"], default="swe_bench")
@@ -2373,12 +2386,16 @@ def main() -> None:
                     value_api_base=args.value_api_base,
                     value_api_key=args.value_api_key,
                     hindsight_feedback=bool(getattr(args, "hindsight_feedback", False)),
+<<<<<<< HEAD
                     # Critic gate parameters
                     critic_gate=bool(getattr(args, "critic_gate", False)),
                     critic_model=args.reviewer_model,
                     critic_api_base=args.reviewer_api_base,
                     critic_api_key=args.reviewer_api_key,
                     planner_handoff=planner_handoff,
+=======
+                    native_tools=bool(getattr(args, "native_tools", True)),
+>>>>>>> 651c482 (All collection runs complete. Mid-development of plotting scripts)
                 )
                 mcts.allow_auto_finalize = bool(getattr(args, "auto_finalize", True))
                 coder_result = mcts.run()
