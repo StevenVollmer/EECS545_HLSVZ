@@ -44,10 +44,11 @@ import sys
 import time
 from dataclasses import dataclass, asdict
 
-ROOT          = pathlib.Path(__file__).resolve().parents[3]
-COMBINED_RUNS = ROOT / "SWE-agent/tree_search_runs/combined"
-LEGACY_A_C1   = ROOT / "SWE-agent/tree_search_runs/all_custom_run_v10"
-LEGACY_A_C2   = ROOT / "SWE-agent/tree_search_runs/custom_cases_2_baseline_9b"
+ROOT             = pathlib.Path(__file__).resolve().parents[3]
+COMBINED_RUNS    = ROOT / "SWE-agent/tree_search_runs/combined"
+COMBINED_RESULTS = ROOT / "combined_results"
+LEGACY_A_C1      = ROOT / "SWE-agent/tree_search_runs/all_custom_run_v10"
+LEGACY_A_C2      = ROOT / "SWE-agent/tree_search_runs/custom_cases_2_baseline_9b"
 CASES_DIRS    = [
     ROOT / "SWE-agent/custom_cases",
     ROOT / "SWE-agent/custom_cases_2",
@@ -465,13 +466,20 @@ def _iter_trajs(combined_root: pathlib.Path,
     if _want("A_C2") and LEGACY_A_C2.exists():
         _add("A_c2_9b_mcts", LEGACY_A_C2)
 
-    if combined_root.exists():
-        for run_dir in sorted(combined_root.iterdir()):
+    seen: set[str] = set()
+    for root in [combined_root, COMBINED_RESULTS]:
+        if not root.exists():
+            continue
+        for run_dir in sorted(root.iterdir()):
             if not run_dir.is_dir():
+                continue
+            if run_dir.name in {"figures", "preliminary_results", "reviewer_audits"}:
                 continue
             if run_filter and not run_dir.name.upper().startswith(run_filter.upper()):
                 continue
-            _add(run_dir.name, run_dir)
+            if run_dir.name not in seen:
+                seen.add(run_dir.name)
+                _add(run_dir.name, run_dir)
 
     return pairs
 
@@ -479,6 +487,94 @@ def _iter_trajs(combined_root: pathlib.Path,
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
+def _variant_from_run(run_id: str) -> str:
+    """Extract variant label (e.g. 'A_strict', 'C', 'L') from run_id."""
+    parts = run_id.split("_")
+    for i, p in enumerate(parts):
+        if p in {"c1", "c2", "c3"}:
+            return "_".join(parts[:i]) if i > 0 else run_id
+    return parts[0]
+
+
+def _case_set_from_run(run_id: str) -> str:
+    for p in run_id.split("_"):
+        if p in {"c1", "c2", "c3"}:
+            return p
+    return "unknown"
+
+
+def export_reviewer_performance_csv(
+    all_records: list[AuditRecord],
+    path: pathlib.Path,
+) -> None:
+    """Confusion matrix per (reviewer_size × variant × case_set).
+
+    Surfaces model-size impact on reviewer quality — e.g. 30b underperformance.
+    """
+    from collections import defaultdict
+    groups: dict[tuple[str, str, str], list[AuditRecord]] = defaultdict(list)
+    for r in all_records:
+        v  = _variant_from_run(r.run_id)
+        cs = _case_set_from_run(r.run_id)
+        groups[(r.reviewer_size, v, cs)].append(r)
+
+    rows = []
+    for (size, variant, case_set), recs in sorted(groups.items()):
+        cm = _confusion(recs)
+        if cm is None:
+            continue
+        avg_tok_in  = sum(r.tokens_in  for r in recs) / len(recs)
+        avg_tok_out = sum(r.tokens_out for r in recs) / len(recs)
+        rows.append({
+            "reviewer_size": size,
+            "variant":       variant,
+            "case_set":      case_set,
+            "n_instances":   cm["n"],
+            "tp": cm["tp"], "fp": cm["fp"], "fn": cm["fn"], "tn": cm["tn"],
+            "precision":     f"{cm['precision']:.4f}",
+            "recall":        f"{cm['recall']:.4f}",
+            "f1":            f"{cm['f1']:.4f}",
+            "accuracy":      f"{cm['acc']:.4f}",
+            "avg_tokens_in":  f"{avg_tok_in:.0f}",
+            "avg_tokens_out": f"{avg_tok_out:.0f}",
+        })
+
+    # Also add all-variant rollup per (reviewer_size, case_set)
+    cs_groups: dict[tuple[str, str], list[AuditRecord]] = defaultdict(list)
+    for r in all_records:
+        cs_groups[(r.reviewer_size, _case_set_from_run(r.run_id))].extend([r])
+    for (size, case_set), recs in sorted(cs_groups.items()):
+        cm = _confusion(recs)
+        if cm is None:
+            continue
+        avg_tok_in  = sum(r.tokens_in  for r in recs) / len(recs)
+        avg_tok_out = sum(r.tokens_out for r in recs) / len(recs)
+        rows.append({
+            "reviewer_size": size,
+            "variant":       "ALL",
+            "case_set":      case_set,
+            "n_instances":   cm["n"],
+            "tp": cm["tp"], "fp": cm["fp"], "fn": cm["fn"], "tn": cm["tn"],
+            "precision":     f"{cm['precision']:.4f}",
+            "recall":        f"{cm['recall']:.4f}",
+            "f1":            f"{cm['f1']:.4f}",
+            "accuracy":      f"{cm['acc']:.4f}",
+            "avg_tokens_in":  f"{avg_tok_in:.0f}",
+            "avg_tokens_out": f"{avg_tok_out:.0f}",
+        })
+
+    if not rows:
+        path.write_text("")
+        print(f"Reviewer performance CSV written (empty): {path}")
+        return
+    fields = list(rows[0].keys())
+    with open(path, "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fields)
+        w.writeheader()
+        w.writerows(rows)
+    print(f"Reviewer performance CSV written: {path}")
+
 
 def _do_merge(pattern: str, csv_path: pathlib.Path | None,
               combined_root: pathlib.Path) -> None:
@@ -541,6 +637,8 @@ def _do_merge(pattern: str, csv_path: pathlib.Path | None,
                 w.writerow(row)
         print(f"CSV written: {csv_path}")
 
+    return all_records
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__,
@@ -559,13 +657,17 @@ def main() -> None:
                         help="Merge cache files matching glob and print report, e.g. "
                              "'audit_cache_*.json'")
     parser.add_argument("--csv",   type=pathlib.Path, default=None)
+    parser.add_argument("--reviewer-performance-csv", type=pathlib.Path, default=None,
+                        help="Write reviewer performance CSV (confusion matrix by size×variant)")
     parser.add_argument("--delay", type=float, default=0.3,
                         help="Seconds between LLM calls (default 0.3)")
     args = parser.parse_args()
 
     # ── Merge mode ────────────────────────────────────────────────────────────
     if args.merge:
-        _do_merge(args.merge, args.csv, args.combined_root)
+        all_records = _do_merge(args.merge, args.csv, args.combined_root)
+        if all_records and args.reviewer_performance_csv:
+            export_reviewer_performance_csv(all_records, args.reviewer_performance_csv)
         return
 
     # ── Normal run mode ───────────────────────────────────────────────────────

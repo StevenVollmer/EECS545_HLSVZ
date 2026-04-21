@@ -680,6 +680,7 @@ class MCTSAgentLoop:
         self.value_api_base = value_api_base or api_base
         self.value_api_key = value_api_key or api_key
         self.hindsight_feedback = hindsight_feedback
+        self.allow_auto_finalize = True   # set to False via --no-auto-finalize
         self._dead_branch_feedback: list[str] = []
         self._value_tokens_in: int = 0
         self._value_tokens_out: int = 0
@@ -1128,6 +1129,7 @@ class MCTSAgentLoop:
 
     def _call_model(self, messages: list[dict], temperature: float) -> tuple[str, int, int]:
         import litellm
+        from run_custom_swebench import TOOL_SCHEMAS
         litellm.suppress_debug_info = True
         kwargs: dict[str, Any] = {
             "model": self.model,
@@ -1139,13 +1141,32 @@ class MCTSAgentLoop:
         }
         if self.model.startswith("ollama/"):
             kwargs["reasoning_effort"] = "high" if self.thinking_mode else "none"
+        else:
+            # Non-ollama (remote) models: use native tool calling so the model
+            # has a structured way to express actions. Without TOOL_SCHEMAS the
+            # 120b model buries its response in <think> blocks and returns empty
+            # content, causing parse failures on every turn.
+            kwargs["tools"] = TOOL_SCHEMAS
+            kwargs["tool_choice"] = "auto"
         if self.num_ctx is not None:
             kwargs["num_ctx"] = self.num_ctx
         response = litellm.completion(**kwargs)
         usage = getattr(response, "usage", None)
         tokens_in = int(getattr(usage, "prompt_tokens", 0) or 0)
         tokens_out = int(getattr(usage, "completion_tokens", 0) or 0)
-        content = (response.choices[0].message.content or "")
+        message = response.choices[0].message
+        content = message.content or ""
+        # Extract native tool calls and convert to react_json format
+        native_calls = getattr(message, "tool_calls", None)
+        if native_calls:
+            call = native_calls[0]
+            args = call.function.arguments
+            if isinstance(args, str):
+                try:
+                    args = json.loads(args)
+                except Exception:
+                    args = {"command": args}
+            content = json.dumps({"name": call.function.name, "arguments": args})
         return content, tokens_in, tokens_out
 
     def _parse_action(self, content: str) -> ParseOutcome:
@@ -1789,7 +1810,7 @@ class MCTSAgentLoop:
                     or self._score_node(child) > self._score_node(best_submitted)
                 ):
                     best_submitted = child
-                if self._is_ready_for_finalization(child) and (
+                if self.allow_auto_finalize and self._is_ready_for_finalization(child) and (
                     best_ready is None
                     or self._estimate_value(child) > self._estimate_value(best_ready)
                 ):
@@ -1829,7 +1850,8 @@ class MCTSAgentLoop:
             check="ignore",
         ) or ""
         if (
-            not result_node.submitted
+            self.allow_auto_finalize
+            and not result_node.submitted
             and self._is_ready_for_finalization(result_node)
             and patch.strip()
         ):
@@ -2021,6 +2043,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--early-branching", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--thinking-mode", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--failure-surfacing", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--auto-finalize", action=argparse.BooleanOptionalAction, default=True,
+                        help="Auto-submit when all success checks pass without explicit submit call "
+                             "(default: on). Use --no-auto-finalize for fair single-agent baselines.")
     parser.add_argument("--hindsight-feedback", action=argparse.BooleanOptionalAction, default=False,
                         help="Inject dead-branch failure summaries into sibling branches (combined agent)")
     parser.add_argument("--plan-critic", action=argparse.BooleanOptionalAction, default=False,
@@ -2355,6 +2380,7 @@ def main() -> None:
                     critic_api_key=args.reviewer_api_key,
                     planner_handoff=planner_handoff,
                 )
+                mcts.allow_auto_finalize = bool(getattr(args, "auto_finalize", True))
                 coder_result = mcts.run()
                 role_model_stats["coder"] = {"model": model, **coder_result.get("stats", {})}
                 if getattr(args, "critic_gate", False):

@@ -31,7 +31,7 @@ LINEAR_FLAGS=(
     --model "$MODEL" --api-base "$API_BASE" --api-key "$API_KEY"
     --num-ctx 32768 --max-tokens 384
     --agent-architecture single
-    --iterations 1 --expansion-candidates 1 --edit-vote-samples 1 --max-node-depth 5
+    --iterations 18 --expansion-candidates 1 --edit-vote-samples 1 --max-node-depth 18
     --reviewer-gate-mode soft   # unused by single-arch; required by argparse
     --no-adaptive-branching --no-failure-surfacing --no-hindsight-feedback
 )

@@ -1,5 +1,5 @@
 {
   "model_name_or_path": "N_c1_120b_linear",
   "instance_id": "budget_snapshot_001",
-  "model_patch": ""
+  "model_patch": "diff --git a/app/utils/currency.py b/app/utils/currency.py\nindex 6c2af37..98263f5 100644\n--- a/app/utils/currency.py\n+++ b/app/utils/currency.py\n@@ -2,5 +2,7 @@ def abbreviate_currency(amount: float) -> str:\n     if amount >= 1_000_000:\n         return f\"${amount / 1_000_000:.1f}M\"\n     if amount >= 1_000:\n-        return f\"${round(amount / 1_000, 1):.1f}K\"\n+        # Truncate to one decimal place without rounding up to avoid jumping to next unit\n+        truncated = int(amount / 100) / 10  # equivalent to floor to one decimal\n+        return f\"${truncated:.1f}K\"\n     return f\"${amount:.0f}\"\n"
 }

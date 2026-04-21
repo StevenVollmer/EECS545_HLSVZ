@@ -34,9 +34,10 @@ C3="SWE-agent/custom_cases_3"
 
 LINEAR_FLAGS=(
     --agent-architecture single
-    --iterations 1 --expansion-candidates 1 --edit-vote-samples 1 --max-node-depth 5
+    --iterations 18 --expansion-candidates 1 --edit-vote-samples 1 --max-node-depth 18
     --reviewer-gate-mode soft   # unused by single-arch; required by argparse
     --no-adaptive-branching --no-failure-surfacing --no-hindsight-feedback
+    --no-auto-finalize
 )
 
 run() {
@@ -69,7 +70,7 @@ elif [[ "$GROUP" == "120b" ]]; then
     MODEL="openai/openai/gpt-oss-120b"
     API_BASE="http://promaxgb10-d473.eecs.umich.edu:8000/v1"
     API_KEY="api_IcLlffdxoWOSgBPWW3X3zS15YSBHim5a"
-    MODEL_FLAGS=(--model "$MODEL" --api-base "$API_BASE" --api-key "$API_KEY" --max-tokens 1024)
+    MODEL_FLAGS=(--model "$MODEL" --api-base "$API_BASE" --api-key "$API_KEY" --max-tokens 4096)
 
     run N_c1_120b_linear "$C1" "${MODEL_FLAGS[@]}" "${LINEAR_FLAGS[@]}"
     run N_c2_120b_linear "$C2" "${MODEL_FLAGS[@]}" "${LINEAR_FLAGS[@]}"
