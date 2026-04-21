@@ -1,0 +1,5 @@
+{
+  "model_name_or_path": "umich_gptoss_120b",
+  "instance_id": "pagination_drift_001",
+  "model_patch": "diff --git a/app/api/list_endpoint.py b/app/api/list_endpoint.py\nindex 018731b..d9f1030 100644\n--- a/app/api/list_endpoint.py\n+++ b/app/api/list_endpoint.py\n@@ -15,15 +15,8 @@ def list_all(store: RowStore, page_size: int) -> list[dict]:\n     offset = 0\n     while True:\n         page = store.fetch_page(offset, page_size)\n-        collected.extend(page)\n-        # BUG: treats \"fewer than requested\" as end-of-data. The store\n-        # silently caps pages at STORE_MAX_PAGE, so any caller requesting\n-        # page_size > STORE_MAX_PAGE gets STORE_MAX_PAGE rows on every call\n-        # and the endpoint halts after the first page, missing all remaining\n-        # rows. Fix requires aligning with the store's capping invariant \u2014\n-        # either request within the cap, or detect end-of-data via an\n-        # explicit empty page rather than short-read.\n-        if len(page) < page_size:\n+        if not page:\n             break\n+        collected.extend(page)\n         offset += len(page)\n     return collected\n"
+}

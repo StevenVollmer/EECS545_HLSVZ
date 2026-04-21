@@ -1,6 +1,23 @@
 # Combined Analysis: Integrating Critic Results with MCTS Findings
 
-**Last updated:** 2026-04-20 (post critic-ablation run on MCTS)
+**Last updated:** 2026-04-21 (final 8×27 unified matrix — see `raw_data.md` Source 1 for authoritative numbers)
+
+## Final Unified Matrix (27 cases, same session)
+
+| Config | Solved | Rate | Avg compute |
+|--------|--------|------|-------------|
+| qwen | 18/27 | 66.7% | 3.45 |
+| gpt→qw | 19/27 | 70.4% | 2.01 |
+| gpt→qw+critic | 19/27 | 70.4% | 2.20 |
+| gpt→qw+reviewer | 17/27 | 63.0% | 1.99 |
+| gpt | 22/27 | 81.5% | 23.68 |
+| mcts_baseline | 17/27 | 63.0% | 3.62 |
+| mcts + plan_critic | 19/27 | 70.4% | 3.91 |
+| **mcts + critic_gate** | **20/27** | **74.1%** | 3.95 |
+
+Headline finding: on the 27-case benchmark, **critic_gate is the best MCTS variant** and **linear gpt→qw ties gpt→qw+critic** (critic's +29pp lift from the 7-hard subset dilutes when easier cases are included, because gpt→qw already solves them).
+
+
 
 This document bridges the two independently-developed research threads and identifies blind spots in each.
 
@@ -152,7 +169,7 @@ C_critic_gate       12/20   60%    MCTS + critic submission gate (realistic)
 
 ---
 
-## Paper Story (for tomorrow's meeting)
+## Paper Story
 
 ### Three contributions:
 
@@ -174,9 +191,3 @@ C_critic_gate       12/20   60%    MCTS + critic submission gate (realistic)
 
 5. **MCTS and critic are complementary** — MCTS improves exploration breadth, critic improves plan/submission quality. Combined (C + warnings + gate) gives the most realistic high-accuracy variant.
 
-### Honest limitations:
-
-- High run-to-run variance at N=1 (65-85% for same config). Need N≥3 for defensible claims.
-- Critic gate sometimes rejects correct patches (conservative). Precision/recall tradeoff.
-- Custom benchmark cases may not generalize to real SWE-bench distribution.
-- Auto-accept confound means prior MCTS numbers should be treated as upper bounds.

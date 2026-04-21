@@ -1,0 +1,5 @@
+{
+  "model_name_or_path": "umich_gptoss_planner_umich_qwen_coder",
+  "instance_id": "digest_preview_001",
+  "model_patch": "diff --git a/app/utils/text.py b/app/utils/text.py\nindex 0addf0e..6116e40 100644\n--- a/app/utils/text.py\n+++ b/app/utils/text.py\n@@ -21,7 +21,27 @@ def _capitalize_fragment(fragment: str) -> str:\n def _capitalize_word_with_joiners(word: str) -> str:\n     if not word:\n         return word\n-    return _capitalize_fragment(word)\n+    # Split on joiners and capitalize each segment\n+    segments = []\n+    current = \"\"\n+    for char in word:\n+        if char in NAME_JOINERS:\n+            if current:\n+                segments.append(current)\n+                current = \"\"\n+            segments.append(char)\n+        else:\n+            current += char\n+    if current:\n+        segments.append(current)\n+    # Capitalize each segment\n+    capitalized = []\n+    for seg in segments:\n+        if seg in NAME_JOINERS:\n+            capitalized.append(seg)\n+        else:\n+            capitalized.append(_capitalize_fragment(seg))\n+    return \"\".join(capitalized)\n \n \n def title_case_words(value: str) -> str:\n"
+}

@@ -1,0 +1,441 @@
+{
+  "turns": [
+    {
+      "turn": 1,
+      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"python scripts/demo_preview.py\"}}",
+      "tool_calls": [
+        {
+          "id": "react-1-bash",
+          "name": "bash",
+          "arguments": {
+            "command": "python scripts/demo_preview.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python scripts/demo_preview.py"
+          },
+          "output": "Owner: MCALLISTER-SMITH | Projects: 4",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 2,
+      "assistant_text": "{\"tool\":\"view\",\"arguments\":{\"path\":\"app/presenters/recap_presenter.py\",\"start_line\":1,\"end_line\":50}}\n",
+      "tool_calls": [
+        {
+          "id": "react-1-view",
+          "name": "view",
+          "arguments": {
+            "path": "app/presenters/recap_presenter.py",
+            "start_line": 1,
+            "end_line": 50
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/presenters/recap_presenter.py",
+            "start_line": 1,
+            "end_line": 50
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/presenters/recap_presenter.py:\n     1\tfrom app.models.owner import OwnerRecap\n     2\tfrom app.utils.text import normalize_owner_code\n     3\t\n     4\t\n     5\tdef render_owner_preview(recap: OwnerRecap) -> str:\n     6\t    display_name = normalize_owner_code(recap.owner_name)\n     7\t    return f\"Owner: {display_name} | Projects: {recap.total_projects}\"",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 3,
+      "assistant_text": "{\"tool\":\"view\",\"arguments\":{\"path\":\"app/utils/text.py\",\"start_line\":1,\"end_line\":50}}\n\n",
+      "tool_calls": [
+        {
+          "id": "react-1-view",
+          "name": "view",
+          "arguments": {
+            "path": "app/utils/text.py",
+            "start_line": 1,
+            "end_line": 50
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/utils/text.py",
+            "start_line": 1,
+            "end_line": 50
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/utils/text.py:\n     1\tdef normalize_owner_code(name: str) -> str:\n     2\t    return \"-\".join(part.strip().upper() for part in name.split(\"-\"))\n     3\t\n     4\t\n     5\tdef format_display_owner_name(name: str) -> str:\n     6\t    tokens = []\n     7\t    for part in name.split(\"-\"):\n     8\t        stripped = part.strip()\n     9\t        if stripped.startswith(\"mc\") and len(stripped) > 2:\n    10\t            tokens.append(\"Mc\" + stripped[2:3].upper() + stripped[3:].lower())\n    11\t        else:\n    12\t            tokens.append(stripped[:1].upper() + stripped[1:].lower())\n    13\t    return \"-\".join(tokens)",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 4,
+      "assistant_text": "{\"tool\":\"str_replace\",\"arguments\":{\"path\":\"app/presenters/recap_presenter.py\",\"old_str\":\"display_name = normalize_owner_code(recap.owner_name)\",\"new_str\":\"display_name = format_display_owner_name(recap.owner_name)\"}}\n\n\n",
+      "tool_calls": [
+        {
+          "id": "react-1-str_replace",
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/presenters/recap_presenter.py",
+            "old_str": "display_name = normalize_owner_code(recap.owner_name)",
+            "new_str": "display_name = format_display_owner_name(recap.owner_name)"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/presenters/recap_presenter.py",
+            "old_str": "display_name = normalize_owner_code(recap.owner_name)",
+            "new_str": "display_name = format_display_owner_name(recap.owner_name)"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/presenters/recap_presenter.py:\n     1\tfrom app.models.owner import OwnerRecap\n     2\tfrom app.utils.text import normalize_owner_code\n     3\t\n     4\t\n     5\tdef render_owner_preview(recap: OwnerRecap) -> str:\n     6\t    display_name = format_display_owner_name(recap.owner_name)\n     7\t    return f\"Owner: {display_name} | Projects: {recap.total_projects}\"",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 5,
+      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"python scripts/demo_preview.py\"}}\n\n\n",
+      "tool_calls": [
+        {
+          "id": "react-1-bash",
+          "name": "bash",
+          "arguments": {
+            "command": "python scripts/demo_preview.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python scripts/demo_preview.py"
+          },
+          "output": "Traceback (most recent call last):\n  File \"/repo/scripts/demo_preview.py\", line 14, in <module>\n    main()\n  File \"/repo/scripts/demo_preview.py\", line 10, in main\n    print(preview_owner_recap(\"mcallister-smith\", 4))\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/repo/app/main.py\", line 8, in preview_owner_recap\n    return render_owner_preview(recap)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/repo/app/presenters/recap_presenter.py\", line 6, in render_owner_preview\n    display_name = format_display_owner_name(recap.owner_name)\n                   ^^^^^^^^^^^^^^^^^^^^^^^^^\nNameError: name 'format_display_owner_name' is not defined",
+          "is_error": true,
+          "exit_code": 1
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 6,
+      "assistant_text": "{\"tool\":\"view\",\"arguments\":{\"path\":\"app/presenters/recap_presenter.py\",\"start_line\":1,\"end_line\":50}}\n\n\n\n",
+      "tool_calls": [
+        {
+          "id": "react-1-view",
+          "name": "view",
+          "arguments": {
+            "path": "app/presenters/recap_presenter.py",
+            "start_line": 1,
+            "end_line": 50
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/presenters/recap_presenter.py",
+            "start_line": 1,
+            "end_line": 50
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/presenters/recap_presenter.py:\n     1\tfrom app.models.owner import OwnerRecap\n     2\tfrom app.utils.text import normalize_owner_code\n     3\t\n     4\t\n     5\tdef render_owner_preview(recap: OwnerRecap) -> str:\n     6\t    display_name = format_display_owner_name(recap.owner_name)\n     7\t    return f\"Owner: {display_name} | Projects: {recap.total_projects}\"",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 7,
+      "assistant_text": "{\"tool\":\"view\",\"arguments\":{\"path\":\"app/utils/text.py\",\"start_line\":1,\"end_line\":50}}\n\n\n\n\n",
+      "tool_calls": [
+        {
+          "id": "react-1-view",
+          "name": "view",
+          "arguments": {
+            "path": "app/utils/text.py",
+            "start_line": 1,
+            "end_line": 50
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/utils/text.py",
+            "start_line": 1,
+            "end_line": 50
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/utils/text.py:\n     1\tdef normalize_owner_code(name: str) -> str:\n     2\t    return \"-\".join(part.strip().upper() for part in name.split(\"-\"))\n     3\t\n     4\t\n     5\tdef format_display_owner_name(name: str) -> str:\n     6\t    tokens = []\n     7\t    for part in name.split(\"-\"):\n     8\t        stripped = part.strip()\n     9\t        if stripped.startswith(\"mc\") and len(stripped) > 2:\n    10\t            tokens.append(\"Mc\" + stripped[2:3].upper() + stripped[3:].lower())\n    11\t        else:\n    12\t            tokens.append(stripped[:1].upper() + stripped[1:].lower())\n    13\t    return \"-\".join(tokens)",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 8,
+      "assistant_text": "{\"tool\":\"str_replace\",\"arguments\":{\"path\":\"app/presenters/recap_presenter.py\",\"old_str\":\"from app.utils.text import normalize_owner_code\",\"new_str\":\"from app.utils.text import normalize_owner_code, format_display_owner_name\"}}\n\n\n\n\n",
+      "tool_calls": [
+        {
+          "id": "react-1-str_replace",
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/presenters/recap_presenter.py",
+            "old_str": "from app.utils.text import normalize_owner_code",
+            "new_str": "from app.utils.text import normalize_owner_code, format_display_owner_name"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/presenters/recap_presenter.py",
+            "old_str": "from app.utils.text import normalize_owner_code",
+            "new_str": "from app.utils.text import normalize_owner_code, format_display_owner_name"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/presenters/recap_presenter.py:\n     1\tfrom app.models.owner import OwnerRecap\n     2\tfrom app.utils.text import normalize_owner_code, format_display_owner_name\n     3\t\n     4\t\n     5\tdef render_owner_preview(recap: OwnerRecap) -> str:\n     6\t    display_name = format_display_owner_name(recap.owner_name)\n     7\t    return f\"Owner: {display_name} | Projects: {recap.total_projects}\"",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 9,
+      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"python scripts/demo_preview.py\"}}\n\n\n\n\n",
+      "tool_calls": [
+        {
+          "id": "react-1-bash",
+          "name": "bash",
+          "arguments": {
+            "command": "python scripts/demo_preview.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python scripts/demo_preview.py"
+          },
+          "output": "Owner: McAllister-Smith | Projects: 4",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 10,
+      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"python scripts/demo_export.py\"}}\n\n\n\n\n\n",
+      "tool_calls": [
+        {
+          "id": "react-1-bash",
+          "name": "bash",
+          "arguments": {
+            "command": "python scripts/demo_export.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python scripts/demo_export.py"
+          },
+          "output": "owner_code=MCALLISTER-SMITH,projects=4",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 11,
+      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"git diff\"}}\n\n\n\n\n\n\n",
+      "tool_calls": [
+        {
+          "id": "react-1-bash",
+          "name": "bash",
+          "arguments": {
+            "command": "git diff"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "git diff"
+          },
+          "output": "diff --git a/app/presenters/recap_presenter.py b/app/presenters/recap_presenter.py\nindex 4649e1c..985252f 100644\n--- a/app/presenters/recap_presenter.py\n+++ b/app/presenters/recap_presenter.py\n@@ -1,7 +1,7 @@\n from app.models.owner import OwnerRecap\n-from app.utils.text import normalize_owner_code\n+from app.utils.text import normalize_owner_code, format_display_owner_name\n \n \n def render_owner_preview(recap: OwnerRecap) -> str:\n-    display_name = normalize_owner_code(recap.owner_name)\n+    display_name = format_display_owner_name(recap.owner_name)\n     return f\"Owner: {display_name} | Projects: {recap.total_projects}\"",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 12,
+      "assistant_text": "{\"tool\":\"submit\",\"arguments\":{\"summary\":\"Fixed owner name formatting in preview by using display-oriented formatter while preserving export code format.\"}}",
+      "tool_calls": [
+        {
+          "id": "react-1-submit",
+          "name": "submit",
+          "arguments": {
+            "summary": "Fixed owner name formatting in preview by using display-oriented formatter while preserving export code format."
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "submit",
+          "arguments": {
+            "summary": "Fixed owner name formatting in preview by using display-oriented formatter while preserving export code format."
+          },
+          "output": "Submission recorded. Summary: Fixed owner name formatting in preview by using display-oriented formatter while preserving export code format.",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    }
+  ],
+  "stats": {
+    "input_tokens": 1598,
+    "output_tokens": 1045,
+    "turns": 12,
+    "tool_calls": 12,
+    "api_calls": 1
+  },
+  "loop_state": {
+    "executable_edit_made": true,
+    "validation_passed": false,
+    "validation_attempted_after_edit": true,
+    "diff_checked": true,
+    "successful_post_edit_commands": [
+      "git diff",
+      "python scripts/demo_export.py",
+      "python scripts/demo_preview.py"
+    ],
+    "satisfied_success_checks": [],
+    "changed_files": [
+      "app/presenters/recap_presenter.py"
+    ]
+  },
+  "stopped_reason": "submitted",
+  "submitted": true,
+  "submission_summary": "Fixed owner name formatting in preview by using display-oriented formatter while preserving export code format.",
+  "patch": "diff --git a/app/presenters/recap_presenter.py b/app/presenters/recap_presenter.py\nindex 4649e1c..985252f 100644\n--- a/app/presenters/recap_presenter.py\n+++ b/app/presenters/recap_presenter.py\n@@ -1,7 +1,7 @@\n from app.models.owner import OwnerRecap\n-from app.utils.text import normalize_owner_code\n+from app.utils.text import normalize_owner_code, format_display_owner_name\n \n \n def render_owner_preview(recap: OwnerRecap) -> str:\n-    display_name = normalize_owner_code(recap.owner_name)\n+    display_name = format_display_owner_name(recap.owner_name)\n     return f\"Owner: {display_name} | Projects: {recap.total_projects}\"\n",
+  "info": {
+    "submission": "diff --git a/app/presenters/recap_presenter.py b/app/presenters/recap_presenter.py\nindex 4649e1c..985252f 100644\n--- a/app/presenters/recap_presenter.py\n+++ b/app/presenters/recap_presenter.py\n@@ -1,7 +1,7 @@\n from app.models.owner import OwnerRecap\n-from app.utils.text import normalize_owner_code\n+from app.utils.text import normalize_owner_code, format_display_owner_name\n \n \n def render_owner_preview(recap: OwnerRecap) -> str:\n-    display_name = normalize_owner_code(recap.owner_name)\n+    display_name = format_display_owner_name(recap.owner_name)\n     return f\"Owner: {display_name} | Projects: {recap.total_projects}\"\n",
+    "submitted": true,
+    "submission_summary": "Fixed owner name formatting in preview by using display-oriented formatter while preserving export code format.",
+    "stopped_reason": "submitted"
+  },
+  "agent_architecture": "planner_coder",
+  "role_model_stats": {
+    "planner": {
+      "model": "openai/openai/gpt-oss-120b",
+      "tokens_in": 1598,
+      "tokens_out": 1045,
+      "api_calls": 1
+    },
+    "coder": {
+      "model": "openai/Qwen/Qwen3-VL-30B-A3B-Instruct",
+      "tokens_in": 0,
+      "tokens_out": 0,
+      "api_calls": 0,
+      "turns": 12,
+      "tool_calls": 12
+    }
+  },
+  "planner_handoff": {
+    "problem_summary": "Owner names appear incorrectly formatted in the customer-facing recap preview, while export formatting must stay unchanged.",
+    "root_cause_hypothesis": "RecapPresenter formats owner names using the export-oriented helper (e.g., format_owner_code) from app.utils.text instead of the display-oriented helper (e.g., format_owner_name), causing the preview to show the wrong format.",
+    "files_likely_affected": [
+      "app/presenters/recap_presenter.py",
+      "app/utils/text.py"
+    ],
+    "target_symbols": [
+      "RecapPresenter",
+      "format_owner_name",
+      "format_owner_code"
+    ],
+    "discovery_priority": [
+      "app/presenters/recap_presenter.py",
+      "app/utils/text.py"
+    ],
+    "first_actions": [
+      "Run the preview demo script to observe the current formatting: `python scripts/demo_preview.py`.",
+      "Open app/presenters/recap_presenter.py and locate the code that builds the preview header or owner name string.",
+      "Identify which utils.text helper is being called for owner formatting and compare it with the helper used in app/exports/csv_writer.py."
+    ],
+    "safe_reproduction_steps": [
+      "python scripts/demo_preview.py"
+    ],
+    "reproduction_notes": [
+      "If the demo script expects command\u2011line arguments, run it without arguments to use its built\u2011in sample data."
+    ],
+    "required_validations": [
+      "python scripts/demo_preview.py   # verify owner names now appear in the correct display format",
+      "python scripts/demo_export.py   # ensure the exported CSV still contains the original owner\u2011code format"
+    ],
+    "allowed_change_types": [
+      "modify existing presenter logic",
+      "adjust or add a formatting helper in utils.text",
+      "refactor calls between presenter and utils"
+    ],
+    "forbidden_edits": [
+      "changing CSV export formatting",
+      "modifying tests",
+      "altering data model definitions"
+    ],
+    "escalation_conditions": [
+      "Preview still shows the wrong format after adjusting the presenter.",
+      "Exported CSV output differs from the baseline (owner codes changed).",
+      "Existing test suite fails."
+    ],
+    "difficulty": "easy",
+    "difficulty_rationale": "The bug is likely a single incorrect helper call in the presenter, fixable with a small code change and straightforward validation."
+  },
+  "review_feedback": {},
+  "instance_id": "owner_recap_001",
+  "duration_seconds": 83.63
+}

@@ -1,0 +1,38 @@
+diff --git a/app/finance/ledger.py b/app/finance/ledger.py
+index 491a421..f41537b 100644
+--- a/app/finance/ledger.py
++++ b/app/finance/ledger.py
+@@ -1,6 +1,23 @@
+ """Ledger totals.
+ 
+ Amounts are stored as dollars-and-cents in float form. The reporting pipeline
++import math
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
+ then rounds the final total to two decimal places for display. All amounts
+ entering the ledger are guaranteed to be representable as cents (i.e., each
+ individual amount is exact to two decimal places as a decimal number).
+@@ -18,7 +35,5 @@ def total(amounts: list[float]) -> float:
+     # Fix requires recognizing that summing decimal-exact amounts demands a
+     # numerically stable approach (sum of integer cents, Decimal, or
+     # fsum/Kahan) — a naive sum is insufficient.
+-    running = 0.0
+-    for amount in amounts:
+-        running += amount
+-    return running
++    # Use math.fsum for numerically stable summation of floating-point values
++    return math.fsum(amounts)

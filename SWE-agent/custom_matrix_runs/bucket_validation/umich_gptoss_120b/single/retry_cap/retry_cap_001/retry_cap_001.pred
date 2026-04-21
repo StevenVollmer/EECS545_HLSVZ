@@ -1,0 +1,5 @@
+{
+  "model_name_or_path": "umich_gptoss_120b",
+  "instance_id": "retry_cap_001",
+  "model_patch": "diff --git a/app/utils/backoff.py b/app/utils/backoff.py\nindex 80630a0..c4925ab 100644\n--- a/app/utils/backoff.py\n+++ b/app/utils/backoff.py\n@@ -27,5 +27,6 @@ def compute_delay(\n     exponential = base_seconds * (factor ** (attempt - 1))\n     # Apply jitter: +/- jitter_ratio of exponential\n     jitter = rng.uniform(-jitter_ratio, jitter_ratio) * exponential\n-    capped = min(exponential, max_delay_seconds)\n-    return capped + jitter\n+    jittered = exponential + jitter\n+    # Cap after jitter is applied\n+    return min(jittered, max_delay_seconds)\n"
+}

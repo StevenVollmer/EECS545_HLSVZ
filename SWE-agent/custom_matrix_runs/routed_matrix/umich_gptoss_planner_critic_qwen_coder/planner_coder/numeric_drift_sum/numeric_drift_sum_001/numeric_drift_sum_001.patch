@@ -1,0 +1,28 @@
+diff --git a/app/finance/ledger.py b/app/finance/ledger.py
+index 491a421..96ac8c5 100644
+--- a/app/finance/ledger.py
++++ b/app/finance/ledger.py
+@@ -9,16 +9,12 @@ individual amount is exact to two decimal places as a decimal number).
+ from __future__ import annotations
+ 
+ 
++from decimal import Decimal, ROUND_HALF_UP
++
+ def total(amounts: list[float]) -> float:
+-    # BUG: naive float summation accumulates drift when summing thousands of
+-    # values that individually are exact in two-decimal form but whose binary
+-    # float representations are not. The reporting layer rounds to two
+-    # decimals, so small drift is usually hidden, but at operator scale the
+-    # drift crosses a penny boundary and the reported total is off by 0.01.
+-    # Fix requires recognizing that summing decimal-exact amounts demands a
+-    # numerically stable approach (sum of integer cents, Decimal, or
+-    # fsum/Kahan) — a naive sum is insufficient.
+-    running = 0.0
++    # Sum amounts as Decimal to avoid floating-point drift.
++    # Convert each amount to Decimal, sum, then round to 2 decimal places.
++    running = Decimal('0.00')
+     for amount in amounts:
+-        running += amount
+-    return running
++        running += Decimal(str(amount))
++    return float(running.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP) if running != 0 else Decimal('0.00'))

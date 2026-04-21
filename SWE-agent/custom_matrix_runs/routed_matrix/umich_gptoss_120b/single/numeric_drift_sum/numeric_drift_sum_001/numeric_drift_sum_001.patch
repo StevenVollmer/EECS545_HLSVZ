@@ -1,0 +1,18 @@
+diff --git a/app/finance/ledger.py b/app/finance/ledger.py
+index 491a421..1ea98d3 100644
+--- a/app/finance/ledger.py
++++ b/app/finance/ledger.py
+@@ -18,7 +18,10 @@ def total(amounts: list[float]) -> float:
+     # Fix requires recognizing that summing decimal-exact amounts demands a
+     # numerically stable approach (sum of integer cents, Decimal, or
+     # fsum/Kahan) — a naive sum is insufficient.
+-    running = 0.0
++    # Convert amounts to integer cents to avoid floating‑point drift
++    total_cents = 0
+     for amount in amounts:
+-        running += amount
+-    return running
++        # Multiply by 100 and round to nearest cent to get integer cents
++        cents = int(round(amount * 100))
++        total_cents += cents
++    return total_cents / 100.0

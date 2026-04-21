@@ -1,0 +1,23 @@
+diff --git a/app/utils/text.py b/app/utils/text.py
+index 0addf0e..a059028 100644
+--- a/app/utils/text.py
++++ b/app/utils/text.py
+@@ -29,6 +29,18 @@ def title_case_words(value: str) -> str:
+     return " ".join(_capitalize_word_with_joiners(word) for word in words)
+ 
+ 
++def _capitalize_word_with_joiners(word: str) -> str:
++    if not word:
++        return word
++    # Preserve capitalization after punctuation joiners
++    if word[0].isalpha() and word[0].islower() and not any(c in word[1:] for c in NAME_JOINERS):
++        return word[0].upper() + word[1:]
++    # Special case: if the word starts with a joiner, preserve the case
++    if word[0] in NAME_JOINERS:
++        return word
++    return word
++
++
+ def normalize_display_name(value: str) -> str:
+     cleaned = collapse_outer_whitespace(value)
+     cleaned = cleaned.replace("_", " ")

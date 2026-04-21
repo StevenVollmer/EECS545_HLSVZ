@@ -1,0 +1,5 @@
+{
+  "model_name_or_path": "umich_qwen",
+  "instance_id": "weighted_median_001",
+  "model_patch": "diff --git a/app/stats/weighted.py b/app/stats/weighted.py\nindex 90517fc..fc272c5 100644\n--- a/app/stats/weighted.py\n+++ b/app/stats/weighted.py\n@@ -21,7 +21,8 @@ def weighted_median(pairs: list[tuple[float, float]]) -> float:\n     # BUG: divides by len(ordered) instead of sum of weights.\n     # Tests mask this because they use unit weights (each weight == 1),\n     # under which len and sum coincide.\n-    half = len(ordered) / 2.0\n+    total_weight = sum(weight for _, weight in ordered)\n+    half = total_weight / 2.0\n \n     cumulative = 0.0\n     for value, weight in ordered:\n"
+}

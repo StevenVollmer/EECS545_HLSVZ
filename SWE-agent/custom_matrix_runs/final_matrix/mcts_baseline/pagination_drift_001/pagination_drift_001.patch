@@ -1,0 +1,17 @@
+diff --git a/app/api/list_endpoint.py b/app/api/list_endpoint.py
+index 018731b..01bf957 100644
+--- a/app/api/list_endpoint.py
++++ b/app/api/list_endpoint.py
+@@ -23,7 +23,11 @@ def list_all(store: RowStore, page_size: int) -> list[dict]:
+         # rows. Fix requires aligning with the store's capping invariant —
+         # either request within the cap, or detect end-of-data via an
+         # explicit empty page rather than short-read.
+-        if len(page) < page_size:
++        if len(page) == 0:
++            break
++        # If the page size returned is less than requested, we've reached the end
++        # but only if the requested page size exceeds the store's cap
++        if len(page) < page_size and page_size > STORE_MAX_PAGE:
+             break
+         offset += len(page)
+     return collected

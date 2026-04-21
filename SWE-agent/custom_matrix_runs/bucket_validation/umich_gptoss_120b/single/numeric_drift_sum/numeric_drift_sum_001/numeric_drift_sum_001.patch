@@ -1,0 +1,32 @@
+diff --git a/app/finance/ledger.py b/app/finance/ledger.py
+index 491a421..0707a89 100644
+--- a/app/finance/ledger.py
++++ b/app/finance/ledger.py
+@@ -10,15 +10,15 @@ from __future__ import annotations
+ 
+ 
+ def total(amounts: list[float]) -> float:
+-    # BUG: naive float summation accumulates drift when summing thousands of
+-    # values that individually are exact in two-decimal form but whose binary
+-    # float representations are not. The reporting layer rounds to two
+-    # decimals, so small drift is usually hidden, but at operator scale the
+-    # drift crosses a penny boundary and the reported total is off by 0.01.
+-    # Fix requires recognizing that summing decimal-exact amounts demands a
+-    # numerically stable approach (sum of integer cents, Decimal, or
+-    # fsum/Kahan) — a naive sum is insufficient.
+-    running = 0.0
+-    for amount in amounts:
+-        running += amount
+-    return running
++    """Return the exact sum of dollar amounts.
++
++    Each amount is guaranteed to be representable as cents (two decimal places).
++    To avoid floating‑point drift we convert each amount to integer cents, sum
++    those integers, and then convert back to a float representing dollars.
++    """
++    # Convert each amount to cents as an integer to avoid binary rounding errors.
++    # Multiplying by 100 and rounding handles cases where the float representation
++    # is slightly off (e.g., 0.10 becomes 10.000000000000002). Using round ensures
++    # we get the correct cent value.
++    total_cents = sum(int(round(amount * 100)) for amount in amounts)
++    return total_cents / 100.0

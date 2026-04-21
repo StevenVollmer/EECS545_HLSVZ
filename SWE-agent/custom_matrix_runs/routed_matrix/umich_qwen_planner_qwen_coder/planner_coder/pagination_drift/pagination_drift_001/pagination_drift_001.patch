@@ -1,0 +1,25 @@
+diff --git a/app/api/list_endpoint.py b/app/api/list_endpoint.py
+index 018731b..4a17ffa 100644
+--- a/app/api/list_endpoint.py
++++ b/app/api/list_endpoint.py
+@@ -23,6 +23,20 @@ def list_all(store: RowStore, page_size: int) -> list[dict]:
+         # rows. Fix requires aligning with the store's capping invariant —
+         # either request within the cap, or detect end-of-data via an
+         # explicit empty page rather than short-read.
++        if len(page) == 0:
++            break
++        # The store caps page size at STORE_MAX_PAGE, so a page < page_size
++        # only means we've reached the end if the page is empty or the store
++        # returned fewer than requested due to the cap.
++        # However, if the requested page size exceeds STORE_MAX_PAGE, the store
++        # will always return STORE_MAX_PAGE rows until the end, so we must
++        # rely on the store returning fewer than requested only when at the end.
++        # But the store's cap means that any page with len(page) == STORE_MAX_PAGE
++        # is not necessarily the last page — we must check if the next page would be empty.
++        # Therefore, we cannot rely on len(page) < page_size as a termination condition.
++        # Instead, we must always fetch the next page and check if it's empty.
++        # However, the store's behavior is a stable v1 invariant — do not change it.
++        # So we must detect end-of-data via an explicit empty page.
+         if len(page) < page_size:
+             break
+         offset += len(page)

@@ -1,0 +1,5 @@
+{
+  "model_name_or_path": "umich_gptoss_120b",
+  "instance_id": "dep_cycle_detect_001",
+  "model_patch": "diff --git a/app/graph/cycle.py b/app/graph/cycle.py\nindex d9ce90e..d200bfd 100644\n--- a/app/graph/cycle.py\n+++ b/app/graph/cycle.py\n@@ -16,14 +16,19 @@ def has_cycle(adj: dict[str, list[str]]) -> bool:\n     # re-enter it look like cycles \u2014 false positives \u2014 AND joint-reachable\n     # subgraphs miss true back-edges depending on traversal order.)\n     visited: set[str] = set()\n+    rec_stack: set[str] = set()\n \n     def dfs(node: str) -> bool:\n-        if node in visited:\n+        if node in rec_stack:\n             return True\n-        visited.add(node)\n+        if node in visited:\n+            return False\n+        rec_stack.add(node)\n         for nxt in adj.get(node, []):\n             if dfs(nxt):\n                 return True\n+        rec_stack.remove(node)\n+        visited.add(node)\n         return False\n \n     for start in list(adj.keys()):\n"
+}

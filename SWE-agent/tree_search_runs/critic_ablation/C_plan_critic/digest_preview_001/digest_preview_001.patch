@@ -1,0 +1,29 @@
+diff --git a/app/utils/text.py b/app/utils/text.py
+index 0addf0e..3d9b297 100644
+--- a/app/utils/text.py
++++ b/app/utils/text.py
+@@ -29,6 +29,24 @@ def title_case_words(value: str) -> str:
+     return " ".join(_capitalize_word_with_joiners(word) for word in words)
+ 
+ 
++def _capitalize_word_with_joiners(word: str) -> str:
++    if not word:
++        return word
++    # Preserve capitalization after apostrophes and hyphens
++    result = []
++    capitalize_next = True
++    for char in word:
++        if char in "'-":
++            result.append(char)
++            capitalize_next = True
++        elif capitalize_next:
++            result.append(char.upper())
++            capitalize_next = False
++        else:
++            result.append(char.lower())
++    return ''.join(result)
++
++
+ def normalize_display_name(value: str) -> str:
+     cleaned = collapse_outer_whitespace(value)
+     cleaned = cleaned.replace("_", " ")

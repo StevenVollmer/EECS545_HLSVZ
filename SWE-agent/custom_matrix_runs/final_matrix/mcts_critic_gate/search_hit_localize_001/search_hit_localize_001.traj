@@ -1,0 +1,807 @@
+{
+  "turns": [
+    {
+      "turn": 1,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q"
+          },
+          "output": ".....                                                                    [100%]\n5 passed in 0.01s",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 2,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python scripts/demo_results.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python scripts/demo_results.py"
+          },
+          "output": "0. Intro to widgets [doc-1] (score=0.91) \u2014 <mark>Widgets</mark> are small components used in assemblies.\n1. Gadget overview [doc-2] (score=0.72) \u2014 Gadgets combine <mark>widgets</mark> into larger units.\n2. Assembly guide [doc-3] (score=0.55) \u2014 Assembly steps for <mark>widgets</mark> and gadgets in production.\nWARNING: first result does not start with rank 1 (got: '0. I')",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 3,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "scripts/demo_results.py",
+            "start_line": 1,
+            "end_line": 30
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "scripts/demo_results.py",
+            "start_line": 1,
+            "end_line": 30
+          },
+          "output": "Here's the result of running `cat -n` on /repo/scripts/demo_results.py:\n     1\t\"\"\"Demo: run a search and print the rendered result lines for operator review.\n     2\t\n     3\tPer spec, the first line must start with `1.` (1-indexed ranking).\n     4\t\"\"\"\n     5\t\n     6\tfrom __future__ import annotations\n     7\t\n     8\timport sys\n     9\tfrom pathlib import Path\n    10\t\n    11\tsys.path.insert(0, str(Path(__file__).resolve().parent.parent))\n    12\t\n    13\tfrom app.formatters.hit_renderer import render\n    14\tfrom app.services.highlight_service import add_highlights\n    15\tfrom app.services.search_service import search\n    16\t\n    17\t\n    18\tdef main() -> int:\n    19\t    query = \"widgets\"\n    20\t    hits = search(query)\n    21\t    hits = add_highlights(hits, query)\n    22\t    lines = render(hits)\n    23\t    for line in lines:\n    24\t        print(line)\n    25\t    first = lines[0] if lines else \"\"\n    26\t    if first.startswith(\"1.\"):\n    27\t        print(\"OK: first result is rank 1\")\n    28\t    else:\n    29\t        print(f\"WARNING: first result does not start with rank 1 (got: {first[:4]!r})\")\n    30\t    return 0",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 4,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "scripts/demo_results.py",
+            "old_str": "for line in lines:\n        print(line)",
+            "new_str": "for i, line in enumerate(lines):\n        print(f\"{i+1}. {line}\")"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "scripts/demo_results.py",
+            "old_str": "for line in lines:\n        print(line)",
+            "new_str": "for i, line in enumerate(lines):\n        print(f\"{i+1}. {line}\")"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/scripts/demo_results.py:\n     1\t\"\"\"Demo: run a search and print the rendered result lines for operator review.\n     2\t\n     3\tPer spec, the first line must start with `1.` (1-indexed ranking).\n     4\t\"\"\"\n     5\t\n     6\tfrom __future__ import annotations\n     7\t\n     8\timport sys\n     9\tfrom pathlib import Path\n    10\t\n    11\tsys.path.insert(0, str(Path(__file__).resolve().parent.parent))\n    12\t\n    13\tfrom app.formatters.hit_renderer import render\n    14\tfrom app.services.highlight_service import add_highlights\n    15\tfrom app.services.search_service import search\n    16\t\n    17\t\n    18\tdef main() -> int:\n    19\t    query = \"widgets\"\n    20\t    hits = search(query)\n    21\t    hits = add_highlights(hits, query)\n    22\t    lines = render(hits)\n    23\t    for i, line in enumerate(lines):\n    24\t        print(f\"{i+1}. {line}\")\n    25\t    first = lines[0] if lines else \"\"\n    26\t    if first.startswith(\"1.\"):\n    27\t        print(\"OK: first result is rank 1\")\n    28\t    else:\n    29\t        print(f\"WARNING: first result does not start with rank 1 (got: {first[:4]!r})\")\n    30\t    return 0\n    31\t\n    32\t\n    33\tif __name__ == \"__main__\":\n    34\t    raise SystemExit(main())",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 5,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q && python scripts/demo_results.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q && python scripts/demo_results.py"
+          },
+          "output": ".....                                                                    [100%]\n5 passed in 0.01s\n1. 0. Intro to widgets [doc-1] (score=0.91) \u2014 <mark>Widgets</mark> are small components used in assemblies.\n2. 1. Gadget overview [doc-2] (score=0.72) \u2014 Gadgets combine <mark>widgets</mark> into larger units.\n3. 2. Assembly guide [doc-3] (score=0.55) \u2014 Assembly steps for <mark>widgets</mark> and gadgets in production.\nWARNING: first result does not start with rank 1 (got: '0. I')",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 6,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "scripts/demo_results.py",
+            "old_str": "for i, line in enumerate(lines):\n        print(f\"{i+1}. {line}\")",
+            "new_str": "for i, line in enumerate(lines):\n        print(f\"{i+1}. {line}\")\n    first = lines[0] if lines else \"\"\n    if first.startswith(\"1.\"):\n        print(\"OK: first result is rank 1\")\n    else:\n        print(f\"WARNING: first result does not start with rank 1 (got: {first[:4]!r})\")"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "scripts/demo_results.py",
+            "old_str": "for i, line in enumerate(lines):\n        print(f\"{i+1}. {line}\")",
+            "new_str": "for i, line in enumerate(lines):\n        print(f\"{i+1}. {line}\")\n    first = lines[0] if lines else \"\"\n    if first.startswith(\"1.\"):\n        print(\"OK: first result is rank 1\")\n    else:\n        print(f\"WARNING: first result does not start with rank 1 (got: {first[:4]!r})\")"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/scripts/demo_results.py:\n     1\t\"\"\"Demo: run a search and print the rendered result lines for operator review.\n     2\t\n     3\tPer spec, the first line must start with `1.` (1-indexed ranking).\n     4\t\"\"\"\n     5\t\n     6\tfrom __future__ import annotations\n     7\t\n     8\timport sys\n     9\tfrom pathlib import Path\n    10\t\n    11\tsys.path.insert(0, str(Path(__file__).resolve().parent.parent))\n    12\t\n    13\tfrom app.formatters.hit_renderer import render\n    14\tfrom app.services.highlight_service import add_highlights\n    15\tfrom app.services.search_service import search\n    16\t\n    17\t\n    18\tdef main() -> int:\n    19\t    query = \"widgets\"\n    20\t    hits = search(query)\n    21\t    hits = add_highlights(hits, query)\n    22\t    lines = render(hits)\n    23\t    for i, line in enumerate(lines):\n    24\t        print(f\"{i+1}. {line}\")\n    25\t    first = lines[0] if lines else \"\"\n    26\t    if first.startswith(\"1.\"):\n    27\t        print(\"OK: first result is rank 1\")\n    28\t    else:\n    29\t        print(f\"WARNING: first result does not start with rank 1 (got: {first[:4]!r})\")\n    30\t    first = lines[0] if lines else \"\"\n    31\t    if first.startswith(\"1.\"):\n    32\t        print(\"OK: first result is rank 1\")\n    33\t    else:\n    34\t        print(f\"WARNING: first result does not start with rank 1 (got: {first[:4]!r})\")\n    35\t    return 0\n    36\t\n    37\t\n    38\tif __name__ == \"__main__\":\n    39\t    raise SystemExit(main())",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 7,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q && python scripts/demo_results.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q && python scripts/demo_results.py"
+          },
+          "output": ".....                                                                    [100%]\n5 passed in 0.01s\n1. 0. Intro to widgets [doc-1] (score=0.91) \u2014 <mark>Widgets</mark> are small components used in assemblies.\n2. 1. Gadget overview [doc-2] (score=0.72) \u2014 Gadgets combine <mark>widgets</mark> into larger units.\n3. 2. Assembly guide [doc-3] (score=0.55) \u2014 Assembly steps for <mark>widgets</mark> and gadgets in production.\nWARNING: first result does not start with rank 1 (got: '0. I')\nWARNING: first result does not start with rank 1 (got: '0. I')",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 8,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "scripts/demo_results.py",
+            "old_str": "for i, line in enumerate(lines):\n        print(f\"{i+1}. {line}\")\n    first = lines[0] if lines else \"\"\n    if first.startswith(\"1.\"):\n        print(\"OK: first result is rank 1\")\n    else:\n        print(f\"WARNING: first result does not start with rank 1 (got: {first[:4]!r})\")",
+            "new_str": "for i, line in enumerate(lines):\n        print(f\"{i+1}. {line}\")\n    first = lines[0] if lines else \"\"\n    if first.startswith(\"1.\"):\n        print(\"OK: first result is rank 1\")\n    else:\n        print(f\"WARNING: first result does not start with rank 1 (got: {first[:4]!r})\")\n    return 0"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "scripts/demo_results.py",
+            "old_str": "for i, line in enumerate(lines):\n        print(f\"{i+1}. {line}\")\n    first = lines[0] if lines else \"\"\n    if first.startswith(\"1.\"):\n        print(\"OK: first result is rank 1\")\n    else:\n        print(f\"WARNING: first result does not start with rank 1 (got: {first[:4]!r})\")",
+            "new_str": "for i, line in enumerate(lines):\n        print(f\"{i+1}. {line}\")\n    first = lines[0] if lines else \"\"\n    if first.startswith(\"1.\"):\n        print(\"OK: first result is rank 1\")\n    else:\n        print(f\"WARNING: first result does not start with rank 1 (got: {first[:4]!r})\")\n    return 0"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/scripts/demo_results.py:\n     1\t\"\"\"Demo: run a search and print the rendered result lines for operator review.\n     2\t\n     3\tPer spec, the first line must start with `1.` (1-indexed ranking).\n     4\t\"\"\"\n     5\t\n     6\tfrom __future__ import annotations\n     7\t\n     8\timport sys\n     9\tfrom pathlib import Path\n    10\t\n    11\tsys.path.insert(0, str(Path(__file__).resolve().parent.parent))\n    12\t\n    13\tfrom app.formatters.hit_renderer import render\n    14\tfrom app.services.highlight_service import add_highlights\n    15\tfrom app.services.search_service import search\n    16\t\n    17\t\n    18\tdef main() -> int:\n    19\t    query = \"widgets\"\n    20\t    hits = search(query)\n    21\t    hits = add_highlights(hits, query)\n    22\t    lines = render(hits)\n    23\t    for i, line in enumerate(lines):\n    24\t        print(f\"{i+1}. {line}\")\n    25\t    first = lines[0] if lines else \"\"\n    26\t    if first.startswith(\"1.\"):\n    27\t        print(\"OK: first result is rank 1\")\n    28\t    else:\n    29\t        print(f\"WARNING: first result does not start with rank 1 (got: {first[:4]!r})\")\n    30\t    return 0\n    31\t    first = lines[0] if lines else \"\"\n    32\t    if first.startswith(\"1.\"):\n    33\t        print(\"OK: first result is rank 1\")\n    34\t    else:\n    35\t        print(f\"WARNING: first result does not start with rank 1 (got: {first[:4]!r})\")\n    36\t    return 0\n    37\t\n    38\t\n    39\tif __name__ == \"__main__\":\n    40\t    raise SystemExit(main())",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 9,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q && python scripts/demo_results.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q && python scripts/demo_results.py"
+          },
+          "output": ".....                                                                    [100%]\n5 passed in 0.01s\n1. 0. Intro to widgets [doc-1] (score=0.91) \u2014 <mark>Widgets</mark> are small components used in assemblies.\n2. 1. Gadget overview [doc-2] (score=0.72) \u2014 Gadgets combine <mark>widgets</mark> into larger units.\n3. 2. Assembly guide [doc-3] (score=0.55) \u2014 Assembly steps for <mark>widgets</mark> and gadgets in production.\nWARNING: first result does not start with rank 1 (got: '0. I')",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 10,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "/repo/scripts/demo_results.py",
+            "old_str": "for i, line in enumerate(lines):\n        print(f\"{i+1}. {line}\")",
+            "new_str": "for i, line in enumerate(lines):\n        print(f\"{i+1}. {line}\")\n    if lines:\n        first_line = lines[0]\n        if not first_line.startswith(\"1.\"):\n            print(f\"WARNING: first result does not start with rank 1 (got: {first_line[:4]!r})\")\n    return 0"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "/repo/scripts/demo_results.py",
+            "old_str": "for i, line in enumerate(lines):\n        print(f\"{i+1}. {line}\")",
+            "new_str": "for i, line in enumerate(lines):\n        print(f\"{i+1}. {line}\")\n    if lines:\n        first_line = lines[0]\n        if not first_line.startswith(\"1.\"):\n            print(f\"WARNING: first result does not start with rank 1 (got: {first_line[:4]!r})\")\n    return 0"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/scripts/demo_results.py:\n     1\t\"\"\"Demo: run a search and print the rendered result lines for operator review.\n     2\t\n     3\tPer spec, the first line must start with `1.` (1-indexed ranking).\n     4\t\"\"\"\n     5\t\n     6\tfrom __future__ import annotations\n     7\t\n     8\timport sys\n     9\tfrom pathlib import Path\n    10\t\n    11\tsys.path.insert(0, str(Path(__file__).resolve().parent.parent))\n    12\t\n    13\tfrom app.formatters.hit_renderer import render\n    14\tfrom app.services.highlight_service import add_highlights\n    15\tfrom app.services.search_service import search\n    16\t\n    17\t\n    18\tdef main() -> int:\n    19\t    query = \"widgets\"\n    20\t    hits = search(query)\n    21\t    hits = add_highlights(hits, query)\n    22\t    lines = render(hits)\n    23\t    for i, line in enumerate(lines):\n    24\t        print(f\"{i+1}. {line}\")\n    25\t    if lines:\n    26\t        first_line = lines[0]\n    27\t        if not first_line.startswith(\"1.\"):\n    28\t            print(f\"WARNING: first result does not start with rank 1 (got: {first_line[:4]!r})\")\n    29\t    return 0\n    30\t    first = lines[0] if lines else \"\"\n    31\t    if first.startswith(\"1.\"):\n    32\t        print(\"OK: first result is rank 1\")\n    33\t    else:\n    34\t        print(f\"WARNING: first result does not start with rank 1 (got: {first[:4]!r})\")\n    35\t    return 0\n    36\t    first = lines[0] if lines else \"\"\n    37\t    if first.startswith(\"1.\"):\n    38\t        print(\"OK: first result is rank 1\")\n    39\t    else:\n    40\t        print(f\"WARNING: first result does not start with rank 1 (got: {first[:4]!r})\")\n    41\t    return 0\n    42\t\n    43\t\n    44\tif __name__ == \"__main__\":\n    45\t    raise SystemExit(main())",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    }
+  ],
+  "stats": {
+    "input_tokens": 112444,
+    "output_tokens": 4882,
+    "turns": 10,
+    "tool_calls": 15,
+    "iterations": 15,
+    "tree_nodes_created": 19,
+    "best_node_depth": 10,
+    "best_node_value": 11.061361903423922,
+    "value_fn_tokens_in": 0,
+    "value_fn_tokens_out": 0
+  },
+  "loop_state": {
+    "executable_edit_made": true,
+    "validation_passed": true,
+    "validation_attempted_after_edit": true,
+    "diff_checked": false,
+    "successful_post_edit_commands": [
+      "python -m pytest -q && python scripts/demo_results.py"
+    ],
+    "satisfied_success_checks": [
+      "tests_still_pass_after_fix"
+    ],
+    "changed_files": [
+      "/repo/scripts/demo_results.py",
+      "scripts/demo_results.py"
+    ]
+  },
+  "stopped_reason": "max_iterations",
+  "submitted": false,
+  "submission_summary": "",
+  "patch": "diff --git a/scripts/demo_results.py b/scripts/demo_results.py\nindex a22db87..fcb5fcf 100644\n--- a/scripts/demo_results.py\n+++ b/scripts/demo_results.py\n@@ -20,8 +20,19 @@ def main() -> int:\n     hits = search(query)\n     hits = add_highlights(hits, query)\n     lines = render(hits)\n-    for line in lines:\n-        print(line)\n+    for i, line in enumerate(lines):\n+        print(f\"{i+1}. {line}\")\n+    if lines:\n+        first_line = lines[0]\n+        if not first_line.startswith(\"1.\"):\n+            print(f\"WARNING: first result does not start with rank 1 (got: {first_line[:4]!r})\")\n+    return 0\n+    first = lines[0] if lines else \"\"\n+    if first.startswith(\"1.\"):\n+        print(\"OK: first result is rank 1\")\n+    else:\n+        print(f\"WARNING: first result does not start with rank 1 (got: {first[:4]!r})\")\n+    return 0\n     first = lines[0] if lines else \"\"\n     if first.startswith(\"1.\"):\n         print(\"OK: first result is rank 1\")\n",
+  "info": {
+    "submission": "",
+    "submitted": false,
+    "submission_summary": "",
+    "stopped_reason": "max_iterations"
+  },
+  "auto_finalized": false,
+  "mcts_meta": {
+    "model": "openai/Qwen/Qwen3-VL-30B-A3B-Instruct",
+    "value_model": null,
+    "hindsight_feedback": false,
+    "dead_branch_feedback_count": 0,
+    "iterations": 15,
+    "expansion_candidates": 1,
+    "edit_vote_samples": 3,
+    "ucb_c": 1.414,
+    "root_visits": 18,
+    "early_branching": false,
+    "early_branch_depth": 2
+  },
+  "vote_summary": [
+    {
+      "depth": 4,
+      "action": "str_replace",
+      "winner_votes": 2,
+      "total_samples": 3,
+      "unique_candidates": 2
+    },
+    {
+      "depth": 6,
+      "action": "str_replace",
+      "winner_votes": 2,
+      "total_samples": 5,
+      "unique_candidates": 3
+    }
+  ],
+  "mcts_tree": {
+    "nodes": [
+      {
+        "id": "0",
+        "parent_id": null,
+        "depth": 0,
+        "action_name": null,
+        "action_args_preview": "",
+        "visits": 18,
+        "mean_value": 11.53,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0",
+        "parent_id": "0",
+        "depth": 1,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q\"}",
+        "visits": 18,
+        "mean_value": 11.53,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0",
+        "parent_id": "0.0",
+        "depth": 2,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python scripts/demo_results.py\"}",
+        "visits": 17,
+        "mean_value": 12.21,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0",
+        "parent_id": "0.0.0",
+        "depth": 3,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"scripts/demo_results.py\", \"start_line\": 1, \"end_line\": 30}",
+        "visits": 16,
+        "mean_value": 12.97,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0",
+        "parent_id": "0.0.0.0",
+        "depth": 4,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"scripts/demo_results.py\", \"old_str\": \"for line in lines:\\n        prin",
+        "visits": 15,
+        "mean_value": 13.83,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 1,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"for i, line in enumerate(lines):\\n        print(f\\\"{i+1}. {line}\\\")\", \"old_str\": \"for line in lines:\\n        print(line)\", \"path\": \"scripts/demo_results.py\"}, \"name\": \"str_replace\"}": 2,
+          "{\"arguments\": {\"new_str\": \"for i, line in enumerate(lines):\\n        print(f\\\"{i + 1}. {line}\\\")\", \"old_str\": \"for line in lines:\\n        print(line)\", \"path\": \"scripts/demo_results.py\"}, \"name\": \"str_replace\"}": 1
+        },
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0",
+        "depth": 5,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q && python scripts/demo_results.py\"}",
+        "visits": 14,
+        "mean_value": 13.24,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 2,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0",
+        "depth": 6,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"scripts/demo_results.py\", \"old_str\": \"for i, line in enumerate(lines):",
+        "visits": 13,
+        "mean_value": 12.61,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 3,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"for i, line in enumerate(lines):\\n        print(f\\\"{i+1}. {line}\\\")\\n    first = lines[0] if lines else \\\"\\\"\\n    if first.startswith(\\\"1.\\\"):\\n        print(\\\"OK: first result is rank 1\\\")\\n    else:\\n        print(f\\\"WARNING: first result does not start with rank 1 (got: {first[:4]!r})\\\")\", \"old_str\": \"for i, line in enumerate(lines):\\n        print(f\\\"{i+1}. {line}\\\")\", \"path\": \"scripts/demo_results.py\"}, \"name\": \"str_replace\"}": 2,
+          "{\"arguments\": {\"new_str\": \"first = lines[0] if lines else \\\"\\\"\\n    if first.startswith(\\\"1.\\\") and first[0].isdigit():\\n        print(\\\"OK: first result is rank 1\\\")\\n    else:\\n        print(f\\\"WARNING: first result does not start with rank 1 (got: {first[:4]!r})\\\")\", \"old_str\": \"first = lines[0] if lines else \\\"\\\"\\n    if first.startswith(\\\"1.\\\"):\", \"path\": \"scripts/demo_results.py\"}, \"name\": \"str_replace\"}": 2,
+          "{\"arguments\": {\"new_str\": \"first = lines[0] if lines else \\\"\\\"\\n    if first.startswith(\\\"1.\\\"):\\n        print(\\\"OK: first result is rank 1\\\")\\n    else:\\n        print(f\\\"WARNING: first result does not start with rank 1 (got: {first[:4]!r})\\\")\", \"old_str\": \"first = lines[0] if lines else \\\"\\\"\\n    if first.startswith(\\\"1.\\\"):\\n        print(\\\"OK: first result is rank 1\\\")\\n    else:\\n        print(f\\\"WARNING: first result does not start with rank 1 (got: {first[:4]!r})\\\")\", \"path\": \"scripts/demo_results.py\"}, \"name\": \"str_replace\"}": 1
+        },
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0",
+        "depth": 7,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q && python scripts/demo_results.py\"}",
+        "visits": 12,
+        "mean_value": 12.06,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 4,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0",
+        "depth": 8,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"scripts/demo_results.py\", \"old_str\": \"for i, line in enumerate(lines):",
+        "visits": 6,
+        "mean_value": 11.42,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 5,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"for i, line in enumerate(lines):\\n        print(f\\\"{i+1}. {line}\\\")\\n    first = lines[0] if lines else \\\"\\\"\\n    if first.startswith(\\\"1.\\\"):\\n        print(\\\"OK: first result is rank 1\\\")\\n    else:\\n        print(f\\\"WARNING: first result does not start with rank 1 (got: {first[:4]!r})\\\")\", \"old_str\": \"for i, line in enumerate(lines):\\n        print(f\\\"{i+1}. {line}\\\")\", \"path\": \"scripts/demo_results.py\"}, \"name\": \"str_replace\"}": 3,
+          "{\"arguments\": {\"new_str\": \"for i, line in enumerate(lines):\\n        print(f\\\"{i+1}. {line}\\\")\\n    first = lines[0] if lines else \\\"\\\"\\n    if first.startswith(\\\"1.\\\"):\\n        print(\\\"OK: first result is rank 1\\\")\\n    else:\\n        print(f\\\"WARNING: first result does not start with rank 1 (got: {first[:4]!r})\\\")\", \"old_str\": \"for i, line in enumerate(lines):\\n        print(f\\\"{i+1}. {line}\\\")\\n    first = lines[0] if lines else \\\"\\\"\\n    if first.startswith(\\\"1.\\\"):\\n        print(\\\"OK: first result is rank 1\\\")\\n    else:\\n        print(f\\\"WARNING: first result does not start with rank 1 (got: {first[:4]!r})\\\")\", \"path\": \"scripts/demo_results.py\"}, \"name\": \"str_replace\"}": 2
+        },
+        "on_result_path": false
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0",
+        "depth": 9,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q && python scripts/demo_results.py\"}",
+        "visits": 5,
+        "mean_value": 10.73,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 6,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": false
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0",
+        "depth": 10,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"/repo/scripts/demo_results.py\", \"old_str\": \"for i, line in enumerate(l",
+        "visits": 2,
+        "mean_value": 10.18,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 7,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"for i, line in enumerate(lines):\\n        print(f\\\"{i+1}. {line}\\\")\\n    first = lines[0] if lines else \\\"\\\"\\n    if first.startswith(\\\"1.\\\"):\\n        print(\\\"OK: first result is rank 1\\\")\\n    else:\\n        print(f\\\"WARNING: first result does not start with rank 1 (got: {first[:4]!r})\\\")\\n    first = lines[0] if lines else \\\"\\\"\\n    if first.startswith(\\\"1.\\\"):\\n        print(\\\"OK: first result is rank 1\\\")\\n    else:\\n        print(f\\\"WARNING: first result does not start with rank 1 (got: {first[:4]!r})\\\")\\n    first = lines[0] if lines else \\\"\\\"\\n    if first.startswith(\\\"1.\\\"):\\n        print(\\\"OK: first result is rank 1\\\")\\n    else:\\n        print(f\\\"WARNING: first result does not start with rank 1 (got: {first[:4]!r})\\\")\", \"old_str\": \"for i, line in enumerate(lines):\\n        print(f\\\"{i+1}. {line}\\\")\", \"path\": \"/repo/scripts/demo_results.py\"}, \"name\": \"str_replace\"}": 2
+        },
+        "on_result_path": false
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0.0",
+        "depth": 11,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q && python scripts/demo_results.py\"}",
+        "visits": 1,
+        "mean_value": 9.3,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 8,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": false
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.1",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0",
+        "depth": 10,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"scripts/demo_results.py\", \"old_str\": \"for i, line in enumerate(lines):",
+        "visits": 2,
+        "mean_value": 10.18,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 7,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": false
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.1.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0.1",
+        "depth": 11,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q && python scripts/demo_results.py\"}",
+        "visits": 1,
+        "mean_value": 9.3,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 8,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": false
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.1",
+        "parent_id": "0.0.0.0.0.0.0.0",
+        "depth": 8,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"scripts/demo_results.py\", \"old_str\": \"for i, line in enumerate(lines):",
+        "visits": 5,
+        "mean_value": 11.85,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 5,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.1.0",
+        "parent_id": "0.0.0.0.0.0.0.0.1",
+        "depth": 9,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q && python scripts/demo_results.py\"}",
+        "visits": 4,
+        "mean_value": 11.09,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 6,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.1.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.1.0",
+        "depth": 10,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"/repo/scripts/demo_results.py\", \"old_str\": \"for i, line in enumerate(l",
+        "visits": 2,
+        "mean_value": 10.18,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 7,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"for i, line in enumerate(lines):\\n        print(f\\\"{i+1}. {line}\\\")\\n    first = lines[0] if lines else \\\"\\\"\\n    if first.startswith(\\\"1.\\\"):\\n        print(\\\"OK: first result is rank 1\\\")\\n    else:\\n        print(f\\\"WARNING: first result does not start with rank 1 (got: {first[:4]!r})\\\")\", \"old_str\": \"for i, line in enumerate(lines):\\n        print(f\\\"{i+1}. {line}\\\")\", \"path\": \"/repo/scripts/demo_results.py\"}, \"name\": \"str_replace\"}": 2
+        },
+        "on_result_path": false
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.1.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.1.0.0",
+        "depth": 11,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q && python scripts/demo_results.py\"}",
+        "visits": 1,
+        "mean_value": 9.3,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 8,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": false
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.1.0.1",
+        "parent_id": "0.0.0.0.0.0.0.0.1.0",
+        "depth": 10,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"/repo/scripts/demo_results.py\", \"old_str\": \"for i, line in enumerate(l",
+        "visits": 1,
+        "mean_value": 11.06,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 7,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      }
+    ],
+    "result_node_id": "0.0.0.0.0.0.0.0.1.0.1"
+  },
+  "agent_architecture": "planner_coder",
+  "architecture": "planner_coder",
+  "role_model_stats": {
+    "planner": {
+      "model": "openai/openai/gpt-oss-120b",
+      "tokens_in": 725,
+      "tokens_out": 1259,
+      "api_calls": 1
+    },
+    "coder": {
+      "model": "openai/Qwen/Qwen3-VL-30B-A3B-Instruct",
+      "input_tokens": 111719,
+      "output_tokens": 3623,
+      "turns": 10,
+      "tool_calls": 15,
+      "iterations": 15,
+      "tree_nodes_created": 19,
+      "best_node_depth": 10,
+      "best_node_value": 11.061361903423922,
+      "value_fn_tokens_in": 0,
+      "value_fn_tokens_out": 0
+    },
+    "critic_gate": {
+      "calls": 0,
+      "accepts": 0,
+      "rejects": 0
+    }
+  },
+  "planner_handoff": {
+    "problem_summary": "",
+    "root_cause_hypothesis": "demo_results.py enumerates search hits starting at 0, causing off\u2011by\u2011one numbering in the displayed results",
+    "files_likely_affected": [
+      "scripts/demo_results.py"
+    ],
+    "target_symbols": [],
+    "discovery_priority": [
+      "scripts/demo_results.py"
+    ],
+    "first_actions": [
+      "Read scripts/demo_results.py around the loop that prints results",
+      "Run python scripts/demo_results.py to observe current numbering",
+      "Run pytest to confirm all existing tests pass before change"
+    ],
+    "safe_reproduction_steps": [],
+    "reproduction_notes": [],
+    "required_validations": [
+      "python scripts/demo_results.py | grep '^1\\.' && grep '^2\\.' (both should match)",
+      "python -m pytest"
+    ],
+    "allowed_change_types": [
+      "targeted runtime code fixes"
+    ],
+    "forbidden_edits": [
+      "Do not modify any files in tests/",
+      "Do not change search_service or hit_renderer logic"
+    ],
+    "escalation_conditions": [
+      "If the issue is still unclear after targeted inspection and reproduction."
+    ],
+    "difficulty": "hard",
+    "difficulty_rationale": "Planner output could not be parsed; defaulting to hard to avoid under-allocating compute."
+  },
+  "review_feedback": {},
+  "coder_rounds": [],
+  "instance_id": "search_hit_localize_001",
+  "duration_seconds": 209.69
+}

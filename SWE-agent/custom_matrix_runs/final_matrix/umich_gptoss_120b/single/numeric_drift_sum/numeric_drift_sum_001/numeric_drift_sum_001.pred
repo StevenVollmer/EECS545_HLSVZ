@@ -1,0 +1,5 @@
+{
+  "model_name_or_path": "umich_gptoss_120b",
+  "instance_id": "numeric_drift_sum_001",
+  "model_patch": "diff --git a/app/finance/ledger.py b/app/finance/ledger.py\nindex 491a421..0ef19f8 100644\n--- a/app/finance/ledger.py\n+++ b/app/finance/ledger.py\n@@ -18,7 +18,11 @@ def total(amounts: list[float]) -> float:\n     # Fix requires recognizing that summing decimal-exact amounts demands a\n     # numerically stable approach (sum of integer cents, Decimal, or\n     # fsum/Kahan) \u2014 a naive sum is insufficient.\n-    running = 0.0\n+    # Convert each amount to integer cents to avoid floating\u2011point drift\n+    total_cents = 0\n     for amount in amounts:\n-        running += amount\n-    return running\n+        # Multiply by 100 and round to nearest cent to get integer cents\n+        cents = int(round(amount * 100))\n+        total_cents += cents\n+    # Return as float dollars\n+    return total_cents / 100.0\n"
+}

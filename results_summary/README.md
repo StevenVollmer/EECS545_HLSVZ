@@ -121,6 +121,33 @@ Cases were classified by which configs solve them:
 
 ---
 
+## Part 3: MCTS Integration (27-Case Unified Matrix)
+
+We integrated the critic into Steven's MCTS pipeline with two modes and ran the full 8-config × 27-case matrix in a single session for consistency. See [raw_data.md](/Users/rafe/classes/eecs545/project/results_summary/raw_data.md) Source 1 for full tables.
+
+- **Plan critic (warnings):** critic output injected into MCTS search context without plan revision. Revision destroyed performance (50%) in early work; warnings preserve search breadth.
+- **Critic gate:** replaces MCTS auto-accept with LLM patch quality evaluation before submission. Deployment-realistic — no hidden-test oracle leak.
+
+### MCTS Results (27 cases)
+
+```
+Variant              Resolved   Rate    Description
+─────────────────────────────────────────────────────────────────────
+mcts_baseline         17/27    63.0%   MCTS + auto-accept
+mcts + plan_critic    19/27    70.4%   MCTS + critic warnings (no revision)
+mcts + critic_gate    20/27    74.1%   MCTS + critic submission gate (best MCTS)
+```
+
+### Key MCTS Findings
+
+**1. Critic submission gate is the best MCTS variant** — +3 cases over auto-accept baseline. Counter-intuitively, the gate *improves* solve rate by preventing the search from stopping on early branches that pass success checks but don't fully fix the issue.
+
+**2. Plan critic as warnings is neutral-to-helpful for MCTS** — +2 cases over baseline, no regression. Critic-as-revision would hurt (seen in earlier ablation at 50%).
+
+**3. MCTS variants are 2× the compute of linear gpt→qw but 6× cheaper than gpt solo.** Compute: mcts ≈ 3.9, linear gpt→qw ≈ 2.0, gpt solo ≈ 23.7.
+
+---
+
 ## Compute Caveat
 
 `Avg relative compute burden to 4o-mini` is a heuristic useful for internal relative comparison. For self-hosted or UMich models, it estimates relative compute burden, not literal dollar cost.
@@ -134,3 +161,5 @@ Cases were classified by which configs solve them:
 3. **Critic is the most compute-efficient audit mechanism** — same resolved-rate lift as reviewer at 17% less compute. Catching plan errors before code generation is cheaper than catching patch errors after.
 
 4. **Both audits reach 89% of the large-coder ceiling (8/10 vs 9/10) at roughly 10x less compute.**
+
+5. **Critic as MCTS submission gate is the best MCTS variant** — +3 cases over auto-accept on 27 cases, and gives deployment-realistic numbers instead of leaking the hidden-test oracle.

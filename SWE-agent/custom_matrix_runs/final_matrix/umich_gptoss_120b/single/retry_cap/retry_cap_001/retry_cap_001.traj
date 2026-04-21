@@ -1,0 +1,340 @@
+{
+  "turns": [
+    {
+      "turn": 1,
+      "assistant_text": "",
+      "tool_calls": [],
+      "tool_results": [],
+      "finish_reason": "stop",
+      "parse_error": "Empty response; expected JSON action object or array."
+    },
+    {
+      "turn": 2,
+      "assistant_text": "{\"tool\":\"view\",\"arguments\":{\"path\":\"app/utils/backoff.py\",\"start_line\":1,\"end_line\":400}}",
+      "tool_calls": [
+        {
+          "id": "react-1-view",
+          "name": "view",
+          "arguments": {
+            "path": "app/utils/backoff.py",
+            "start_line": 1,
+            "end_line": 400
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/utils/backoff.py",
+            "start_line": 1,
+            "end_line": 400
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/utils/backoff.py:\n     1\t\"\"\"Exponential backoff with jitter, capped at max_delay_seconds.\"\"\"\n     2\t\n     3\tfrom __future__ import annotations\n     4\t\n     5\timport random\n     6\t\n     7\t\n     8\tdef compute_delay(\n     9\t    attempt: int,\n    10\t    *,\n    11\t    base_seconds: float = 1.0,\n    12\t    factor: float = 2.0,\n    13\t    max_delay_seconds: float = 30.0,\n    14\t    jitter_ratio: float = 0.25,\n    15\t    rng: random.Random | None = None,\n    16\t) -> float:\n    17\t    \"\"\"Return the delay (seconds) before retry number ``attempt`` (1-indexed).\n    18\t\n    19\t    The effective delay must never exceed ``max_delay_seconds``. Jitter is\n    20\t    applied as a uniform ratio of the pre-cap exponential value.\n    21\t    \"\"\"\n    22\t    if attempt < 1:\n    23\t        raise ValueError(\"attempt must be >= 1\")\n    24\t\n    25\t    if rng is None:\n    26\t        rng = random.Random()\n    27\t    exponential = base_seconds * (factor ** (attempt - 1))\n    28\t    # Apply jitter: +/- jitter_ratio of exponential\n    29\t    jitter = rng.uniform(-jitter_ratio, jitter_ratio) * exponential\n    30\t    capped = min(exponential, max_delay_seconds)\n    31\t    return capped + jitter",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 3,
+      "assistant_text": "",
+      "tool_calls": [],
+      "tool_results": [],
+      "finish_reason": "stop",
+      "parse_error": "Empty response; expected JSON action object or array."
+    },
+    {
+      "turn": 4,
+      "assistant_text": "{\"path\":\"scripts/demo_backoff.py\",\"start_line\":1,\"end_line\":200}",
+      "tool_calls": [
+        {
+          "id": "react-1-view",
+          "name": "view",
+          "arguments": {
+            "path": "scripts/demo_backoff.py",
+            "start_line": 1,
+            "end_line": 200
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "scripts/demo_backoff.py",
+            "start_line": 1,
+            "end_line": 200
+          },
+          "output": "Here's the result of running `cat -n` on /repo/scripts/demo_backoff.py:\n     1\t\"\"\"Demo: preview backoff delays for a 10-attempt retry schedule with a 30s cap.\n     2\t\n     3\tThe cap MUST bound the scheduled wait. We print the maximum scheduled delay so\n     4\toperators can confirm retries never wait longer than the configured cap.\n     5\t\"\"\"\n     6\t\n     7\tfrom __future__ import annotations\n     8\t\n     9\timport random\n    10\timport sys\n    11\tfrom pathlib import Path\n    12\t\n    13\tsys.path.insert(0, str(Path(__file__).resolve().parent.parent))\n    14\t\n    15\tfrom app.services.retry_runner import plan_schedule\n    16\t\n    17\t\n    18\tdef main() -> int:\n    19\t    rng = random.Random(42)\n    20\t    schedule = plan_schedule(\n    21\t        attempts=10,\n    22\t        base_seconds=1.0,\n    23\t        factor=2.0,\n    24\t        max_delay_seconds=30.0,\n    25\t        jitter_ratio=0.25,\n    26\t        rng=rng,\n    27\t    )\n    28\t    print(\"Retry schedule preview\")\n    29\t    print(\"======================\")\n    30\t    print(f\"Max scheduled delay: {schedule.max_delay:.2f}s\")\n    31\t    print(f\"Cap configured:      30.00s\")\n    32\t    if schedule.max_delay > 30.0:\n    33\t        print(\"WARNING: scheduled delay exceeds configured cap\")\n    34\t    else:\n    35\t        print(\"OK: all scheduled delays are within the cap\")\n    36\t    return 0\n    37\t\n    38\t\n    39\tif __name__ == \"__main__\":\n    40\t    raise SystemExit(main())",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 5,
+      "assistant_text": "{\"command\":\"python scripts/demo_backoff.py\"}",
+      "tool_calls": [
+        {
+          "id": "react-1-bash",
+          "name": "bash",
+          "arguments": {
+            "command": "python scripts/demo_backoff.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python scripts/demo_backoff.py"
+          },
+          "output": "Retry schedule preview\n======================\nMax scheduled delay: 42.55s\nCap configured:      30.00s\nWARNING: scheduled delay exceeds configured cap",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 6,
+      "assistant_text": "{\"tool\":\"str_replace\",\"arguments\":{\"path\":\"app/utils/backoff.py\",\"old_str\":\"    exponential = base_seconds * (factor ** (attempt - 1))\\n    # Apply jitter: +/- jitter_ratio of exponential\\n    jitter = rng.uniform(-jitter_ratio, jitter_ratio) * exponential\\n    capped = min(exponential, max_delay_seconds)\\n    return capped + jitter\",\"new_str\":\"    exponential = base_seconds * (factor ** (attempt - 1))\\n    # Apply jitter: +/- jitter_ratio of the capped exponential value\\n    capped = min(exponential, max_delay_seconds)\\n    jitter = rng.uniform(-jitter_ratio, jitter_ratio) * capped\\n    # Ensure final delay does not exceed max_delay_seconds and is not negative\\n    delay = capped + jitter\\n    return max(0.0, min(delay, max_delay_seconds))\"}}",
+      "tool_calls": [
+        {
+          "id": "react-1-str_replace",
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/utils/backoff.py",
+            "old_str": "    exponential = base_seconds * (factor ** (attempt - 1))\n    # Apply jitter: +/- jitter_ratio of exponential\n    jitter = rng.uniform(-jitter_ratio, jitter_ratio) * exponential\n    capped = min(exponential, max_delay_seconds)\n    return capped + jitter",
+            "new_str": "    exponential = base_seconds * (factor ** (attempt - 1))\n    # Apply jitter: +/- jitter_ratio of the capped exponential value\n    capped = min(exponential, max_delay_seconds)\n    jitter = rng.uniform(-jitter_ratio, jitter_ratio) * capped\n    # Ensure final delay does not exceed max_delay_seconds and is not negative\n    delay = capped + jitter\n    return max(0.0, min(delay, max_delay_seconds))"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/utils/backoff.py",
+            "old_str": "    exponential = base_seconds * (factor ** (attempt - 1))\n    # Apply jitter: +/- jitter_ratio of exponential\n    jitter = rng.uniform(-jitter_ratio, jitter_ratio) * exponential\n    capped = min(exponential, max_delay_seconds)\n    return capped + jitter",
+            "new_str": "    exponential = base_seconds * (factor ** (attempt - 1))\n    # Apply jitter: +/- jitter_ratio of the capped exponential value\n    capped = min(exponential, max_delay_seconds)\n    jitter = rng.uniform(-jitter_ratio, jitter_ratio) * capped\n    # Ensure final delay does not exceed max_delay_seconds and is not negative\n    delay = capped + jitter\n    return max(0.0, min(delay, max_delay_seconds))"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/utils/backoff.py:\n     1\t\"\"\"Exponential backoff with jitter, capped at max_delay_seconds.\"\"\"\n     2\t\n     3\tfrom __future__ import annotations\n     4\t\n     5\timport random\n     6\t\n     7\t\n     8\tdef compute_delay(\n     9\t    attempt: int,\n    10\t    *,\n    11\t    base_seconds: float = 1.0,\n    12\t    factor: float = 2.0,\n    13\t    max_delay_seconds: float = 30.0,\n    14\t    jitter_ratio: float = 0.25,\n    15\t    rng: random.Random | None = None,\n    16\t) -> float:\n    17\t    \"\"\"Return the delay (seconds) before retry number ``attempt`` (1-indexed).\n    18\t\n    19\t    The effective delay must never exceed ``max_delay_seconds``. Jitter is\n    20\t    applied as a uniform ratio of the pre-cap exponential value.\n    21\t    \"\"\"\n    22\t    if attempt < 1:\n    23\t        raise ValueError(\"attempt must be >= 1\")\n    24\t\n    25\t    if rng is None:\n    26\t        rng = random.Random()\n    27\t    exponential = base_seconds * (factor ** (attempt - 1))\n    28\t    # Apply jitter: +/- jitter_ratio of the capped exponential value\n    29\t    capped = min(exponential, max_delay_seconds)\n    30\t    jitter = rng.uniform(-jitter_ratio, jitter_ratio) * capped\n    31\t    # Ensure final delay does not exceed max_delay_seconds and is not negative\n    32\t    delay = capped + jitter\n    33\t    return max(0.0, min(delay, max_delay_seconds))",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 7,
+      "assistant_text": "{\"command\":\"pytest -q\"}",
+      "tool_calls": [
+        {
+          "id": "react-1-bash",
+          "name": "bash",
+          "arguments": {
+            "command": "pytest -q"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "pytest -q"
+          },
+          "output": ".....                                                                    [100%]\n5 passed in 0.02s",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 8,
+      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"python scripts/demo_backoff.py\"}}",
+      "tool_calls": [
+        {
+          "id": "react-1-bash",
+          "name": "bash",
+          "arguments": {
+            "command": "python scripts/demo_backoff.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python scripts/demo_backoff.py"
+          },
+          "output": "Retry schedule preview\n======================\nMax scheduled delay: 30.00s\nCap configured:      30.00s\nOK: all scheduled delays are within the cap",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 9,
+      "assistant_text": "{\"tool\":\"submit\",\"arguments\":{\"summary\":\"Fixed\u00a0\u200b\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u200b\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u200b\u00a0\u00a0\u00a0\u200b\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u200b\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u200b\u00a0\"}}",
+      "tool_calls": [
+        {
+          "id": "react-1-submit",
+          "name": "submit",
+          "arguments": {
+            "summary": "Fixed\u00a0\u200b\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u200b\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u200b\u00a0\u00a0\u00a0\u200b\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u200b\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u200b\u00a0"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "submit",
+          "arguments": {
+            "summary": "Fixed\u00a0\u200b\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u200b\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u200b\u00a0\u00a0\u00a0\u200b\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u200b\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u200b\u00a0"
+          },
+          "output": "Do not submit yet. Inspect `git diff` first.",
+          "is_error": true,
+          "exit_code": null
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 10,
+      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"git diff --stat\"}}",
+      "tool_calls": [
+        {
+          "id": "react-1-bash",
+          "name": "bash",
+          "arguments": {
+            "command": "git diff --stat"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "git diff --stat"
+          },
+          "output": " app/utils/backoff.py | 8 +++++---\n 1 file changed, 5 insertions(+), 3 deletions(-)",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 11,
+      "assistant_text": "{\"tool\":\"bash\",\"arguments\":{\"command\":\"git diff\"}}",
+      "tool_calls": [
+        {
+          "id": "react-1-bash",
+          "name": "bash",
+          "arguments": {
+            "command": "git diff"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "git diff"
+          },
+          "output": "diff --git a/app/utils/backoff.py b/app/utils/backoff.py\nindex 80630a0..76ab249 100644\n--- a/app/utils/backoff.py\n+++ b/app/utils/backoff.py\n@@ -25,7 +25,9 @@ def compute_delay(\n     if rng is None:\n         rng = random.Random()\n     exponential = base_seconds * (factor ** (attempt - 1))\n-    # Apply jitter: +/- jitter_ratio of exponential\n-    jitter = rng.uniform(-jitter_ratio, jitter_ratio) * exponential\n+    # Apply jitter: +/- jitter_ratio of the capped exponential value\n     capped = min(exponential, max_delay_seconds)\n-    return capped + jitter\n+    jitter = rng.uniform(-jitter_ratio, jitter_ratio) * capped\n+    # Ensure final delay does not exceed max_delay_seconds and is not negative\n+    delay = capped + jitter\n+    return max(0.0, min(delay, max_delay_seconds))",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    },
+    {
+      "turn": 12,
+      "assistant_text": "{\"tool\":\"submit\",\"arguments\":{\"summary\":\"Fixed backoff delay cap handling to ensure jitter is applied after capping and final delay respects max_delay_seconds.\"}}\nThe bug was that jitter was applied to the uncapped exponential delay, which could push the final scheduled delay beyond the configured maximum. The fix now:\n\n- Caps the exponential delay before applying jitter.\n- Applies jitter relative to the capped value.\n- Ensures the final delay stays within the configured bounds and is non\u2011negative.\n\nAll tests continue to pass, and the demo script now correctly reports that the maximum scheduled delay respects the 30\u2011second cap.",
+      "tool_calls": [
+        {
+          "id": "react-1-submit",
+          "name": "submit",
+          "arguments": {
+            "summary": "Fixed backoff delay cap handling to ensure jitter is applied after capping and final delay respects max_delay_seconds."
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "submit",
+          "arguments": {
+            "summary": "Fixed backoff delay cap handling to ensure jitter is applied after capping and final delay respects max_delay_seconds."
+          },
+          "output": "Submission recorded. Summary: Fixed backoff delay cap handling to ensure jitter is applied after capping and final delay respects max_delay_seconds.",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": "stop",
+      "parse_error": null
+    }
+  ],
+  "stats": {
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "turns": 12,
+    "tool_calls": 10,
+    "api_calls": 0
+  },
+  "loop_state": {
+    "executable_edit_made": true,
+    "validation_passed": true,
+    "validation_attempted_after_edit": true,
+    "diff_checked": true,
+    "successful_post_edit_commands": [
+      "git diff",
+      "git diff --stat",
+      "pytest -q",
+      "python scripts/demo_backoff.py"
+    ],
+    "satisfied_success_checks": [],
+    "changed_files": [
+      "app/utils/backoff.py"
+    ]
+  },
+  "stopped_reason": "submitted",
+  "submitted": true,
+  "submission_summary": "Fixed backoff delay cap handling to ensure jitter is applied after capping and final delay respects max_delay_seconds.",
+  "patch": "diff --git a/app/utils/backoff.py b/app/utils/backoff.py\nindex 80630a0..76ab249 100644\n--- a/app/utils/backoff.py\n+++ b/app/utils/backoff.py\n@@ -25,7 +25,9 @@ def compute_delay(\n     if rng is None:\n         rng = random.Random()\n     exponential = base_seconds * (factor ** (attempt - 1))\n-    # Apply jitter: +/- jitter_ratio of exponential\n-    jitter = rng.uniform(-jitter_ratio, jitter_ratio) * exponential\n+    # Apply jitter: +/- jitter_ratio of the capped exponential value\n     capped = min(exponential, max_delay_seconds)\n-    return capped + jitter\n+    jitter = rng.uniform(-jitter_ratio, jitter_ratio) * capped\n+    # Ensure final delay does not exceed max_delay_seconds and is not negative\n+    delay = capped + jitter\n+    return max(0.0, min(delay, max_delay_seconds))\n",
+  "info": {
+    "submission": "diff --git a/app/utils/backoff.py b/app/utils/backoff.py\nindex 80630a0..76ab249 100644\n--- a/app/utils/backoff.py\n+++ b/app/utils/backoff.py\n@@ -25,7 +25,9 @@ def compute_delay(\n     if rng is None:\n         rng = random.Random()\n     exponential = base_seconds * (factor ** (attempt - 1))\n-    # Apply jitter: +/- jitter_ratio of exponential\n-    jitter = rng.uniform(-jitter_ratio, jitter_ratio) * exponential\n+    # Apply jitter: +/- jitter_ratio of the capped exponential value\n     capped = min(exponential, max_delay_seconds)\n-    return capped + jitter\n+    jitter = rng.uniform(-jitter_ratio, jitter_ratio) * capped\n+    # Ensure final delay does not exceed max_delay_seconds and is not negative\n+    delay = capped + jitter\n+    return max(0.0, min(delay, max_delay_seconds))\n",
+    "submitted": true,
+    "submission_summary": "Fixed backoff delay cap handling to ensure jitter is applied after capping and final delay respects max_delay_seconds.",
+    "stopped_reason": "submitted"
+  },
+  "agent_architecture": "single",
+  "role_model_stats": {
+    "coder": {
+      "model": "openai/openai/gpt-oss-120b",
+      "tokens_in": 0,
+      "tokens_out": 0,
+      "api_calls": 0,
+      "turns": 12,
+      "tool_calls": 10
+    }
+  },
+  "planner_handoff": {},
+  "review_feedback": {},
+  "instance_id": "retry_cap_001",
+  "duration_seconds": 57.62
+}

@@ -1,0 +1,5 @@
+{
+  "model_name_or_path": "umich_qwen",
+  "instance_id": "pagination_drift_001",
+  "model_patch": "diff --git a/app/api/list_endpoint.py b/app/api/list_endpoint.py\nindex 018731b..2846a59 100644\n--- a/app/api/list_endpoint.py\n+++ b/app/api/list_endpoint.py\n@@ -23,7 +23,14 @@ def list_all(store: RowStore, page_size: int) -> list[dict]:\n         # rows. Fix requires aligning with the store's capping invariant \u2014\n         # either request within the cap, or detect end-of-data via an\n         # explicit empty page rather than short-read.\n-        if len(page) < page_size:\n+        if len(page) == 0:\n+            break\n+        # The store caps page size at STORE_MAX_PAGE, so a short page\n+        # only means end-of-data if the requested page size exceeds the cap.\n+        # Otherwise, it's just a partial page at the end.\n+        if page_size <= 50 and len(page) < page_size:\n+            break\n+        if page_size > 50 and len(page) < 50:\n             break\n         offset += len(page)\n     return collected\n"
+}

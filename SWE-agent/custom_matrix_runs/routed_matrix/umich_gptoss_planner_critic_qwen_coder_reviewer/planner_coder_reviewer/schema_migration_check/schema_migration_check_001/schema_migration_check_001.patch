@@ -1,0 +1,12 @@
+diff --git a/app/validators/schema_check.py b/app/validators/schema_check.py
+index 561b5e8..cf5a568 100644
+--- a/app/validators/schema_check.py
++++ b/app/validators/schema_check.py
+@@ -32,6 +32,6 @@ def missing_columns(db: Database, migrations: list[dict]) -> list[tuple[str, str
+             # so the validator falsely reports it as missing. Fix requires
+             # recognizing the invariant enforced in app/migrations/apply.py
+             # and matching it here (or removing the fold in both places).
+-            if not db.has_column(table, column):
++            if not db.has_column(table.lower(), column.lower()): # case-folded to match apply.py
+                 missing.append((table, column))
+     return missing

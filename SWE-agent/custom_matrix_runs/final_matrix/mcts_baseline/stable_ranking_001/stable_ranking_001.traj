@@ -1,0 +1,295 @@
+{
+  "turns": [
+    {
+      "turn": 1,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python scripts/demo_leaderboard.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python scripts/demo_leaderboard.py"
+          },
+          "output": "Leaderboard order: ['charlie', 'alpha', 'bravo']\nWARNING: tie-break order is wrong; expected ['charlie', 'bravo', 'alpha']",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 2,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/core/ranking.py",
+            "start_line": 1,
+            "end_line": 100
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/core/ranking.py",
+            "start_line": 1,
+            "end_line": 100
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/core/ranking.py:\n     1\t\"\"\"Leaderboard ranking with tie-break rules.\n     2\t\n     3\tPrimary sort: score descending.\n     4\tTie-break 1: submission_number ascending (earlier submissions rank higher).\n     5\tTie-break 2: team_id ascending (lexicographic on id string).\n     6\t\n     7\tEntries are dicts with keys: team_id, score, submission_number.\n     8\t\"\"\"\n     9\t\n    10\tfrom __future__ import annotations\n    11\t\n    12\tfrom typing import Any\n    13\t\n    14\t\n    15\tdef rank(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:\n    16\t    # Sort by (-score, submission_number, team_id).\n    17\t    # submission_number is stored as a string in the input (legacy import quirk).\n    18\t    return sorted(\n    19\t        entries,\n    20\t        key=lambda e: (-e[\"score\"], e[\"submission_number\"], e[\"team_id\"]),\n    21\t    )",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 3,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/core/ranking.py",
+            "old_str": "key=lambda e: (-e[\"score\"], e[\"submission_number\"], e[\"team_id\"])",
+            "new_str": "key=lambda e: (-e[\"score\"], int(e[\"submission_number\"]), e[\"team_id\"])"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "app/core/ranking.py",
+            "old_str": "key=lambda e: (-e[\"score\"], e[\"submission_number\"], e[\"team_id\"])",
+            "new_str": "key=lambda e: (-e[\"score\"], int(e[\"submission_number\"]), e[\"team_id\"])"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/core/ranking.py:\n     1\t\"\"\"Leaderboard ranking with tie-break rules.\n     2\t\n     3\tPrimary sort: score descending.\n     4\tTie-break 1: submission_number ascending (earlier submissions rank higher).\n     5\tTie-break 2: team_id ascending (lexicographic on id string).\n     6\t\n     7\tEntries are dicts with keys: team_id, score, submission_number.\n     8\t\"\"\"\n     9\t\n    10\tfrom __future__ import annotations\n    11\t\n    12\tfrom typing import Any\n    13\t\n    14\t\n    15\tdef rank(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:\n    16\t    # Sort by (-score, submission_number, team_id).\n    17\t    # submission_number is stored as a string in the input (legacy import quirk).\n    18\t    return sorted(\n    19\t        entries,\n    20\t        key=lambda e: (-e[\"score\"], int(e[\"submission_number\"]), e[\"team_id\"]),\n    21\t    )",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    }
+  ],
+  "stats": {
+    "input_tokens": 10864,
+    "output_tokens": 792,
+    "turns": 3,
+    "tool_calls": 3,
+    "iterations": 15,
+    "tree_nodes_created": 4,
+    "best_node_depth": 3,
+    "best_node_value": 43.808304,
+    "value_fn_tokens_in": 0,
+    "value_fn_tokens_out": 0
+  },
+  "loop_state": {
+    "executable_edit_made": true,
+    "validation_passed": false,
+    "validation_attempted_after_edit": true,
+    "diff_checked": false,
+    "successful_post_edit_commands": [],
+    "satisfied_success_checks": [
+      "demo_tiebreak_fixed",
+      "tests_still_pass_after_fix"
+    ],
+    "changed_files": [
+      "app/core/ranking.py"
+    ]
+  },
+  "stopped_reason": "auto_finalized",
+  "submitted": true,
+  "submission_summary": "Auto-finalized: required success checks were satisfied with a non-empty patch.",
+  "patch": "diff --git a/app/core/ranking.py b/app/core/ranking.py\nindex 4107999..7172312 100644\n--- a/app/core/ranking.py\n+++ b/app/core/ranking.py\n@@ -17,5 +17,5 @@ def rank(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:\n     # submission_number is stored as a string in the input (legacy import quirk).\n     return sorted(\n         entries,\n-        key=lambda e: (-e[\"score\"], e[\"submission_number\"], e[\"team_id\"]),\n+        key=lambda e: (-e[\"score\"], int(e[\"submission_number\"]), e[\"team_id\"]),\n     )\n",
+  "info": {
+    "submission": "diff --git a/app/core/ranking.py b/app/core/ranking.py\nindex 4107999..7172312 100644\n--- a/app/core/ranking.py\n+++ b/app/core/ranking.py\n@@ -17,5 +17,5 @@ def rank(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:\n     # submission_number is stored as a string in the input (legacy import quirk).\n     return sorted(\n         entries,\n-        key=lambda e: (-e[\"score\"], e[\"submission_number\"], e[\"team_id\"]),\n+        key=lambda e: (-e[\"score\"], int(e[\"submission_number\"]), e[\"team_id\"]),\n     )\n",
+    "submitted": true,
+    "submission_summary": "Auto-finalized: required success checks were satisfied with a non-empty patch.",
+    "stopped_reason": "auto_finalized"
+  },
+  "auto_finalized": true,
+  "mcts_meta": {
+    "model": "openai/Qwen/Qwen3-VL-30B-A3B-Instruct",
+    "value_model": null,
+    "hindsight_feedback": false,
+    "dead_branch_feedback_count": 0,
+    "iterations": 15,
+    "expansion_candidates": 1,
+    "edit_vote_samples": 3,
+    "ucb_c": 1.414,
+    "root_visits": 3,
+    "early_branching": false,
+    "early_branch_depth": 2
+  },
+  "vote_summary": [
+    {
+      "depth": 3,
+      "action": "str_replace",
+      "winner_votes": 2,
+      "total_samples": 3,
+      "unique_candidates": 2
+    }
+  ],
+  "mcts_tree": {
+    "nodes": [
+      {
+        "id": "0",
+        "parent_id": null,
+        "depth": 0,
+        "action_name": null,
+        "action_args_preview": "",
+        "visits": 3,
+        "mean_value": 7.0,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0",
+        "parent_id": "0",
+        "depth": 1,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python scripts/demo_leaderboard.py\"}",
+        "visits": 3,
+        "mean_value": 7.0,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0",
+        "parent_id": "0.0",
+        "depth": 2,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"app/core/ranking.py\", \"start_line\": 1, \"end_line\": 100}",
+        "visits": 2,
+        "mean_value": 10.5,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0",
+        "parent_id": "0.0.0",
+        "depth": 3,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"app/core/ranking.py\", \"old_str\": \"key=lambda e: (-e[\\\"score\\\"], e[\\\"su",
+        "visits": 1,
+        "mean_value": 20.99,
+        "llm_value": null,
+        "submitted": true,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 2,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 1,
+        "has_nonempty_patch": true,
+        "stopped_reason": "auto_finalized",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"key=lambda e: (-e[\\\"score\\\"], int(e[\\\"submission_number\\\"]), e[\\\"team_id\\\"])\", \"old_str\": \"key=lambda e: (-e[\\\"score\\\"], e[\\\"submission_number\\\"], e[\\\"team_id\\\"])\", \"path\": \"app/core/ranking.py\"}, \"name\": \"str_replace\"}": 2,
+          "{\"arguments\": {\"new_str\": \"(-e[\\\"score\\\"], int(e[\\\"submission_number\\\"]), e[\\\"team_id\\\"])\", \"old_str\": \"(-e[\\\"score\\\"], e[\\\"submission_number\\\"], e[\\\"team_id\\\"])\", \"path\": \"app/core/ranking.py\"}, \"name\": \"str_replace\"}": 1
+        },
+        "on_result_path": true
+      }
+    ],
+    "result_node_id": "0.0.0.0"
+  },
+  "agent_architecture": "planner_coder",
+  "architecture": "planner_coder",
+  "role_model_stats": {
+    "planner": {
+      "model": "openai/openai/gpt-oss-120b",
+      "tokens_in": 670,
+      "tokens_out": 443,
+      "api_calls": 1
+    },
+    "coder": {
+      "model": "openai/Qwen/Qwen3-VL-30B-A3B-Instruct",
+      "input_tokens": 10194,
+      "output_tokens": 349,
+      "turns": 3,
+      "tool_calls": 3,
+      "iterations": 15,
+      "tree_nodes_created": 4,
+      "best_node_depth": 3,
+      "best_node_value": 43.808304,
+      "value_fn_tokens_in": 0,
+      "value_fn_tokens_out": 0
+    }
+  },
+  "planner_handoff": {
+    "problem_summary": "",
+    "root_cause_hypothesis": "ranking.sort_leaderboard uses an incorrect tie\u2011break order (e.g., submission_number descending or string comparison) causing tied scores to be ordered wrong",
+    "files_likely_affected": [
+      "app/core/ranking.py"
+    ],
+    "target_symbols": [],
+    "discovery_priority": [
+      "app/core/ranking.py"
+    ],
+    "first_actions": [
+      "Read app/core/ranking.py around the sorting implementation",
+      "Run python scripts/demo_leaderboard.py to see the failing order",
+      "Run pytest -q to confirm current tests still pass"
+    ],
+    "safe_reproduction_steps": [],
+    "reproduction_notes": [],
+    "required_validations": [
+      "python scripts/demo_leaderboard.py && echo OK",
+      "pytest -q"
+    ],
+    "allowed_change_types": [
+      "targeted runtime code fixes"
+    ],
+    "forbidden_edits": [
+      "do not modify any test files",
+      "do not change function signatures or public API"
+    ],
+    "escalation_conditions": [
+      "If the issue is still unclear after targeted inspection and reproduction."
+    ],
+    "difficulty": "hard",
+    "difficulty_rationale": "Planner output could not be parsed; defaulting to hard to avoid under-allocating compute."
+  },
+  "review_feedback": {},
+  "coder_rounds": [],
+  "instance_id": "stable_ranking_001",
+  "duration_seconds": 45.2
+}

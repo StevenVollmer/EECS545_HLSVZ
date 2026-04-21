@@ -22,7 +22,7 @@ CASES="$CASES_OLD $CASES_NEW"
 rm -rf "$OUTROOT"
 mkdir -p "$OUTROOT"
 
-BATCH_SIZE=5
+BATCH_SIZE=2
 
 # Args: label preset arch [extra...]
 run_phase() {

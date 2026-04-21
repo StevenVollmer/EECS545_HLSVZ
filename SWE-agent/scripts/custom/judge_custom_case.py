@@ -74,6 +74,7 @@ def _run_shell(command: str, cwd: Path) -> subprocess.CompletedProcess[str]:
         shell=True,
         text=True,
         capture_output=True,
+        timeout=60,
         executable="/bin/zsh",
         env=env,
     )
@@ -81,7 +82,18 @@ def _run_shell(command: str, cwd: Path) -> subprocess.CompletedProcess[str]:
 
 def _run_check(check: dict[str, Any], cwd: Path) -> CommandResult:
     command = str(check["command"])
-    result = _run_shell(command, cwd)
+    try:
+        result = _run_shell(command, cwd)
+    except subprocess.TimeoutExpired as exc:
+        return CommandResult(
+            name=str(check.get("name", command)),
+            command=command,
+            exit_code=-1,
+            stdout=exc.stdout or "",
+            stderr=(exc.stderr or "") + "\n[JUDGE] command timed out after 60s",
+            passed=False,
+            failures=["command timed out after 60s"],
+        )
     failures: list[str] = []
     expected_exit = int(check.get("expect_exit_code", 0))
     if result.returncode != expected_exit:

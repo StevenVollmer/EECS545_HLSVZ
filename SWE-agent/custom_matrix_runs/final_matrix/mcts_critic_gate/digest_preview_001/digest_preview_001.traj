@@ -1,0 +1,802 @@
+{
+  "turns": [
+    {
+      "turn": 1,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -c \"from app.main import render_digest_preview; print(render_digest_preview(\\\"o'connor-smith\\\", 12840.5, 3))\""
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -c \"from app.main import render_digest_preview; print(render_digest_preview(\\\"o'connor-smith\\\", 12840.5, 3))\""
+          },
+          "output": "Digest Preview | Portfolio Summary\n--------------------------------\nGood morning, O'connor-smith\nPortfolio value: $12.8K | 3 active alerts\nAlerts: 3\nNotes:\n- Generated for dashboard preview\n- Movement status: stable\n- Owner initials: O\n- Name shape: compound\nEnd preview",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 2,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/utils/text.py",
+            "start_line": 1,
+            "end_line": 50
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/utils/text.py",
+            "start_line": 1,
+            "end_line": 50
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/utils/text.py:\n     1\tNAME_JOINERS = {\"-\", \"'\", \"/\"}\n     2\tMIN_IDENTIFIER_LENGTH = 12\n     3\tSHORT_IDENTIFIER_HEAD = 9\n     4\t\n     5\t\n     6\tdef collapse_outer_whitespace(value: str) -> str:\n     7\t    return value.strip()\n     8\t\n     9\t\n    10\tdef normalize_spacing(value: str) -> str:\n    11\t    pieces = value.replace(\"\\t\", \" \").split()\n    12\t    return \" \".join(pieces)\n    13\t\n    14\t\n    15\tdef _capitalize_fragment(fragment: str) -> str:\n    16\t    if not fragment:\n    17\t        return fragment\n    18\t    return fragment[0].upper() + fragment[1:].lower()\n    19\t\n    20\t\n    21\tdef _capitalize_word_with_joiners(word: str) -> str:\n    22\t    if not word:\n    23\t        return word\n    24\t    return _capitalize_fragment(word)\n    25\t\n    26\t\n    27\tdef title_case_words(value: str) -> str:\n    28\t    words = value.split(\" \")\n    29\t    return \" \".join(_capitalize_word_with_joiners(word) for word in words)\n    30\t\n    31\t\n    32\tdef normalize_display_name(value: str) -> str:\n    33\t    cleaned = collapse_outer_whitespace(value)\n    34\t    cleaned = cleaned.replace(\"_\", \" \")\n    35\t    cleaned = normalize_spacing(cleaned)\n    36\t    return title_case_words(cleaned)\n    37\t\n    38\t\n    39\tdef summarize_identifier(value: str) -> str:\n    40\t    cleaned = collapse_outer_whitespace(value)\n    41\t    if len(cleaned) <= MIN_IDENTIFIER_LENGTH:\n    42\t        return cleaned\n    43\t    return cleaned[:SHORT_IDENTIFIER_HEAD] + \"...\"\n    44\t\n    45\t\n    46\tdef build_initials(value: str) -> str:\n    47\t    cleaned = normalize_spacing(value)\n    48\t    parts = [part for part in cleaned.split(\" \") if part]\n    49\t    return \"\".join(part[0].upper() for part in parts[:3])\n    50\t",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 3,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/presenters/report_presenter.py",
+            "start_line": 1,
+            "end_line": 50
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/presenters/report_presenter.py",
+            "start_line": 1,
+            "end_line": 50
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/presenters/report_presenter.py:\n     1\tfrom app.config import MAX_HEADLINE_WIDTH, build_header_prefix\n     2\tfrom app.models.report import DigestViewModel\n     3\tfrom app.views.cli import join_lines\n     4\t\n     5\t\n     6\tdef _headline(model: DigestViewModel) -> str:\n     7\t    return f\"{model.greeting}, {model.owner_name}\"\n     8\t\n     9\t\n    10\tdef _subheadline(model: DigestViewModel) -> str:\n    11\t    return model.summary_line\n    12\t\n    13\t\n    14\tdef _metric_line(model: DigestViewModel) -> str:\n    15\t    return f\"Alerts: {model.metrics.alert_count}\"\n    16\t\n    17\t\n    18\tdef _divider() -> str:\n    19\t    return \"-\" * 32\n    20\t\n    21\t\n    22\tdef _footer_line() -> str:\n    23\t    return \"End preview\"\n    24\t\n    25\t\n    26\tdef _build_note_lines(model: DigestViewModel) -> list[str]:\n    27\t    lines = [\"Notes:\"]\n    28\t    for note in model.notes:\n    29\t        lines.append(f\"- {note}\")\n    30\t    return lines\n    31\t\n    32\t\n    33\tdef render_preview(model: DigestViewModel) -> str:\n    34\t    header = build_header_prefix()\n    35\t    headline = _headline(model)\n    36\t    if len(headline) > MAX_HEADLINE_WIDTH:\n    37\t        headline = headline[: MAX_HEADLINE_WIDTH - 3] + \"...\"\n    38\t    lines = [\n    39\t        header,\n    40\t        _divider(),\n    41\t        headline,\n    42\t        _subheadline(model),\n    43\t        _metric_line(model),\n    44\t    ]\n    45\t    lines.extend(_build_note_lines(model))\n    46\t    lines.append(_footer_line())\n    47\t    return join_lines(lines)",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 4,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/utils/text.py",
+            "start_line": 32,
+            "end_line": 36
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "view",
+          "arguments": {
+            "path": "app/utils/text.py",
+            "start_line": 32,
+            "end_line": 36
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/utils/text.py:\n    32\tdef normalize_display_name(value: str) -> str:\n    33\t    cleaned = collapse_outer_whitespace(value)\n    34\t    cleaned = cleaned.replace(\"_\", \" \")\n    35\t    cleaned = normalize_spacing(cleaned)\n    36\t    return title_case_words(cleaned)",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 5,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "/repo/app/utils/text.py",
+            "old_str": "def title_case_words(value: str) -> str:\n    words = value.split(\" \")\n    return \" \".join(_capitalize_word_with_joiners(word) for word in words)",
+            "new_str": "def title_case_words(value: str) -> str:\n    words = value.split(\" \")\n    return \" \".join(_capitalize_word_with_joiners(word) for word in words)\n\n\ndef title_case_with_joiners(value: str) -> str:\n    words = value.split(\" \")\n    return \" \".join(_capitalize_word_with_joiners(word) for word in words)"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "/repo/app/utils/text.py",
+            "old_str": "def title_case_words(value: str) -> str:\n    words = value.split(\" \")\n    return \" \".join(_capitalize_word_with_joiners(word) for word in words)",
+            "new_str": "def title_case_words(value: str) -> str:\n    words = value.split(\" \")\n    return \" \".join(_capitalize_word_with_joiners(word) for word in words)\n\n\ndef title_case_with_joiners(value: str) -> str:\n    words = value.split(\" \")\n    return \" \".join(_capitalize_word_with_joiners(word) for word in words)"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/utils/text.py:\n     1\tNAME_JOINERS = {\"-\", \"'\", \"/\"}\n     2\tMIN_IDENTIFIER_LENGTH = 12\n     3\tSHORT_IDENTIFIER_HEAD = 9\n     4\t\n     5\t\n     6\tdef collapse_outer_whitespace(value: str) -> str:\n     7\t    return value.strip()\n     8\t\n     9\t\n    10\tdef normalize_spacing(value: str) -> str:\n    11\t    pieces = value.replace(\"\\t\", \" \").split()\n    12\t    return \" \".join(pieces)\n    13\t\n    14\t\n    15\tdef _capitalize_fragment(fragment: str) -> str:\n    16\t    if not fragment:\n    17\t        return fragment\n    18\t    return fragment[0].upper() + fragment[1:].lower()\n    19\t\n    20\t\n    21\tdef _capitalize_word_with_joiners(word: str) -> str:\n    22\t    if not word:\n    23\t        return word\n    24\t    return _capitalize_fragment(word)\n    25\t\n    26\t\n    27\tdef title_case_words(value: str) -> str:\n    28\t    words = value.split(\" \")\n    29\t    return \" \".join(_capitalize_word_with_joiners(word) for word in words)\n    30\t\n    31\t\n    32\tdef title_case_with_joiners(value: str) -> str:\n    33\t    words = value.split(\" \")\n    34\t    return \" \".join(_capitalize_word_with_joiners(word) for word in words)\n    35\t\n    36\t\n    37\tdef normalize_display_name(value: str) -> str:\n    38\t    cleaned = collapse_outer_whitespace(value)\n    39\t    cleaned = cleaned.replace(\"_\", \" \")\n    40\t    cleaned = normalize_spacing(cleaned)\n    41\t    return title_case_words(cleaned)\n    42\t\n    43\t\n    44\tdef summarize_identifier(value: str) -> str:\n    45\t    cleaned = collapse_outer_whitespace(value)\n    46\t    if len(cleaned) <= MIN_IDENTIFIER_LENGTH:\n    47\t        return cleaned\n    48\t    return cleaned[:SHORT_IDENTIFIER_HEAD] + \"...\"\n    49\t\n    50\t\n    51\tdef build_initials(value: str) -> str:\n    52\t    cleaned = normalize_spacing(value)\n    53\t    parts = [part for part in cleaned.split(\" \") if part]\n    54\t    return \"\".join(part[0].upper() for part in parts[:3])\n    55\t\n    56\t\n    57\tdef classify_name_shape(value: str) -> str:\n    58\t    cleaned = collapse_outer_whitespace(value)\n    59\t    if not cleaned:\n    60\t        return \"empty\"\n    61\t    if any(joiner in cleaned for joiner in NAME_JOINERS):\n    62\t        return \"compound\"\n    63\t    if \" \" in cleaned:\n    64\t        return \"multi_word\"\n    65\t    return \"simple\"",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 6,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q; python scripts/demo_preview.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q; python scripts/demo_preview.py"
+          },
+          "output": "......                                                                   [100%]\n6 passed in 0.01s\nDigest Preview | Portfolio Summary\n--------------------------------\nGood morning, O'connor-smith\nPortfolio value: $12.8K | 3 active alerts\nAlerts: 3\nNotes:\n- Generated for dashboard preview\n- Movement status: stable\n- Owner initials: O\n- Name shape: compound\nEnd preview",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 7,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "/repo/app/utils/text.py",
+            "old_str": "def _capitalize_word_with_joiners(word: str) -> str:\n    if not word:\n        return word\n    return _capitalize_fragment(word)",
+            "new_str": "def _capitalize_word_with_joiners(word: str) -> str:\n    if not word:\n        return word\n    if any(joiner in word for joiner in NAME_JOINERS):\n        return word\n    return _capitalize_fragment(word)"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "/repo/app/utils/text.py",
+            "old_str": "def _capitalize_word_with_joiners(word: str) -> str:\n    if not word:\n        return word\n    return _capitalize_fragment(word)",
+            "new_str": "def _capitalize_word_with_joiners(word: str) -> str:\n    if not word:\n        return word\n    if any(joiner in word for joiner in NAME_JOINERS):\n        return word\n    return _capitalize_fragment(word)"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/utils/text.py:\n     1\tNAME_JOINERS = {\"-\", \"'\", \"/\"}\n     2\tMIN_IDENTIFIER_LENGTH = 12\n     3\tSHORT_IDENTIFIER_HEAD = 9\n     4\t\n     5\t\n     6\tdef collapse_outer_whitespace(value: str) -> str:\n     7\t    return value.strip()\n     8\t\n     9\t\n    10\tdef normalize_spacing(value: str) -> str:\n    11\t    pieces = value.replace(\"\\t\", \" \").split()\n    12\t    return \" \".join(pieces)\n    13\t\n    14\t\n    15\tdef _capitalize_fragment(fragment: str) -> str:\n    16\t    if not fragment:\n    17\t        return fragment\n    18\t    return fragment[0].upper() + fragment[1:].lower()\n    19\t\n    20\t\n    21\tdef _capitalize_word_with_joiners(word: str) -> str:\n    22\t    if not word:\n    23\t        return word\n    24\t    if any(joiner in word for joiner in NAME_JOINERS):\n    25\t        return word\n    26\t    return _capitalize_fragment(word)\n    27\t\n    28\t\n    29\tdef title_case_words(value: str) -> str:\n    30\t    words = value.split(\" \")\n    31\t    return \" \".join(_capitalize_word_with_joiners(word) for word in words)\n    32\t\n    33\t\n    34\tdef title_case_with_joiners(value: str) -> str:\n    35\t    words = value.split(\" \")\n    36\t    return \" \".join(_capitalize_word_with_joiners(word) for word in words)\n    37\t\n    38\t\n    39\tdef normalize_display_name(value: str) -> str:\n    40\t    cleaned = collapse_outer_whitespace(value)\n    41\t    cleaned = cleaned.replace(\"_\", \" \")\n    42\t    cleaned = normalize_spacing(cleaned)\n    43\t    return title_case_words(cleaned)\n    44\t\n    45\t\n    46\tdef summarize_identifier(value: str) -> str:\n    47\t    cleaned = collapse_outer_whitespace(value)\n    48\t    if len(cleaned) <= MIN_IDENTIFIER_LENGTH:\n    49\t        return cleaned\n    50\t    return cleaned[:SHORT_IDENTIFIER_HEAD] + \"...\"\n    51\t\n    52\t\n    53\tdef build_initials(value: str) -> str:\n    54\t    cleaned = normalize_spacing(value)\n    55\t    parts = [part for part in cleaned.split(\" \") if part]\n    56\t    return \"\".join(part[0].upper() for part in parts[:3])\n    57\t\n    58\t\n    59\tdef classify_name_shape(value: str) -> str:\n    60\t    cleaned = collapse_outer_whitespace(value)\n    61\t    if not cleaned:\n    62\t        return \"empty\"\n    63\t    if any(joiner in cleaned for joiner in NAME_JOINERS):\n    64\t        return \"compound\"\n    65\t    if \" \" in cleaned:\n    66\t        return \"multi_word\"\n    67\t    return \"simple\"",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 8,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q; python scripts/demo_preview.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q; python scripts/demo_preview.py"
+          },
+          "output": "......                                                                   [100%]\n6 passed in 0.01s\nDigest Preview | Portfolio Summary\n--------------------------------\nGood morning, o'connor-smith\nPortfolio value: $12.8K | 3 active alerts\nAlerts: 3\nNotes:\n- Generated for dashboard preview\n- Movement status: stable\n- Owner initials: O\n- Name shape: compound\nEnd preview",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 9,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "/repo/app/utils/text.py",
+            "old_str": "def _capitalize_word_with_joiners(word: str) -> str:\n    if not word:\n        return word\n    if any(joiner in word for joiner in NAME_JOINERS):\n        return word\n    return _capitalize_fragment(word)",
+            "new_str": "def _capitalize_word_with_joiners(word: str) -> str:\n    if not word:\n        return word\n    if any(joiner in word for joiner in NAME_JOINERS):\n        return word\n    return _capitalize_fragment(word)\n\n    # Special handling for compound names with joiners\n    if any(joiner in word for joiner in NAME_JOINERS):\n        return word\n    return _capitalize_fragment(word)"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "str_replace",
+          "arguments": {
+            "path": "/repo/app/utils/text.py",
+            "old_str": "def _capitalize_word_with_joiners(word: str) -> str:\n    if not word:\n        return word\n    if any(joiner in word for joiner in NAME_JOINERS):\n        return word\n    return _capitalize_fragment(word)",
+            "new_str": "def _capitalize_word_with_joiners(word: str) -> str:\n    if not word:\n        return word\n    if any(joiner in word for joiner in NAME_JOINERS):\n        return word\n    return _capitalize_fragment(word)\n\n    # Special handling for compound names with joiners\n    if any(joiner in word for joiner in NAME_JOINERS):\n        return word\n    return _capitalize_fragment(word)"
+          },
+          "output": "Here's the result of running `cat -n` on /repo/app/utils/text.py:\n     1\tNAME_JOINERS = {\"-\", \"'\", \"/\"}\n     2\tMIN_IDENTIFIER_LENGTH = 12\n     3\tSHORT_IDENTIFIER_HEAD = 9\n     4\t\n     5\t\n     6\tdef collapse_outer_whitespace(value: str) -> str:\n     7\t    return value.strip()\n     8\t\n     9\t\n    10\tdef normalize_spacing(value: str) -> str:\n    11\t    pieces = value.replace(\"\\t\", \" \").split()\n    12\t    return \" \".join(pieces)\n    13\t\n    14\t\n    15\tdef _capitalize_fragment(fragment: str) -> str:\n    16\t    if not fragment:\n    17\t        return fragment\n    18\t    return fragment[0].upper() + fragment[1:].lower()\n    19\t\n    20\t\n    21\tdef _capitalize_word_with_joiners(word: str) -> str:\n    22\t    if not word:\n    23\t        return word\n    24\t    if any(joiner in word for joiner in NAME_JOINERS):\n    25\t        return word\n    26\t    return _capitalize_fragment(word)\n    27\t\n    28\t    # Special handling for compound names with joiners\n    29\t    if any(joiner in word for joiner in NAME_JOINERS):\n    30\t        return word\n    31\t    return _capitalize_fragment(word)\n    32\t\n    33\t\n    34\tdef title_case_words(value: str) -> str:\n    35\t    words = value.split(\" \")\n    36\t    return \" \".join(_capitalize_word_with_joiners(word) for word in words)\n    37\t\n    38\t\n    39\tdef title_case_with_joiners(value: str) -> str:\n    40\t    words = value.split(\" \")\n    41\t    return \" \".join(_capitalize_word_with_joiners(word) for word in words)\n    42\t\n    43\t\n    44\tdef normalize_display_name(value: str) -> str:\n    45\t    cleaned = collapse_outer_whitespace(value)\n    46\t    cleaned = cleaned.replace(\"_\", \" \")\n    47\t    cleaned = normalize_spacing(cleaned)\n    48\t    return title_case_words(cleaned)\n    49\t\n    50\t\n    51\tdef summarize_identifier(value: str) -> str:\n    52\t    cleaned = collapse_outer_whitespace(value)\n    53\t    if len(cleaned) <= MIN_IDENTIFIER_LENGTH:\n    54\t        return cleaned\n    55\t    return cleaned[:SHORT_IDENTIFIER_HEAD] + \"...\"\n    56\t\n    57\t\n    58\tdef build_initials(value: str) -> str:\n    59\t    cleaned = normalize_spacing(value)\n    60\t    parts = [part for part in cleaned.split(\" \") if part]\n    61\t    return \"\".join(part[0].upper() for part in parts[:3])\n    62\t\n    63\t\n    64\tdef classify_name_shape(value: str) -> str:\n    65\t    cleaned = collapse_outer_whitespace(value)\n    66\t    if not cleaned:\n    67\t        return \"empty\"\n    68\t    if any(joiner in cleaned for joiner in NAME_JOINERS):\n    69\t        return \"compound\"\n    70\t    if \" \" in cleaned:\n    71\t        return \"multi_word\"\n    72\t    return \"simple\"",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    },
+    {
+      "turn": 10,
+      "assistant_text": "",
+      "tool_calls": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q; python scripts/demo_preview.py"
+          }
+        }
+      ],
+      "tool_results": [
+        {
+          "name": "bash",
+          "arguments": {
+            "command": "python -m pytest -q; python scripts/demo_preview.py"
+          },
+          "output": "......                                                                   [100%]\n6 passed in 0.01s\nDigest Preview | Portfolio Summary\n--------------------------------\nGood morning, o'connor-smith\nPortfolio value: $12.8K | 3 active alerts\nAlerts: 3\nNotes:\n- Generated for dashboard preview\n- Movement status: stable\n- Owner initials: O\n- Name shape: compound\nEnd preview",
+          "is_error": false,
+          "exit_code": 0
+        }
+      ],
+      "finish_reason": null,
+      "parse_error": null
+    }
+  ],
+  "stats": {
+    "input_tokens": 134140,
+    "output_tokens": 4024,
+    "turns": 10,
+    "tool_calls": 15,
+    "iterations": 15,
+    "tree_nodes_created": 18,
+    "best_node_depth": 10,
+    "best_node_value": 12.536210157213777,
+    "value_fn_tokens_in": 0,
+    "value_fn_tokens_out": 0
+  },
+  "loop_state": {
+    "executable_edit_made": true,
+    "validation_passed": true,
+    "validation_attempted_after_edit": true,
+    "diff_checked": false,
+    "successful_post_edit_commands": [
+      "python -m pytest -q; python scripts/demo_preview.py"
+    ],
+    "satisfied_success_checks": [
+      "tests_still_pass_after_fix"
+    ],
+    "changed_files": [
+      "/repo/app/utils/text.py"
+    ]
+  },
+  "stopped_reason": "max_iterations",
+  "submitted": false,
+  "submission_summary": "",
+  "patch": "diff --git a/app/utils/text.py b/app/utils/text.py\nindex 0addf0e..8be6e10 100644\n--- a/app/utils/text.py\n+++ b/app/utils/text.py\n@@ -21,6 +21,13 @@ def _capitalize_fragment(fragment: str) -> str:\n def _capitalize_word_with_joiners(word: str) -> str:\n     if not word:\n         return word\n+    if any(joiner in word for joiner in NAME_JOINERS):\n+        return word\n+    return _capitalize_fragment(word)\n+\n+    # Special handling for compound names with joiners\n+    if any(joiner in word for joiner in NAME_JOINERS):\n+        return word\n     return _capitalize_fragment(word)\n \n \n@@ -29,6 +36,11 @@ def title_case_words(value: str) -> str:\n     return \" \".join(_capitalize_word_with_joiners(word) for word in words)\n \n \n+def title_case_with_joiners(value: str) -> str:\n+    words = value.split(\" \")\n+    return \" \".join(_capitalize_word_with_joiners(word) for word in words)\n+\n+\n def normalize_display_name(value: str) -> str:\n     cleaned = collapse_outer_whitespace(value)\n     cleaned = cleaned.replace(\"_\", \" \")\n",
+  "info": {
+    "submission": "",
+    "submitted": false,
+    "submission_summary": "",
+    "stopped_reason": "max_iterations"
+  },
+  "auto_finalized": false,
+  "mcts_meta": {
+    "model": "openai/Qwen/Qwen3-VL-30B-A3B-Instruct",
+    "value_model": null,
+    "hindsight_feedback": false,
+    "dead_branch_feedback_count": 0,
+    "iterations": 15,
+    "expansion_candidates": 1,
+    "edit_vote_samples": 3,
+    "ucb_c": 1.414,
+    "root_visits": 17,
+    "early_branching": false,
+    "early_branch_depth": 2
+  },
+  "vote_summary": [
+    {
+      "depth": 5,
+      "action": "str_replace",
+      "winner_votes": 2,
+      "total_samples": 2,
+      "unique_candidates": 1
+    },
+    {
+      "depth": 7,
+      "action": "str_replace",
+      "winner_votes": 2,
+      "total_samples": 5,
+      "unique_candidates": 4
+    },
+    {
+      "depth": 9,
+      "action": "str_replace",
+      "winner_votes": 2,
+      "total_samples": 5,
+      "unique_candidates": 4
+    }
+  ],
+  "mcts_tree": {
+    "nodes": [
+      {
+        "id": "0",
+        "parent_id": null,
+        "depth": 0,
+        "action_name": null,
+        "action_args_preview": "",
+        "visits": 17,
+        "mean_value": 11.35,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0",
+        "parent_id": "0",
+        "depth": 1,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -c \\\"from app.main import render_digest_preview; print(rende",
+        "visits": 17,
+        "mean_value": 11.35,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0",
+        "parent_id": "0.0",
+        "depth": 2,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"app/utils/text.py\", \"start_line\": 1, \"end_line\": 50}",
+        "visits": 16,
+        "mean_value": 12.06,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0",
+        "parent_id": "0.0.0",
+        "depth": 3,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"app/presenters/report_presenter.py\", \"start_line\": 1, \"end_line\": 50}",
+        "visits": 15,
+        "mean_value": 12.86,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0",
+        "parent_id": "0.0.0.0",
+        "depth": 4,
+        "action_name": "view",
+        "action_args_preview": "{\"path\": \"app/utils/text.py\", \"start_line\": 32, \"end_line\": 36}",
+        "visits": 14,
+        "mean_value": 13.78,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": false,
+        "success_checks": 0,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 0,
+        "has_nonempty_patch": false,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0",
+        "depth": 5,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"/repo/app/utils/text.py\", \"old_str\": \"def title_case_words(value: str)",
+        "visits": 13,
+        "mean_value": 14.84,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 1,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"def title_case_words(value: str) -> str:\\n    words = value.split(\\\" \\\")\\n    return \\\" \\\".join(_capitalize_word_with_joiners(word) for word in words)\\n\\n\\ndef title_case_with_joiners(value: str) -> str:\\n    words = value.split(\\\" \\\")\\n    return \\\" \\\".join(_capitalize_word_with_joiners(word) for word in words)\", \"old_str\": \"def title_case_words(value: str) -> str:\\n    words = value.split(\\\" \\\")\\n    return \\\" \\\".join(_capitalize_word_with_joiners(word) for word in words)\", \"path\": \"/repo/app/utils/text.py\"}, \"name\": \"str_replace\"}": 2
+        },
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0",
+        "depth": 6,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q; python scripts/demo_preview.py\"}",
+        "visits": 12,
+        "mean_value": 15.15,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 2,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0",
+        "depth": 7,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"/repo/app/utils/text.py\", \"old_str\": \"def _capitalize_word_with_joiner",
+        "visits": 6,
+        "mean_value": 14.83,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 3,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"def _capitalize_word_with_joiners(word: str) -> str:\\n    if not word:\\n        return word\\n    if any(joiner in word for joiner in NAME_JOINERS):\\n        return word\\n    return _capitalize_fragment(word)\", \"old_str\": \"def _capitalize_word_with_joiners(word: str) -> str:\\n    if not word:\\n        return word\\n    return _capitalize_fragment(word)\", \"path\": \"/repo/app/utils/text.py\"}, \"name\": \"str_replace\"}": 2,
+          "{\"arguments\": {\"new_str\": \"def _capitalize_word_with_joiners(word: str) -> str:\\n    if not word:\\n        return word\\n    # Preserve capitalization around joiners like ' and -\\n    if any(joiner in word for joiner in NAME_JOINERS):\\n        # Split by joiners, capitalize each fragment, then rejoin\\n        fragments = []\\n        current_fragment = \\\"\\\"\\n        for char in word:\\n            if char in NAME_JOINERS:\\n                if current_fragment:\\n                    fragments.append(_capitalize_fragment(current_fragment))\\n                    current_fragment = \\\"\\\"\\n                fragments.append(char)\\n            else:\\n                current_fragment += char\\n        if current_fragment:\\n            fragments.append(_capitalize_fragment(current_fragment))\\n        return \\\"\\\".join(fragments)\\n    return _capitalize_fragment(word)\", \"old_str\": \"def _capitalize_word_with_joiners(word: str) -> str:\\n    if not word:\\n        return word\\n    return _capitalize_fragment(word)\", \"path\": \"/repo/app/utils/text.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"def _capitalize_word_with_joiners(word: str) -> str:\\n    if not word:\\n        return word\\n    # Preserve capitalization after joiners like '-', ''' and '/'\\n    # by capitalizing only the first letter of each segment\\n    segments = word.split('-')\\n    result = []\\n    for segment in segments:\\n        if segment:\\n            result.append(_capitalize_fragment(segment))\\n    return '-'.join(result)\", \"old_str\": \"def _capitalize_word_with_joiners(word: str) -> str:\\n    if not word:\\n        return word\\n    return _capitalize_fragment(word)\", \"path\": \"/repo/app/utils/text.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"def _capitalize_word_with_joiners(word: str) -> str:\\n    if not word:\\n        return word\\n    if any(c in word for c in NAME_JOINERS):\\n        # Preserve capitalization around joiners\\n        parts = []\\n        current_part = \\\"\\\"\\n        for char in word:\\n            if char in NAME_JOINERS:\\n                if current_part:\\n                    parts.append(_capitalize_fragment(current_part))\\n                    current_part = \\\"\\\"\\n                parts.append(char)\\n            else:\\n                current_part += char\\n        if current_part:\\n            parts.append(_capitalize_fragment(current_part))\\n        return \\\"\\\".join(parts)\\n    return _capitalize_fragment(word)\", \"old_str\": \"def _capitalize_word_with_joiners(word: str) -> str:\\n    if not word:\\n        return word\\n    return _capitalize_fragment(word)\", \"path\": \"/repo/app/utils/text.py\"}, \"name\": \"str_replace\"}": 1
+        },
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0",
+        "depth": 8,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q; python scripts/demo_preview.py\"}",
+        "visits": 5,
+        "mean_value": 14.08,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 4,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0",
+        "depth": 9,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"/repo/app/utils/text.py\", \"old_str\": \"def _capitalize_word_with_joiner",
+        "visits": 2,
+        "mean_value": 13.49,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 5,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"def _capitalize_word_with_joiners(word: str) -> str:\\n    if not word:\\n        return word\\n    if any(joiner in word for joiner in NAME_JOINERS):\\n        return word\\n    return _capitalize_fragment(word)\\n\\n\\ndef _capitalize_with_joiners(value: str) -> str:\\n    return value.title()\", \"old_str\": \"def _capitalize_word_with_joiners(word: str) -> str:\\n    if not word:\\n        return word\\n    if any(joiner in word for joiner in NAME_JOINERS):\\n        return word\\n    return _capitalize_fragment(word)\", \"path\": \"/repo/app/utils/text.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"def _capitalize_word_with_joiners(word: str) -> str:\\n    if not word:\\n        return word\\n    if any(joiner in word for joiner in NAME_JOINERS):\\n        return word\\n    return _capitalize_fragment(word)\\n\\n    # Special handling for compound names: preserve original capitalization\\n    if any(joiner in word for joiner in NAME_JOINERS):\\n        return word\\n    return _capitalize_fragment(word)\", \"old_str\": \"def _capitalize_word_with_joiners(word: str) -> str:\\n    if not word:\\n        return word\\n    if any(joiner in word for joiner in NAME_JOINERS):\\n        return word\\n    return _capitalize_fragment(word)\", \"path\": \"/repo/app/utils/text.py\"}, \"name\": \"str_replace\"}": 1,
+          "{\"arguments\": {\"new_str\": \"def _capitalize_word_with_joiners(word: str) -> str:\\n    if not word:\\n        return word\\n    if any(joiner in word for joiner in NAME_JOINERS):\\n        return word\\n    return _capitalize_fragment(word)\\n\\n    # Special handling for compound names with joiners\\n    if any(joiner in word for joiner in NAME_JOINERS):\\n        return word\\n    return _capitalize_fragment(word)\", \"old_str\": \"def _capitalize_word_with_joiners(word: str) -> str:\\n    if not word:\\n        return word\\n    if any(joiner in word for joiner in NAME_JOINERS):\\n        return word\\n    return _capitalize_fragment(word)\", \"path\": \"/repo/app/utils/text.py\"}, \"name\": \"str_replace\"}": 2,
+          "{\"arguments\": {\"new_str\": \"def _capitalize_word_with_joiners(word: str) -> str:\\n    if not word:\\n        return word\\n    if any(joiner in word for joiner in NAME_JOINERS):\\n        return word\\n    return _capitalize_fragment(word)\\n\\n    # Special handling for compound names: preserve original casing\\n    if any(joiner in word for joiner in NAME_JOINERS):\\n        return word\\n    return _capitalize_fragment(word)\", \"old_str\": \"def _capitalize_word_with_joiners(word: str) -> str:\\n    if not word:\\n        return word\\n    if any(joiner in word for joiner in NAME_JOINERS):\\n        return word\\n    return _capitalize_fragment(word)\", \"path\": \"/repo/app/utils/text.py\"}, \"name\": \"str_replace\"}": 1
+        },
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.0",
+        "depth": 10,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q; python scripts/demo_preview.py\"}",
+        "visits": 1,
+        "mean_value": 12.54,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 6,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": true
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.1",
+        "parent_id": "0.0.0.0.0.0.0.0.0",
+        "depth": 9,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"/repo/app/utils/text.py\", \"old_str\": \"def _capitalize_word_with_joiner",
+        "visits": 2,
+        "mean_value": 13.49,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 5,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": false
+      },
+      {
+        "id": "0.0.0.0.0.0.0.0.0.1.0",
+        "parent_id": "0.0.0.0.0.0.0.0.0.1",
+        "depth": 10,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q; python scripts/demo_preview.py\"}",
+        "visits": 1,
+        "mean_value": 12.54,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 6,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": false
+      },
+      {
+        "id": "0.0.0.0.0.0.0.1",
+        "parent_id": "0.0.0.0.0.0.0",
+        "depth": 7,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"/repo/app/utils/text.py\", \"old_str\": \"def _capitalize_word_with_joiner",
+        "visits": 5,
+        "mean_value": 14.39,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 3,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": false
+      },
+      {
+        "id": "0.0.0.0.0.0.0.1.0",
+        "parent_id": "0.0.0.0.0.0.0.1",
+        "depth": 8,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q; python scripts/demo_preview.py\"}",
+        "visits": 4,
+        "mean_value": 13.35,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 4,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": false
+      },
+      {
+        "id": "0.0.0.0.0.0.0.1.0.0",
+        "parent_id": "0.0.0.0.0.0.0.1.0",
+        "depth": 9,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"/repo/app/utils/text.py\", \"old_str\": \"parts = word.split('')\", \"new_st",
+        "visits": 3,
+        "mean_value": 12.57,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 5,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"parts = word.split('-')\", \"old_str\": \"parts = word.split('')\", \"path\": \"/repo/app/utils/text.py\"}, \"name\": \"str_replace\"}": 2
+        },
+        "on_result_path": false
+      },
+      {
+        "id": "0.0.0.0.0.0.0.1.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.1.0.0",
+        "depth": 10,
+        "action_name": "bash",
+        "action_args_preview": "{\"command\": \"python -m pytest -q; python scripts/demo_preview.py\"}",
+        "visits": 2,
+        "mean_value": 11.63,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": false,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 6,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {},
+        "on_result_path": false
+      },
+      {
+        "id": "0.0.0.0.0.0.0.1.0.0.0.0",
+        "parent_id": "0.0.0.0.0.0.0.1.0.0.0",
+        "depth": 11,
+        "action_name": "str_replace",
+        "action_args_preview": "{\"path\": \"/repo/app/utils/text.py\", \"old_str\": \"parts = word.split('-')\", \"new_s",
+        "visits": 1,
+        "mean_value": 10.73,
+        "llm_value": null,
+        "submitted": false,
+        "is_branch_point": true,
+        "edit_made": true,
+        "success_checks": 1,
+        "check_progress_gain": 0,
+        "post_edit_no_progress_turns": 7,
+        "has_nonempty_patch": true,
+        "stopped_reason": "",
+        "vote_counts": {
+          "{\"arguments\": {\"new_str\": \"parts = word.split('')\", \"old_str\": \"parts = word.split('-')\", \"path\": \"/repo/app/utils/text.py\"}, \"name\": \"str_replace\"}": 2
+        },
+        "on_result_path": false
+      }
+    ],
+    "result_node_id": "0.0.0.0.0.0.0.0.0.0.0"
+  },
+  "agent_architecture": "planner_coder",
+  "architecture": "planner_coder",
+  "role_model_stats": {
+    "planner": {
+      "model": "openai/openai/gpt-oss-120b",
+      "tokens_in": 816,
+      "tokens_out": 1127,
+      "api_calls": 1
+    },
+    "coder": {
+      "model": "openai/Qwen/Qwen3-VL-30B-A3B-Instruct",
+      "input_tokens": 133324,
+      "output_tokens": 2897,
+      "turns": 10,
+      "tool_calls": 15,
+      "iterations": 15,
+      "tree_nodes_created": 18,
+      "best_node_depth": 10,
+      "best_node_value": 12.536210157213777,
+      "value_fn_tokens_in": 0,
+      "value_fn_tokens_out": 0
+    },
+    "critic_gate": {
+      "calls": 0,
+      "accepts": 0,
+      "rejects": 0
+    }
+  },
+  "planner_handoff": {
+    "problem_summary": "",
+    "root_cause_hypothesis": "Owner name formatting uses a simple capitalize() causing punctuation\u2011aware names like \"o'connor-smith\" to lose proper capitalization",
+    "files_likely_affected": [
+      "app/utils/text.py",
+      "app/presenters/report_presenter.py"
+    ],
+    "target_symbols": [],
+    "discovery_priority": [
+      "app/utils/text.py",
+      "app/presenters/report_presenter.py"
+    ],
+    "first_actions": [
+      "Read app/utils/text.py to locate the owner\u2011name formatting function",
+      "Read app/presenters/report_presenter.py to see how the function is used in the preview",
+      "Run python scripts/demo_preview.py and the inline render_digest_preview command to reproduce the incorrect rendering"
+    ],
+    "safe_reproduction_steps": [],
+    "reproduction_notes": [],
+    "required_validations": [
+      "python -c \"from app.main import render_digest_preview; print(render_digest_preview(\\\"o'connor-smith\\\", 12840.5, 3))\" | grep -q \"O'Connor-Smith\"",
+      "python -m pytest tests/test_report_presenter.py"
+    ],
+    "allowed_change_types": [
+      "targeted runtime code fixes"
+    ],
+    "forbidden_edits": [
+      "do not modify any test files",
+      "do not change function signatures or public API",
+      "do not alter unrelated utility functions"
+    ],
+    "escalation_conditions": [
+      "If the issue is still unclear after targeted inspection and reproduction."
+    ],
+    "difficulty": "hard",
+    "difficulty_rationale": "Planner output could not be parsed; defaulting to hard to avoid under-allocating compute."
+  },
+  "review_feedback": {},
+  "coder_rounds": [],
+  "instance_id": "digest_preview_001",
+  "duration_seconds": 250.21
+}

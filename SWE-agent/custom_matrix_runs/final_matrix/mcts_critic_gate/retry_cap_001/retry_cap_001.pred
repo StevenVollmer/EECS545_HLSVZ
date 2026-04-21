@@ -1,0 +1,5 @@
+{
+  "model_name_or_path": "mcts_critic_gate",
+  "instance_id": "retry_cap_001",
+  "model_patch": "diff --git a/app/utils/backoff.py b/app/utils/backoff.py\nindex 80630a0..88ee075 100644\n--- a/app/utils/backoff.py\n+++ b/app/utils/backoff.py\n@@ -27,5 +27,8 @@ def compute_delay(\n     exponential = base_seconds * (factor ** (attempt - 1))\n     # Apply jitter: +/- jitter_ratio of exponential\n     jitter = rng.uniform(-jitter_ratio, jitter_ratio) * exponential\n+    # Apply jitter after capping to ensure final delay does not exceed max_delay\n     capped = min(exponential, max_delay_seconds)\n-    return capped + jitter\n+    jitter = rng.uniform(-jitter_ratio, jitter_ratio) * capped\n+    # Ensure final delay does not exceed max_delay\n+    return min(capped + jitter, max_delay_seconds)\n"
+}

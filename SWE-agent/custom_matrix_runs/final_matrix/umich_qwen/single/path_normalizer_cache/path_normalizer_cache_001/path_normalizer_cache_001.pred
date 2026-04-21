@@ -1,0 +1,5 @@
+{
+  "model_name_or_path": "umich_qwen",
+  "instance_id": "path_normalizer_cache_001",
+  "model_patch": "diff --git a/app/cache/url_cache.py b/app/cache/url_cache.py\nindex b7a650b..028b7a2 100644\n--- a/app/cache/url_cache.py\n+++ b/app/cache/url_cache.py\n@@ -51,7 +51,7 @@ class UrlCache:\n         # checked, they are raw and never match the normalized allowlist.\n         allowed = set(allowlist.entries())\n         for key in list(self._store.keys()):\n-            if key not in allowed:\n+            if not allowlist.is_allowed(key):\n                 del self._store[key]\n                 dropped += 1\n         return dropped\n@@ -67,4 +67,4 @@ class UrlCache:\n         # invariant that all keys are normalized. Fix requires recognizing\n         # this invariant is documented on the class (and in app.net.url) and\n         # applying normalize_url here.\n-        self._store[raw_target_url] = body\n+        self._store[normalize_url(raw_target_url)] = body\n"
+}

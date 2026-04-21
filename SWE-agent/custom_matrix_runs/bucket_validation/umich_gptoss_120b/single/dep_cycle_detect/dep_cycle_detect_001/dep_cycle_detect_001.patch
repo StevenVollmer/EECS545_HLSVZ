@@ -1,0 +1,26 @@
+diff --git a/app/graph/cycle.py b/app/graph/cycle.py
+index d9ce90e..d200bfd 100644
+--- a/app/graph/cycle.py
++++ b/app/graph/cycle.py
+@@ -16,14 +16,19 @@ def has_cycle(adj: dict[str, list[str]]) -> bool:
+     # re-enter it look like cycles — false positives — AND joint-reachable
+     # subgraphs miss true back-edges depending on traversal order.)
+     visited: set[str] = set()
++    rec_stack: set[str] = set()
+ 
+     def dfs(node: str) -> bool:
+-        if node in visited:
++        if node in rec_stack:
+             return True
+-        visited.add(node)
++        if node in visited:
++            return False
++        rec_stack.add(node)
+         for nxt in adj.get(node, []):
+             if dfs(nxt):
+                 return True
++        rec_stack.remove(node)
++        visited.add(node)
+         return False
+ 
+     for start in list(adj.keys()):

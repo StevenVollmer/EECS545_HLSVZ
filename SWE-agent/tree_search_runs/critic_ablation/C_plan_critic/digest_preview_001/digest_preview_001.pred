@@ -1,0 +1,5 @@
+{
+  "model_name_or_path": "C_plan_critic",
+  "instance_id": "digest_preview_001",
+  "model_patch": "diff --git a/app/utils/text.py b/app/utils/text.py\nindex 0addf0e..3d9b297 100644\n--- a/app/utils/text.py\n+++ b/app/utils/text.py\n@@ -29,6 +29,24 @@ def title_case_words(value: str) -> str:\n     return \" \".join(_capitalize_word_with_joiners(word) for word in words)\n \n \n+def _capitalize_word_with_joiners(word: str) -> str:\n+    if not word:\n+        return word\n+    # Preserve capitalization after apostrophes and hyphens\n+    result = []\n+    capitalize_next = True\n+    for char in word:\n+        if char in \"'-\":\n+            result.append(char)\n+            capitalize_next = True\n+        elif capitalize_next:\n+            result.append(char.upper())\n+            capitalize_next = False\n+        else:\n+            result.append(char.lower())\n+    return ''.join(result)\n+\n+\n def normalize_display_name(value: str) -> str:\n     cleaned = collapse_outer_whitespace(value)\n     cleaned = cleaned.replace(\"_\", \" \")\n"
+}

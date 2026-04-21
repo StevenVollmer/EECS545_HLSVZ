@@ -1,0 +1,17 @@
+diff --git a/app/utils/backoff.py b/app/utils/backoff.py
+index 80630a0..76ab249 100644
+--- a/app/utils/backoff.py
++++ b/app/utils/backoff.py
+@@ -25,7 +25,9 @@ def compute_delay(
+     if rng is None:
+         rng = random.Random()
+     exponential = base_seconds * (factor ** (attempt - 1))
+-    # Apply jitter: +/- jitter_ratio of exponential
+-    jitter = rng.uniform(-jitter_ratio, jitter_ratio) * exponential
++    # Apply jitter: +/- jitter_ratio of the capped exponential value
+     capped = min(exponential, max_delay_seconds)
+-    return capped + jitter
++    jitter = rng.uniform(-jitter_ratio, jitter_ratio) * capped
++    # Ensure final delay does not exceed max_delay_seconds and is not negative
++    delay = capped + jitter
++    return max(0.0, min(delay, max_delay_seconds))

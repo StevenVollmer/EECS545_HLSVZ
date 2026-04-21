@@ -1,0 +1,19 @@
+diff --git a/app/cache/url_cache.py b/app/cache/url_cache.py
+index b7a650b..028b7a2 100644
+--- a/app/cache/url_cache.py
++++ b/app/cache/url_cache.py
+@@ -51,7 +51,7 @@ class UrlCache:
+         # checked, they are raw and never match the normalized allowlist.
+         allowed = set(allowlist.entries())
+         for key in list(self._store.keys()):
+-            if key not in allowed:
++            if not allowlist.is_allowed(key):
+                 del self._store[key]
+                 dropped += 1
+         return dropped
+@@ -67,4 +67,4 @@ class UrlCache:
+         # invariant that all keys are normalized. Fix requires recognizing
+         # this invariant is documented on the class (and in app.net.url) and
+         # applying normalize_url here.
+-        self._store[raw_target_url] = body
++        self._store[normalize_url(raw_target_url)] = body

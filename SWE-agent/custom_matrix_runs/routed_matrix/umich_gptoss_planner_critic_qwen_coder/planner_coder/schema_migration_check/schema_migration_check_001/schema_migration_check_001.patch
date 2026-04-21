@@ -1,0 +1,21 @@
+diff --git a/app/validators/schema_check.py b/app/validators/schema_check.py
+index 561b5e8..961b15c 100644
+--- a/app/validators/schema_check.py
++++ b/app/validators/schema_check.py
+@@ -24,7 +24,7 @@ from app.schema.model import Database
+ def missing_columns(db: Database, migrations: list[dict]) -> list[tuple[str, str]]:
+     missing: list[tuple[str, str]] = []
+     for migration in migrations:
+-        table = migration["table"]
++        table = migration["table"].lower()
+         for column in migration["columns"]:
+             # BUG: does not apply the same case-folding the migration step
+             # applies at apply time. If the declared column has a capital
+@@ -32,6 +32,6 @@ def missing_columns(db: Database, migrations: list[dict]) -> list[tuple[str, str
+             # so the validator falsely reports it as missing. Fix requires
+             # recognizing the invariant enforced in app/migrations/apply.py
+             # and matching it here (or removing the fold in both places).
+-            if not db.has_column(table, column):
++            if not db.has_column(table, column.lower()):
+                 missing.append((table, column))
+     return missing

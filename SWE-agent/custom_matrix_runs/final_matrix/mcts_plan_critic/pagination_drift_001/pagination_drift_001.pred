@@ -1,0 +1,5 @@
+{
+  "model_name_or_path": "mcts_plan_critic",
+  "instance_id": "pagination_drift_001",
+  "model_patch": "diff --git a/app/api/list_endpoint.py b/app/api/list_endpoint.py\nindex 018731b..19a2569 100644\n--- a/app/api/list_endpoint.py\n+++ b/app/api/list_endpoint.py\n@@ -7,7 +7,7 @@ requested, which the endpoint treats as the final page.\n \n from __future__ import annotations\n \n-from app.store.row_store import RowStore\n+from app.store.row_store import RowStore, STORE_MAX_PAGE\n \n \n def list_all(store: RowStore, page_size: int) -> list[dict]:\n@@ -23,7 +23,9 @@ def list_all(store: RowStore, page_size: int) -> list[dict]:\n         # rows. Fix requires aligning with the store's capping invariant \u2014\n         # either request within the cap, or detect end-of-data via an\n         # explicit empty page rather than short-read.\n-        if len(page) < page_size:\n+        if len(page) == 0:\n+            break\n+        if len(page) < min(page_size, STORE_MAX_PAGE):\n             break\n         offset += len(page)\n     return collected\n"
+}

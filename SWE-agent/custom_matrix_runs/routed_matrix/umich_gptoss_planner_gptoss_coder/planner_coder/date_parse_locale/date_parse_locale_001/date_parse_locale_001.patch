@@ -1,0 +1,18 @@
+diff --git a/app/parsing/date_parser.py b/app/parsing/date_parser.py
+index c3ad890..dc4de15 100644
+--- a/app/parsing/date_parser.py
++++ b/app/parsing/date_parser.py
+@@ -30,11 +30,7 @@ def parse_date(text: str) -> tuple[int, int, int]:
+         return int(y), int(mo), int(d)
+     m = _US.match(text)
+     if m:
+-        # BUG: swapped month/day when unpacking. Bug is here, but the module
+-        # name and public API are the obvious fix-sites so the bug is easy
+-        # once the coder reads this function. The hard part is localizing
+-        # here rather than in the many downstream modules in app/pipeline/
+-        # that also manipulate dates.
+-        d, mo, y = m.groups()
++        # Fixed US date parsing: correct month/day order
++        mo, d, y = m.groups()
+         return int(y), int(mo), int(d)
+     raise ValueError(f"unrecognized date format: {text!r}")
