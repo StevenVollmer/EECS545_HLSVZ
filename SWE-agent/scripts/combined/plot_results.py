@@ -640,7 +640,8 @@ def fig_instance_overlap(data_dir: pathlib.Path, out_dir: pathlib.Path, fmt: str
         return (only_a, only_b, ab_only, only_c, ac_only, bc_only, abc)
 
     try:
-        from matplotlib_venn import venn3_unweighted
+        from matplotlib_venn import venn3
+        from matplotlib_venn.layout.venn3 import DefaultLayoutAlgorithm
         has_venn = True
     except ImportError:
         has_venn = False
@@ -653,17 +654,22 @@ def fig_instance_overlap(data_dir: pathlib.Path, out_dir: pathlib.Path, fmt: str
     failed_sub = _venn_subsets("A", "B", "C", pos="0")
     n_total    = len(rows_f)
 
+    # Equal-circle layout (replaces deprecated venn3_unweighted)
+    _equal_layout = DefaultLayoutAlgorithm(fixed_subset_sizes=(1, 1, 1, 1, 1, 1, 1))
+
     fig, (ax_s, ax_f) = plt.subplots(1, 2, figsize=(12, 5.5))
 
-    venn3_unweighted(subsets=solved_sub,
+    venn3(subsets=solved_sub,
           set_labels=("A\n9b MCTS", "B\nMulti-role\nlinear", "C\nMixed MCTS"),
-          set_colors=("#5b9bd5", "#9b9b9b", "#c00000"), alpha=0.55, ax=ax_s)
+          set_colors=("#5b9bd5", "#9b9b9b", "#c00000"), alpha=0.55, ax=ax_s,
+          layout_algorithm=_equal_layout)
     ax_s.set_title(f"Instances Solved (c2+c3, n={n_total})",
                    fontsize=10, fontweight="bold")
 
-    venn3_unweighted(subsets=failed_sub,
+    venn3(subsets=failed_sub,
           set_labels=("A\n9b MCTS", "B\nMulti-role\nlinear", "C\nMixed MCTS"),
-          set_colors=("#5b9bd5", "#9b9b9b", "#c00000"), alpha=0.55, ax=ax_f)
+          set_colors=("#5b9bd5", "#9b9b9b", "#c00000"), alpha=0.55, ax=ax_f,
+          layout_algorithm=_equal_layout)
     ax_f.set_title(f"Instances Failed (c2+c3, n={n_total})",
                    fontsize=10, fontweight="bold")
 
@@ -786,9 +792,9 @@ def fig_resource_waste(data_dir: pathlib.Path, out_dir: pathlib.Path, fmt: str) 
     fig1, ax1 = plt.subplots(figsize=(7, 5))
     _plot_steps_hist(ax1, solved_steps, failed_steps,
                      bins=step_bins,
-                     title="Resource Waste: Model Calls, Solved vs Failed\n(all variants, aggregated)")
+                     title="Resource Consumption: Model Calls, Solved vs Failed\n(all variants, aggregated)")
     fig1.tight_layout()
-    out1 = out_dir / f"fig_f1_resource_waste_steps.{fmt}"
+    out1 = out_dir / f"fig_f1_resource_consumption_steps.{fmt}"
     fig1.savefig(out1, dpi=200, bbox_inches="tight")
     plt.close(fig1)
     print(f"Saved: {out1}")
@@ -811,7 +817,7 @@ def fig_resource_waste(data_dir: pathlib.Path, out_dir: pathlib.Path, fmt: str) 
         ax2.set_xscale("log")
         ax2.set_xlabel("Compute per instance (M B-param·tokens, log scale)", fontsize=11)
         ax2.set_ylabel("Instance count", fontsize=11)
-        ax2.set_title(f"Resource Waste: Compute, Solved vs Failed  (failed uses {ratio:.1f}× median)",
+        ax2.set_title(f"Resource Consumption: Compute, Solved vs Failed  (failed uses {ratio:.1f}× median)",
                       fontsize=12, fontweight="bold")
         ax2.legend(fontsize=8.5, framealpha=0.9)
         ax2.yaxis.grid(True, linestyle="--", alpha=0.4, zorder=0)
@@ -850,9 +856,9 @@ def fig_resource_waste_by_arch(data_dir: pathlib.Path, out_dir: pathlib.Path, fm
         lin_bins = range(1, lin_max + 2)
         _plot_steps_hist(ax, lin_solved, lin_failed,
                          bins=lin_bins,
-                         title="Resource Waste: Linear Agents\n(strict-gate variants, all case sets)")
+                         title="Resource Consumption: Linear Agents\n(strict-gate variants, all case sets)")
         fig.tight_layout()
-        out = out_dir / f"fig_f1linear_resource_waste_steps.{fmt}"
+        out = out_dir / f"fig_f1linear_resource_consumption_steps.{fmt}"
         fig.savefig(out, dpi=200, bbox_inches="tight")
         plt.close(fig)
         print(f"Saved: {out}")
@@ -864,9 +870,9 @@ def fig_resource_waste_by_arch(data_dir: pathlib.Path, out_dir: pathlib.Path, fm
         mcts_bins = range(1, mcts_max + 2)
         _plot_steps_hist(ax, mcts_solved, mcts_failed,
                          bins=mcts_bins,
-                         title="Resource Waste: MCTS Agents\n(strict-gate variants, all case sets)")
+                         title="Resource Consumption: MCTS Agents\n(strict-gate variants, all case sets)")
         fig.tight_layout()
-        out = out_dir / f"fig_f1mcts_resource_waste_steps.{fmt}"
+        out = out_dir / f"fig_f1mcts_resource_consumption_steps.{fmt}"
         fig.savefig(out, dpi=200, bbox_inches="tight")
         plt.close(fig)
         print(f"Saved: {out}")
