@@ -746,7 +746,7 @@ def _plot_steps_hist(
         med_f = float(np.median(failed_steps))
         ax.axvline(med_f, color=color_f, linestyle="--", linewidth=1.5,
                    label=f"Failed median={med_f:.0f}")
-    ax.set_xlabel("Total model calls (coder)", fontsize=11)
+    ax.set_xlabel("Total model calls", fontsize=11)
     ax.set_ylabel("Instance count", fontsize=11)
     ax.set_title(title, fontsize=11, fontweight="bold")
     ax.legend(fontsize=8.5, framealpha=0.9)
@@ -1008,7 +1008,7 @@ def main() -> None:
     fig_ablation_features(args.data_dir,   args.output_dir, args.format)
     fig_steps_to_solve(args.data_dir,      args.output_dir, args.format)
     fig_steps_to_solve_bpt(args.data_dir,  args.output_dir, args.format)
-    fig_instance_overlap(args.data_dir,    args.output_dir, args.format)
+    # fig_instance_overlap(args.data_dir,    args.output_dir, args.format)
     fig_resource_waste(args.data_dir,      args.output_dir, args.format)
     fig_resource_waste_by_arch(args.data_dir, args.output_dir, args.format)
     fig_mcts_branching(args.data_dir,      args.output_dir, args.format)
