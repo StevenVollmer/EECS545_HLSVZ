@@ -117,6 +117,23 @@ STEP_GROUP_COLORS: dict[str, str] = {
 # Variants tracked in mcts_branch_stats (MCTS variants only)
 MCTS_VARIANTS = {"A", "A_strict", "C", "C_strict", "E", "G", "G_strict", "P"}
 
+# Variants included in resource-waste figures: strict-gate reviewer OR no-reviewer linear baseline.
+# Excludes auto-accept MCTS (rafe_mcts_baseline, rafe_mcts_plan_critic) and soft-gate variants
+# (A, B, C, D, E, F, G, H, I, J, K, P).
+_STRICT_GATE_VARIANTS: frozenset[str] = frozenset([
+    # Strict-gate MCTS
+    "A_strict", "C_strict", "G_strict", "rafe_mcts_critic_gate",
+    # Strict-gate linear (reviewer/critic gate)
+    "B_strict", "F_strict", "rafe_gpt_plan_qwen_code_rev", "rafe_gpt_plan_critic_qwen",
+    # No-reviewer linear baselines (single-pass, not soft-gate)
+    "L", "M", "N", "rafe_qwen", "rafe_gpt120b", "rafe_gpt_plan_qwen_code",
+])
+
+# Within _STRICT_GATE_VARIANTS, which use MCTS search
+_WASTE_MCTS_VARIANTS: frozenset[str] = frozenset([
+    "A_strict", "C_strict", "G_strict", "rafe_mcts_critic_gate",
+])
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -444,7 +461,7 @@ def fig_steps_to_solve(data_dir: pathlib.Path, out_dir: pathlib.Path, fmt: str) 
     for r in rows_f:
         v     = r["variant"]
         g     = STEP_GROUPS.get(v, "swe-search")
-        steps = int(r["steps_used"])
+        steps = int(r.get("effective_steps") or r["steps_used"])
         if steps > MAX_STEP or steps < 1:
             continue
         if g not in group_counts:
@@ -700,15 +717,57 @@ def _fig_overlap_fallback(data_dir: pathlib.Path, out_dir: pathlib.Path, fmt: st
 # Fig f — Resource waste: solved vs failed compute distributions
 # ---------------------------------------------------------------------------
 
+def _eff_steps(r: dict) -> int:
+    eff = r.get("effective_steps", "")
+    return int(eff) if eff else int(r["steps_used"])
+
+
+def _plot_steps_hist(
+    ax: "Any",
+    solved_steps: list[int],
+    failed_steps: list[int],
+    *,
+    bins: "Any",
+    title: str,
+    color_s: str = "#4472c4",
+    color_f: str = "#c00000",
+    alpha: float = 0.65,
+) -> None:
+    import numpy as np
+    ax.hist(solved_steps, bins=bins, color=color_s, alpha=alpha,
+            label=f"Solved (n={len(solved_steps)})", zorder=3)
+    ax.hist(failed_steps, bins=bins, color=color_f, alpha=alpha,
+            label=f"Failed (n={len(failed_steps)})", zorder=3)
+    if solved_steps:
+        med_s = float(np.median(solved_steps))
+        ax.axvline(med_s, color=color_s, linestyle="--", linewidth=1.5,
+                   label=f"Solved median={med_s:.0f}")
+    if failed_steps:
+        med_f = float(np.median(failed_steps))
+        ax.axvline(med_f, color=color_f, linestyle="--", linewidth=1.5,
+                   label=f"Failed median={med_f:.0f}")
+    ax.set_xlabel("Total model calls (coder)", fontsize=11)
+    ax.set_ylabel("Instance count", fontsize=11)
+    ax.set_title(title, fontsize=11, fontweight="bold")
+    ax.legend(fontsize=8.5, framealpha=0.9)
+    ax.yaxis.grid(True, linestyle="--", alpha=0.4, zorder=0)
+    ax.set_axisbelow(True)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.xaxis.set_major_locator(__import__("matplotlib.ticker", fromlist=["MaxNLocator"]).MaxNLocator(integer=True))
+
+
 def fig_resource_waste(data_dir: pathlib.Path, out_dir: pathlib.Path, fmt: str) -> None:
     import matplotlib.pyplot as plt
     import numpy as np
 
     rows   = _load_csv(data_dir / "resource_waste.csv")
-    rows_f = [r for r in rows if r["case_set"] in ("c2", "c3")]
+    rows_f = [r for r in rows
+              if r["case_set"] in ("c1", "c2", "c3")
+              and r["variant"] in _STRICT_GATE_VARIANTS]
 
-    solved_steps = [int(r["steps_used"])       for r in rows_f if r["solved"] == "1"]
-    failed_steps = [int(r["steps_used"])       for r in rows_f if r["solved"] == "0"]
+    solved_steps = [_eff_steps(r) for r in rows_f if r["solved"] == "1" and _eff_steps(r) > 0]
+    failed_steps = [_eff_steps(r) for r in rows_f if r["solved"] == "0" and _eff_steps(r) > 0]
     solved_bpt   = [float(r["cost_bpt"]) / 1e6 for r in rows_f
                     if r["solved"] == "1" and float(r["cost_bpt"]) > 0]
     failed_bpt   = [float(r["cost_bpt"]) / 1e6 for r in rows_f
@@ -718,37 +777,30 @@ def fig_resource_waste(data_dir: pathlib.Path, out_dir: pathlib.Path, fmt: str) 
         print("fig_f: insufficient data")
         return
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
-    alpha   = 0.65
     color_s = "#4472c4"
     color_f = "#c00000"
 
-    # Left: steps
-    step_bins = range(0, 21, 2)
-    ax1.hist(solved_steps, bins=step_bins, color=color_s, alpha=alpha, label="Solved", zorder=3)
-    ax1.hist(failed_steps, bins=step_bins, color=color_f, alpha=alpha, label="Failed", zorder=3)
-    med_s = float(np.median(solved_steps))
-    med_f = float(np.median(failed_steps))
-    ax1.axvline(med_s, color=color_s, linestyle="--", linewidth=1.5,
-                label=f"Solved median={med_s:.0f}")
-    ax1.axvline(med_f, color=color_f, linestyle="--", linewidth=1.5,
-                label=f"Failed median={med_f:.0f}")
-    ax1.set_xlabel("Steps used", fontsize=11)
-    ax1.set_ylabel("Instance count", fontsize=11)
-    ax1.set_title("Iterations: Solved vs Failed", fontsize=11, fontweight="bold")
-    ax1.legend(fontsize=8.5, framealpha=0.9)
-    ax1.yaxis.grid(True, linestyle="--", alpha=0.4, zorder=0)
-    ax1.set_axisbelow(True)
-    ax1.spines["top"].set_visible(False)
-    ax1.spines["right"].set_visible(False)
+    # Fig f1: steps (all strict-gate variants combined) — bins cover full observed range
+    all_steps_max = max(max(solved_steps), max(failed_steps))
+    step_bins = range(1, all_steps_max + 2)
+    fig1, ax1 = plt.subplots(figsize=(7, 5))
+    _plot_steps_hist(ax1, solved_steps, failed_steps,
+                     bins=step_bins,
+                     title="Resource Waste: Model Calls, Solved vs Failed\n(all variants, aggregated)")
+    fig1.tight_layout()
+    out1 = out_dir / f"fig_f1_resource_waste_steps.{fmt}"
+    fig1.savefig(out1, dpi=200, bbox_inches="tight")
+    plt.close(fig1)
+    print(f"Saved: {out1}")
 
-    # Right: BPT (log scale)
+    # Fig f2: BPT (log scale)
     if solved_bpt and failed_bpt:
+        fig2, ax2 = plt.subplots(figsize=(6, 5))
         log_min = math.floor(math.log10(min(min(solved_bpt), min(failed_bpt))))
         log_max = math.ceil( math.log10(max(max(solved_bpt), max(failed_bpt))))
-        bpt_bins = __import__("numpy").logspace(log_min, log_max, 20)
-        ax2.hist(solved_bpt, bins=bpt_bins, color=color_s, alpha=alpha, label="Solved", zorder=3)
-        ax2.hist(failed_bpt, bins=bpt_bins, color=color_f, alpha=alpha, label="Failed", zorder=3)
+        bpt_bins = np.logspace(log_min, log_max, 20)
+        ax2.hist(solved_bpt, bins=bpt_bins, color=color_s, alpha=0.65, label="Solved", zorder=3)
+        ax2.hist(failed_bpt, bins=bpt_bins, color=color_f, alpha=0.65, label="Failed", zorder=3)
         med_s_bpt = float(np.median(solved_bpt))
         med_f_bpt = float(np.median(failed_bpt))
         ax2.axvline(med_s_bpt, color=color_s, linestyle="--", linewidth=1.5,
@@ -759,21 +811,65 @@ def fig_resource_waste(data_dir: pathlib.Path, out_dir: pathlib.Path, fmt: str) 
         ax2.set_xscale("log")
         ax2.set_xlabel("Compute per instance (M B-param·tokens, log scale)", fontsize=11)
         ax2.set_ylabel("Instance count", fontsize=11)
-        ax2.set_title(f"Compute: Solved vs Failed  (failed uses {ratio:.1f}× median)",
-                      fontsize=11, fontweight="bold")
+        ax2.set_title(f"Resource Waste: Compute, Solved vs Failed  (failed uses {ratio:.1f}× median)",
+                      fontsize=12, fontweight="bold")
         ax2.legend(fontsize=8.5, framealpha=0.9)
         ax2.yaxis.grid(True, linestyle="--", alpha=0.4, zorder=0)
         ax2.set_axisbelow(True)
         ax2.spines["top"].set_visible(False)
         ax2.spines["right"].set_visible(False)
+        fig2.tight_layout()
+        out2 = out_dir / f"fig_f2_resource_waste_compute.{fmt}"
+        fig2.savefig(out2, dpi=200, bbox_inches="tight")
+        plt.close(fig2)
+        print(f"Saved: {out2}")
 
-    fig.suptitle("Resource Waste: Compute Distribution for Successful vs. Failed Runs (c2+c3)",
-                 fontsize=12, fontweight="bold", y=1.01)
-    fig.tight_layout()
-    out = out_dir / f"fig_f_resource_waste.{fmt}"
-    fig.savefig(out, dpi=200, bbox_inches="tight")
-    plt.close(fig)
-    print(f"Saved: {out}")
+
+def fig_resource_waste_by_arch(data_dir: pathlib.Path, out_dir: pathlib.Path, fmt: str) -> None:
+    """Separate resource-waste step histograms for MCTS and linear strict-gate variants."""
+    import matplotlib.pyplot as plt
+
+    rows   = _load_csv(data_dir / "resource_waste.csv")
+    rows_f = [r for r in rows
+              if r["case_set"] in ("c1", "c2", "c3")
+              and r["variant"] in _STRICT_GATE_VARIANTS]
+
+    mcts_solved = [_eff_steps(r) for r in rows_f
+                   if r["variant"] in _WASTE_MCTS_VARIANTS and r["solved"] == "1" and _eff_steps(r) > 0]
+    mcts_failed = [_eff_steps(r) for r in rows_f
+                   if r["variant"] in _WASTE_MCTS_VARIANTS and r["solved"] == "0" and _eff_steps(r) > 0]
+    lin_solved  = [_eff_steps(r) for r in rows_f
+                   if r["variant"] not in _WASTE_MCTS_VARIANTS and r["solved"] == "1" and _eff_steps(r) > 0]
+    lin_failed  = [_eff_steps(r) for r in rows_f
+                   if r["variant"] not in _WASTE_MCTS_VARIANTS and r["solved"] == "0" and _eff_steps(r) > 0]
+
+    # Fig f1linear: linear strict-gate variants
+    if lin_solved or lin_failed:
+        fig, ax = plt.subplots(figsize=(6, 5))
+        lin_max = max(max(lin_solved or [0]), max(lin_failed or [0]))
+        lin_bins = range(1, lin_max + 2)
+        _plot_steps_hist(ax, lin_solved, lin_failed,
+                         bins=lin_bins,
+                         title="Resource Waste: Linear Agents\n(strict-gate variants, all case sets)")
+        fig.tight_layout()
+        out = out_dir / f"fig_f1linear_resource_waste_steps.{fmt}"
+        fig.savefig(out, dpi=200, bbox_inches="tight")
+        plt.close(fig)
+        print(f"Saved: {out}")
+
+    # Fig f1mcts: MCTS strict-gate variants
+    if mcts_solved or mcts_failed:
+        fig, ax = plt.subplots(figsize=(6, 5))
+        mcts_max = max(max(mcts_solved or [0]), max(mcts_failed or [0]))
+        mcts_bins = range(1, mcts_max + 2)
+        _plot_steps_hist(ax, mcts_solved, mcts_failed,
+                         bins=mcts_bins,
+                         title="Resource Waste: MCTS Agents\n(strict-gate variants, all case sets)")
+        fig.tight_layout()
+        out = out_dir / f"fig_f1mcts_resource_waste_steps.{fmt}"
+        fig.savefig(out, dpi=200, bbox_inches="tight")
+        plt.close(fig)
+        print(f"Saved: {out}")
 
 
 # ---------------------------------------------------------------------------
@@ -914,6 +1010,7 @@ def main() -> None:
     fig_steps_to_solve_bpt(args.data_dir,  args.output_dir, args.format)
     fig_instance_overlap(args.data_dir,    args.output_dir, args.format)
     fig_resource_waste(args.data_dir,      args.output_dir, args.format)
+    fig_resource_waste_by_arch(args.data_dir, args.output_dir, args.format)
     fig_mcts_branching(args.data_dir,      args.output_dir, args.format)
     print(f"\nAll figures written to: {args.output_dir}/")
 

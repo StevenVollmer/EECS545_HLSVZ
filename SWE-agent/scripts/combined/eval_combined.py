@@ -205,6 +205,16 @@ def _parse_traj(traj_path: pathlib.Path, run_id: str) -> InstanceResult:
     best_value   = float(stats.get("best_node_value",  c_stats.get("best_node_value",    0.0)))
     iterations   = int(stats.get("iterations",         c_stats.get("iterations",         0)))
 
+    # Multi-reviewer-round correction: top-level stats only record the final round.
+    # Sum tree_nodes, turns, and total tokens across all rounds when coder_rounds is present.
+    round_stats = [r.get("stats", {}) for r in d.get("coder_rounds", [])
+                   if isinstance(r.get("stats"), dict) and r.get("stats")]
+    if len(round_stats) > 1:
+        steps_used = sum(rs.get("turns",              0) or 0 for rs in round_stats)
+        total_in   = sum(rs.get("input_tokens",       0) or 0 for rs in round_stats)
+        total_out  = sum(rs.get("output_tokens",      0) or 0 for rs in round_stats)
+        tree_nodes = sum(rs.get("tree_nodes_created", 0) or 0 for rs in round_stats)
+
     avg_branching = 0.0
     max_branches  = 0
     mcts_tree = d.get("mcts_tree", {})
@@ -853,18 +863,23 @@ def export_steps_to_solve_csv(
             # for linear runs it is 0 (single pass) — use tree_nodes as fallback proxy
             steps_allowed = inst.mcts_iterations if inst.mcts_iterations > 0 else inst.tree_nodes or inst.steps_used
             solve_fraction = (inst.steps_used / steps_allowed) if steps_allowed > 0 else None
+            # effective_steps: tree_nodes for MCTS (counts all branches, not just winning
+            # path depth), steps_used for linear agents where the two are equivalent
+            effective_steps = inst.tree_nodes if inst.tree_nodes > 0 else inst.steps_used
             rows.append({
-                "run_id":          run_id,
-                "variant":         _variant_letter(run_id),
-                "case_set":        _case_set(run_id),
-                "instance_id":     inst.instance_id,
-                "solved":          int(inst.solved),
-                "steps_used":      inst.steps_used,
-                "steps_allowed":   steps_allowed,
-                "solve_fraction":  f"{solve_fraction:.4f}" if solve_fraction is not None else "",
-                "total_tokens":    inst.total_tokens_in + inst.total_tokens_out,
-                "cost_bpt":        inst.cost_bpt,
-                "stopped_reason":  inst.stopped_reason,
+                "run_id":           run_id,
+                "variant":          _variant_letter(run_id),
+                "case_set":         _case_set(run_id),
+                "instance_id":      inst.instance_id,
+                "solved":           int(inst.solved),
+                "steps_used":       inst.steps_used,
+                "effective_steps":  effective_steps,
+                "tree_nodes":       inst.tree_nodes,
+                "steps_allowed":    steps_allowed,
+                "solve_fraction":   f"{solve_fraction:.4f}" if solve_fraction is not None else "",
+                "total_tokens":     inst.total_tokens_in + inst.total_tokens_out,
+                "cost_bpt":         inst.cost_bpt,
+                "stopped_reason":   inst.stopped_reason,
             })
     _write_csv(rows, path)
     print(f"Steps-to-solve CSV written: {path}")
@@ -962,6 +977,7 @@ def export_resource_waste_csv(
         for inst in instances:
             steps_allowed = inst.mcts_iterations if inst.mcts_iterations > 0 else steps_allowed_default
             frac = (inst.steps_used / steps_allowed) if steps_allowed > 0 else None
+            effective_steps = inst.tree_nodes if inst.tree_nodes > 0 else inst.steps_used
             rows.append({
                 "run_id":             run_id,
                 "variant":            _variant_letter(run_id),
@@ -969,6 +985,8 @@ def export_resource_waste_csv(
                 "instance_id":        inst.instance_id,
                 "solved":             int(inst.solved),
                 "steps_used":         inst.steps_used,
+                "tree_nodes":         inst.tree_nodes,
+                "effective_steps":    effective_steps,
                 "steps_allowed":      steps_allowed,
                 "fraction_steps_used": f"{frac:.4f}" if frac is not None else "",
                 "total_tokens":       inst.total_tokens_in + inst.total_tokens_out,
