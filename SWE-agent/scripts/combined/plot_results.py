@@ -11,10 +11,10 @@ Figures produced:
   fig_g_mcts_branching       — MCTS search depth and branching analysis
 
 Usage (from project root):
-  python SWE-agent/scripts/combined/plot_results.py \\
-      --data-dir Summary_Data \\
-      --audit-csv combined_results/reviewer_audits/audit_results.csv \\
-      --output-dir combined_results/figures \\
+  python SWE-agent/scripts/combined/plot_results.py \
+      --data-dir Summary_Data \
+      --audit-csv combined_results/reviewer_audits/audit_results.csv \
+      --output-dir combined_results/figures \
       --format png
 """
 from __future__ import annotations
@@ -640,8 +640,7 @@ def fig_instance_overlap(data_dir: pathlib.Path, out_dir: pathlib.Path, fmt: str
         return (only_a, only_b, ab_only, only_c, ac_only, bc_only, abc)
 
     try:
-        from matplotlib_venn import venn3
-        from matplotlib_venn.layout.venn3 import DefaultLayoutAlgorithm
+        from matplotlib_venn import venn3_unweighted
         has_venn = True
     except ImportError:
         has_venn = False
@@ -654,22 +653,17 @@ def fig_instance_overlap(data_dir: pathlib.Path, out_dir: pathlib.Path, fmt: str
     failed_sub = _venn_subsets("A", "B", "C", pos="0")
     n_total    = len(rows_f)
 
-    # Equal-circle layout (replaces deprecated venn3_unweighted)
-    _equal_layout = DefaultLayoutAlgorithm(fixed_subset_sizes=(1, 1, 1, 1, 1, 1, 1))
-
     fig, (ax_s, ax_f) = plt.subplots(1, 2, figsize=(12, 5.5))
 
-    venn3(subsets=solved_sub,
+    venn3_unweighted(subsets=solved_sub,
           set_labels=("A\n9b MCTS", "B\nMulti-role\nlinear", "C\nMixed MCTS"),
-          set_colors=("#5b9bd5", "#9b9b9b", "#c00000"), alpha=0.55, ax=ax_s,
-          layout_algorithm=_equal_layout)
+          set_colors=("#5b9bd5", "#9b9b9b", "#c00000"), alpha=0.55, ax=ax_s)
     ax_s.set_title(f"Instances Solved (c2+c3, n={n_total})",
                    fontsize=10, fontweight="bold")
 
-    venn3(subsets=failed_sub,
+    venn3_unweighted(subsets=failed_sub,
           set_labels=("A\n9b MCTS", "B\nMulti-role\nlinear", "C\nMixed MCTS"),
-          set_colors=("#5b9bd5", "#9b9b9b", "#c00000"), alpha=0.55, ax=ax_f,
-          layout_algorithm=_equal_layout)
+          set_colors=("#5b9bd5", "#9b9b9b", "#c00000"), alpha=0.55, ax=ax_f)
     ax_f.set_title(f"Instances Failed (c2+c3, n={n_total})",
                    fontsize=10, fontweight="bold")
 
